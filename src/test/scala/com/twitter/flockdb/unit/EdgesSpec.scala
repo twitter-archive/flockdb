@@ -7,8 +7,8 @@ import com.twitter.gizzard.scheduler.{JobScheduler, PrioritizingJobScheduler}
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.service.flock.State
 import com.twitter.service.flock.State._
-import com.twitter.service.flock.{ExceptionWrappingProxy, State}
 import com.twitter.service.flock.thrift.{FlockException, Page, Results}
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
