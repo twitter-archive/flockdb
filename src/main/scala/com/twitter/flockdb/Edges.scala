@@ -7,7 +7,7 @@ import com.twitter.gizzard.Future
 import com.twitter.gizzard.jobs._
 import com.twitter.gizzard.scheduler.{KestrelMessageQueue, JobScheduler, PrioritizingJobScheduler}
 import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.nameserver.{NameServer, ShardRepository}
+import com.twitter.gizzard.nameserver.{ByteSwapper, NameServer, ShardRepository}
 import com.twitter.gizzard.shards.{ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.service.flock.conversions.Page._
@@ -19,7 +19,7 @@ import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.{AutoDisablingQueryEvaluatorFactory, StandardQueryEvaluatorFactory}
 import com.twitter.querulous.query.{TimingOutQueryFactory, SqlQueryFactory}
 import com.twitter.service.flock
-import com.twitter.service.flock.{ByteSwapper, OrderedUuidGenerator, TimingOutStatsCollectingQueryFactory, State}
+import com.twitter.service.flock.{OrderedUuidGenerator, TimingOutStatsCollectingQueryFactory, State}
 import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
