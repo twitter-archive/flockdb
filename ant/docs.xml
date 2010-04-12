@@ -1,0 +1,35 @@
+<project xmlns:ivy="antlib:org.apache.ivy.ant">
+
+  <target name="vscaladoc" depends="prepare" unless="skip.docs">
+    <delete dir="${docs.target.dir}/scaladoc" />
+    <mkdir dir="${docs.target.dir}/scaladoc" />
+    <pathconvert property="doc.sources" pathsep=" ">
+      <fileset dir="${source.dir}" includes="**/*.scala" />
+    </pathconvert>
+    <path id="docs.path">
+      <path refid="bootstrap.path" />
+      <pathelement location="${target.dir}/classes" />
+    </path>
+    <echo message="Building vscaladoc..." />
+    <java classname="org.scala_tools.vscaladoc.Main" fork="true" failonerror="true">
+      <classpath>
+        <path refid="bootstrap.path" />
+      </classpath>
+      <arg value="-classpath" />
+      <arg pathref="docs.path" />
+      <arg value="-d" />
+      <arg value="${docs.target.dir}/scaladoc" />
+      <arg value="-sourcepath" />
+      <arg value="${source.dir}/scala" />
+      <arg value="-windowtitle" />
+      <arg value="${ivy.module} ${ivy.revision}" />
+      <arg value="-doctitle" />
+      <arg value="${ivy.module} ${ivy.revision}" />
+      <arg value="-linksource" />
+      <arg line="${doc.sources}" />
+    </java>
+  </target>
+
+  <target name="docs" depends="prepare,vscaladoc" unless="skip.docs"  description="build source documentation" />
+
+</project>

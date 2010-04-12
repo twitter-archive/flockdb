@@ -1,0 +1,22 @@
+TODO:
+
+move com.twitter.service.flock.Reset into gizzard
+move com.twitter.results into gizzard or its own package.
+move ByteSwapper into gizzard
+merge in Gizzard's no_reflection branch.
+move StatsCollectingQuery where??
+create a `main` file by copying glock
+create simple exceptionWrappingProxy using new gizzard niceness interface (cf Rowz)
+rename Edges.scala to Flockdb.scala
+figure out where Flock.thrift goes
+move State into com.twitter.flockdb; make a copy for Groups; they're only identical on accident. not the same thing.
+copy the production.conf config from glock (but be careful with passwords!!!!)
+rename Edges.thrift Flock.thrift
+figure out how to package conf file??
+
+then:
+make sure it works in development mode
+use flocker.rb to create a bunch of shards
+use the ruby gem to insert a bunch of data and make a bunch of queries.
+write readme's.
+write blog post.

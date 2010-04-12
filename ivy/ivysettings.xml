@@ -1,0 +1,36 @@
+<ivysettings>
+  <settings defaultResolver="chain-repos"/>
+  <resolvers>
+    <chain name="chain-repos" returnFirst="true">
+      <filesystem name="local-libs" m2compatible="true" transactional="false" local="true" checkmodified="true">
+        <artifact pattern="${basedir}/libs/[artifact]-[revision].[ext]"/>
+      </filesystem>
+
+      <ibiblio name="testing.scala-tools.org" m2compatible="true" root="http://scala-tools.org/repo-releases/"/>
+      <ibiblio name="scala-tools.org" m2compatible="true" root="http://scala-tools.org/repo-releases/"/>
+      <ibiblio name="scala-tools.org-snapshots" m2compatible="true" root="http://scala-tools.org/repo-snapshots/"
+               changingPattern=".*-SNAPSHOT"/>
+      <ibiblio name="specs-extra" m2compatible="true" root="http://specs.googlecode.com/svn/maven2/" />
+
+      <ibiblio name="maven2-repository.dev.java.net" m2compatible="true"
+               root="http://download.java.net/maven/2/"/>
+
+      <!-- for smack, smackx -->
+      <ibiblio name="reucon" m2compatible="true" root="http://maven.reucon.com/public/"/>
+      <!-- can't use poms because commons-io pom is corrupted -->
+      <ibiblio name="maven2" m2compatible="true" usepoms="false"/>
+      <ibiblio name="lag.net" m2compatible="true" root="http://www.lag.net/repo/"/>
+      <ibiblio name="twitter.com" m2compatible="true" root="http://www.lag.net/nest/" />
+      <!-- for oauth -->
+      <ibiblio name="oauth.net" m2compatible="true" root="http://oauth.googlecode.com/svn/code/maven"/>
+      <ibiblio name="powermock" m2compatible="true" root="http://powermock.googlecode.com/svn/repo/" />
+      <ibiblio name="jboss" m2compatible="true" root="http://repository.jboss.org/maven2/" />
+      <ibiblio name="mirrors.ibiblio.org" m2compatible="true" root="http://mirrors.ibiblio.org/pub/mirrors/maven2/" />
+    </chain>
+    <filesystem name="local" m2compatible="true" transactional="false">
+      <artifact pattern="${basedir}/dist/repo/[organisation]/[module]/[revision]/[artifact]-[revision].[ext]" />
+    </filesystem>
+  </resolvers>
+
+  <caches useOrigin="true"/>
+</ivysettings>

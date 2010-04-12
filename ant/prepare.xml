@@ -1,0 +1,55 @@
+<project xmlns:ivy="antlib:org.apache.ivy.ant">
+
+  <!-- read the ivy files but don't resolve anything yet -->
+  <target name="init" depends="install-ivy">
+    <!-- override some ivy config. must happen before ivy:info even tho it's slightly recursive. -->
+    <property name="ivy.distrib.dir" value="${dist.dir}" />
+    <property name="ivy.deliver.ivy.pattern" value="${dist.dir}/[artifact]-[revision].[ext]" />
+
+    <ivy:info file="${ivy.dep.file}" />
+
+    <condition property="dist.name" value="${ivy.module}" else="${ivy.module}-${ivy.revision}">
+      <isset property="dist.build_integration" />
+    </condition>
+    <property name="jar.name" value="${ivy.module}-${ivy.revision}" />
+    <property name="dist.relative.dir" value="dist/${dist.name}" />
+    <property name="dist.dir" value="${basedir}/${dist.relative.dir}" />
+    <property name="docs.target.dir" value="${dist.dir}/docs" />
+  </target>
+
+  <target name="resolve" depends="init">
+    <ivy:retrieve log="download-only" conf="bootstrap,default,test" pattern="${target.dir}/libs/[conf]/[artifact]-[type].[ext]" />
+    <ivy:cachepath pathid="bootstrap.path" conf="bootstrap" />
+    <ivy:cachepath pathid="deps.path" conf="default" />
+    <ivy:cachepath pathid="test.path" conf="test" />
+  </target>
+
+  <target name="find-source">
+    <pathconvert property="build.java" setonempty="false">
+      <fileset dir="${source.dir}" includes="java/**/*.java" />
+    </pathconvert>
+    <pathconvert property="build.scala" setonempty="false">
+      <fileset dir="${source.dir}" includes="scala/**/*.scala" />
+    </pathconvert>
+    <pathconvert property="build.thrift" setonempty="false">
+      <fileset dir="${source.dir}" includes="thrift/**/*.thrift" />
+    </pathconvert>
+    <pathconvert property="build.jni" setonempty="false">
+      <fileset dir="${source.dir}" includes="jni/build.xml" />
+    </pathconvert>
+    <pathconvert property="copy.config" setonempty="false">
+      <fileset dir="${basedir}" includes="config/**" />
+    </pathconvert>
+  </target>
+
+  <target name="prepare" depends="resolve, find-source" description="bootstrap ivy and scala, and download dependencies">
+    <taskdef resource="scala/tools/ant/antlib.xml" classpathref="bootstrap.path" />
+    <condition property="generate.scripts" value="true">
+      <available file="${basedir}/src/scripts" type="dir" />
+    </condition>
+    <mkdir dir="${target.dir}/classes" />
+    <mkdir dir="${target.dir}/test-classes" />
+    <mkdir dir="${dist.dir}" />
+  </target>
+
+</project>

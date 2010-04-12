@@ -1,0 +1,56 @@
+<project xmlns:ivy="antlib:org.apache.ivy.ant">
+
+  <target name="compile-tests" depends="prepare, compile" unless="skip.test" if="ivy.extra.testclass">
+    <scalac srcdir="${test.source.dir}/scala" destdir="${target.dir}/test-classes" force="changed" deprecation="on">
+      <classpath>
+        <path refid="test.path" />
+        <pathelement location="${target.dir}/classes" />
+      </classpath>
+      <include name="**/*.scala" />
+    </scalac>
+  </target>
+
+  <macrodef name="run-test-class">
+    <attribute name="classname" />
+    <sequential>
+      <java classname="scala.tools.nsc.MainGenericRunner" fork="true" failonerror="true">
+        <classpath>
+          <path refid="test.path" />
+          <pathelement location="${target.dir}/classes" />
+          <pathelement location="${target.dir}/test-classes" />
+        </classpath>
+        <syspropertyset>
+          <propertyref builtin="all" />
+        </syspropertyset>
+        <jvmarg value="-Ddist.dir=${dist.dir}" />
+        <jvmarg value="-Djava.library.path=${dist.dir}:${dist.dir}/libs" />
+        <jvmarg value="-Xmx1200m" />
+        <arg value="@{classname}" />
+      </java>
+    </sequential>
+  </macrodef>
+
+  <target name="run-unit-tests" unless="skip.test" if="ivy.extra.testclass">
+    <run-test-class classname="${ivy.extra.testclass}" />
+  </target>
+
+  <target name="run-stress-tests" unless="skip.test" if="ivy.extra.stresstestclass">
+    <run-test-class classname="${ivy.extra.stresstestclass}" />
+  </target>
+
+  <target name="run-check-tests" unless="skip.test" if="ivy.extra.checktestclass">
+    <run-test-class classname="${ivy.extra.checktestclass}" />
+  </target>
+
+  <target name="unit" depends="compile-tests, run-unit-tests"
+    description="compile and run unit tests" />
+
+  <target name="stress" depends="compile-tests, run-stress-tests"
+    description="compile and run stress tests" />
+
+  <target name="check" depends="compile-tests, run-check-tests"
+    description="compile and run check tests" />
+
+  <target name="test" depends="unit" />
+
+</project>

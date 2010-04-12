@@ -1,0 +1,8 @@
+dist/*
+*.log
+flock.ipr
+flock.iws
+target/*
+.DS_Store
+kestrel/*
+*.hprof.txt

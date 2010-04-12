@@ -1,0 +1,226 @@
+<project xmlns:ivy="antlib:org.apache.ivy.ant">
+
+  <property name="thrift.source.dir" value="${source.dir}/thrift" />
+  <property name="thrift.target.dir" value="${target.dir}/gen-java" />
+
+
+  <!-- generate thrift stubs if necessary -->
+
+  <macrodef name="generate-thrift">
+    <sequential>
+      <pathconvert property="thrift.gen.path">
+        <path location="${ivy.extra.thriftpackage}" />
+        <unpackagemapper from="${basedir}/*" to="${thrift.target.dir}/*" />
+      </pathconvert>
+      <mkdir dir="${thrift.target.dir}" />
+      <property name="thrift.bin" value="thrift" />
+      <apply executable="${thrift.bin}" dest="${thrift.gen.path}" failonerror="true"
+        skipemptyfilesets="true" verbose="true">
+        <arg value="--gen" />
+        <arg value="java" />
+        <arg value="--gen" />
+        <arg value="rb" />
+        <arg value="-o" />
+        <arg value="${target.dir}" />
+        <arg value="" />
+        <fileset dir="${thrift.source.dir}" includes="**/*.thrift" />
+        <mergemapper from="*.thrift" to="${target.dir}/thrift-run" />
+      </apply>
+      <touch file="${target.dir}/thrift-run" />
+    </sequential>
+  </macrodef>
+
+  <macrodef name="compile-generated-thrift">
+    <sequential>
+      <javac srcdir="${thrift.target.dir}" destdir="${target.dir}/classes" deprecation="on">
+        <classpath>
+          <path refid="deps.path" />
+        </classpath>
+        <include name="**/*.java" />
+      </javac>
+    </sequential>
+  </macrodef>
+
+  <target name="compile-thrift" if="build.thrift">
+    <generate-thrift />
+    <compile-generated-thrift />
+  </target>
+
+
+  <!-- if there's any jni, compile it -->
+
+  <target name="check-jni-source" if="build.jni">
+    <!-- tricksy. remove any target files if any non-target files are newer. -->
+    <dependset>
+      <srcfileset dir="src/main/jni" excludes="**/target/*.${os.jni.ext} **/target/*.jar" />
+      <targetfileset dir="src/main/jni" includes="**/target/*.${os.jni.ext} **/target/*.jar" />
+    </dependset>
+    <!-- and then only set build.jni.ok if those targets are "older" than build.xml (ie missing) -->
+    <uptodate property="build.jni.ok" targetfile="src/main/jni/build.xml">
+      <srcfiles dir="src/main/jni" includes="**/target/*.${os.jni.ext} **/target/*.jar" />
+    </uptodate>
+  </target>
+
+  <target name="compile-jni" depends="check-jni-source" if="build.jni.ok">
+    <ant dir="src/main/jni" target="compile" inheritAll="false" />
+  </target>
+
+  <target name="install-jni" depends="compile-jni" if="build.jni">
+    <copy todir="${dist.dir}" flatten="true">
+      <fileset dir="src/main/jni" includes="**/target/*.${os.jni.ext}" />
+      <fileset dir="src/main/jni" includes="**/target/*.jar" />
+    </copy>
+  </target>
+
+  <!-- compile old-skool java -->
+
+  <target name="compile-java" if="build.java">
+    <javac srcdir="${source.dir}/java" destdir="${target.dir}/classes" deprecation="on">
+      <classpath>
+        <path refid="deps.path" />
+      </classpath>
+      <include name="**/*.java" />
+    </javac>
+  </target>
+
+
+  <!-- compile scala -->
+
+  <target name="compile-scala" if="build.scala">
+    <scalac srcdir="${source.dir}/scala" destdir="${target.dir}/classes" force="changed" deprecation="on" unchecked="on">
+      <classpath>
+        <path refid="deps.path" />
+      </classpath>
+      <include name="**/*.scala" />
+    </scalac>
+  </target>
+
+
+  <!-- create properties file with build info -->
+
+  <condition property="use.git" value="yes">
+    <available file=".git" />
+  </condition>
+
+  <condition property="use.hg" value="yes">
+    <available file=".hg" />
+  </condition>
+
+  <condition property="use.svn" value="yes">
+    <available file=".svn" />
+  </condition>
+
+  <target name="find-git-revision" if="use.git">
+    <!-- ask git for the current "head" commit-id, for memoizing inside the built jar -->
+    <exec outputproperty="revision" executable="git" failifexecutionfails="false">
+      <arg value="rev-parse" />
+      <arg value="HEAD" />
+    </exec>
+    <exec executable="git" failifexecutionfails="false">
+      <arg value="rev-parse" />
+      <arg value="HEAD" />
+      <redirector outputproperty="revision-short">
+        <outputfilterchain>
+          <tokenfilter>
+            <filetokenizer />
+            <replaceregex pattern="(.{8}).*" replace="\1"/>
+          </tokenfilter>
+        </outputfilterchain>
+      </redirector>
+    </exec>
+  </target>
+
+  <target name="find-hg-revision" if="use.hg">
+    <!-- ask hg for the current "tip" commit-id, for memoizing inside the built jar -->
+    <exec outputproperty="revision" executable="hg" failifexecutionfails="false">
+      <arg value="tip" />
+      <arg value="--template" />
+      <arg value="{node}" />
+    </exec>
+    <exec executable="hg" failifexecutionfails="false">
+      <arg value="tip" />
+      <arg value="--template" />
+      <arg value="{node}" />
+      <redirector outputproperty="revision-short">
+        <outputfilterchain>
+          <tokenfilter>
+            <filetokenizer />
+            <replaceregex pattern="(.{8}).*" replace="\1"/>
+          </tokenfilter>
+        </outputfilterchain>
+      </redirector>
+    </exec>
+  </target>
+
+  <target name="find-svn-revision" if="use.svn">
+    <!-- ask svnversion for the revisions in the working copy, for memoizing inside the built jar -->
+    <exec outputproperty="revision" executable="svnversion" failifexecutionfails="false"/>
+    <exec outputproperty="revision-short" executable="svnversion" failifexecutionfails="false"/>
+  </target>
+
+  <target name="find-revision" depends="find-git-revision, find-hg-revision, find-svn-revision" />
+
+  <target name="write-build-info" depends="init, find-revision" if="ivy.extra.buildpackage">
+    <tstamp>
+      <format property="build.timestamp.time" pattern="yyyyMMdd-HHmmss" />
+      <format property="build.timestamp.date" pattern="yyyyMMdd" />
+    </tstamp>
+    <pathconvert property="build.properties.path">
+      <path location="${ivy.extra.buildpackage}" />
+      <unpackagemapper from="${basedir}/*" to="${target.dir}/classes/*" />
+    </pathconvert>
+    <propertyfile file="${build.properties.path}/build.properties">
+      <entry key="name" value="${ivy.module}" />
+      <entry key="version" value="${ivy.revision}" />
+      <entry key="build_name" value="${build.timestamp.time}" />
+      <entry key="build_revision" value="${revision}" />
+    </propertyfile>
+  </target>
+
+
+  <!-- copy resources needed by tests and jar -->
+
+  <target name="copy-resources">
+    <copy todir="${dist.dir}/libs" flatten="true">
+      <path refid="deps.path" />
+    </copy>
+    <copy todir="${target.dir}/test-classes/" failonerror="false">
+      <fileset dir="${test.source.dir}/resources" />
+    </copy>
+    <copy todir="${target.dir}/classes/" overwrite="true" failonerror="false">
+      <fileset dir="${source.dir}/resources" />
+    </copy>
+  </target>
+
+  <target name="copy-config" if="copy.config">
+    <copy todir="${dist.dir}/config">
+      <fileset dir="${basedir}/config" />
+    </copy>
+  </target>
+
+  <target name="copy-extra-config" if="config.extra">
+    <copy todir="${dist.dir}/config">
+      <fileset dir="${config.extra}" />
+    </copy>
+  </target>
+
+  <target name="copy-extra-libs" if="libs.extra">
+    <copy todir="${dist.dir}/libs">
+      <path refid="libs.extra" />
+    </copy>
+  </target>
+
+  <target name="copy-extra-dist" if="dist.extra">
+    <copy todir="${dist.dir}">
+      <path refid="dist.extra" />
+    </copy>
+  </target>
+
+  <target name="copy-extra" depends="copy-resources, copy-config, copy-extra-config, copy-extra-libs, copy-extra-dist" />
+
+
+  <target name="compile" depends="prepare, find-source, compile-thrift, check-jni-source, compile-jni,
+    install-jni, compile-java, compile-scala, write-build-info, copy-extra"
+    description="compile java and scala code" />
+
+</project>
