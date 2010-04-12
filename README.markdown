@@ -54,7 +54,7 @@ the ruby client (gem forthcoming) works like this:
 
     # edges have multiple "colors". we do this for spam:
     Flock.archive(nk.id, :follows, nil) # => archive all edges emanating from nick
-    Flock.archive(nk.id, :follows, nil) # => unarchive all edges emanating from nick. this will restore all archived edges that WEREN'T deleted.
+    Flock.unarchive(nk.id, :follows, nil) # => unarchive all edges emanating from nick. this will restore all archived edges that WEREN'T deleted.
 
     # perform a transaction/bulk-write:
     Flock.transaction do |t|
