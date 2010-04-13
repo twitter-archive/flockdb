@@ -1,7 +1,7 @@
 package com.twitter.flockdb
 
 import java.lang.{Long => JLong, String}
-import java.util.{List => JList, ArrayList => JArrayList}
+import java.util.{ArrayList => JArrayList, List => JList, Random}
 import scala.collection.mutable
 import com.twitter.gizzard.Future
 import com.twitter.gizzard.jobs._
@@ -47,6 +47,11 @@ object Edges {
       queryInfo += (query -> (key, timeout))
     }
     queryInfo
+  }
+
+  val random = new Random()
+  def generateShardId() = {
+    (random.nextInt() & ((1 << 30) - 1)).toInt
   }
 
   def apply(config: ConfigMap, w3c: W3CStats, databaseFactory: DatabaseFactory) = {
@@ -99,7 +104,7 @@ object Edges {
                                        Priority.High.id -> primaryScheduler))
 
     val replicatingNameServerShard = new nameserver.ReadWriteShardAdapter(new ReplicatingShard(new ShardInfo("com.twitter.nameserver.ReplicatingShard", "", ""), 0, nameServerShards, new nameserver.LoadBalancer(nameServerShards), log, replicationFuture))
-    val nameServer = new NameServer(replicatingNameServerShard, shardRepository, ByteSwapper)
+    val nameServer = new NameServer(replicatingNameServerShard, shardRepository, ByteSwapper, generateShardId)
     val forwardingManager = new ForwardingManager(nameServer)
     val copyFactory = jobs.CopyFactory
     nameServer.reload()
