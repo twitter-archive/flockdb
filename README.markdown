@@ -4,7 +4,7 @@ This is in the process of being packaged for "outside of twitter use". It is ver
 
 # WHAT IS THIS
 
-This is a distributed graph database. we use it to store social graphs (who follows whom, who blocks whom) and secondary indices at twitter. it is much simpler than other graph databases such as neo4j. it scales horizontally and is designed for low-latency, high throughput environments such as on-line web-sites.
+This is a distributed graph database. we use it to store social graphs (who follows whom, who blocks whom) and secondary indices at twitter. it is much simpler than other graph databases such as neo4j. it scales horizontally and is designed for on-line, low-latency, high throughput environments such as web-sites.
 
 # SOME STATS
 
