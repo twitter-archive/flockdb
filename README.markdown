@@ -2,9 +2,15 @@
 
 This is in the process of being packaged for "outside of twitter use". It is very rough as code is being pushed around. please forgive the mess.
 
-# WHAT THE HELL IS THIS
+# WHAT IS THIS
 
-This is a distributed graph database. we use it to store social graphs (who follows whom, who blocks whom) and secondary indices at twitter.
+This is a distributed graph database. we use it to store social graphs (who follows whom, who blocks whom) and secondary indices at twitter. it is much simpler than other graph databases such as neo4j. it scales horizontally and is designed for on-line, low-latency, high throughput environments such as web-sites.
+
+# SOME STATS
+
+Twitter runs FlockDB on a large cluster of machines. There are "Flapp" middleware machines and MySQL backends. (In theory, there are pluggable back-ends.)
+
+Our FlockDB cluster stores 13+ billion edges, sustains 20k writes/second at peak, 100k reads/second at peak.
 
 # HOW TO RUN TESTS
 
