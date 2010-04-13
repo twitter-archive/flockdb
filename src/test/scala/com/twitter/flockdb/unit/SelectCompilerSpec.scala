@@ -7,10 +7,10 @@ import com.twitter.xrayspecs.TimeConversions._
 import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.service.flock.State
-import com.twitter.service.flock.thrift.{Page, Results}
 import queries.SelectCompiler
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard
+import thrift.{Page, Results}
 
 
 object SelectCompilerSpec extends Specification with JMocker with ClassMocker {

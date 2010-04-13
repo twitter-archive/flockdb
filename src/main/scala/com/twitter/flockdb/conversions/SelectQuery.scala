@@ -1,7 +1,7 @@
 package com.twitter.flockdb.conversions
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.service.flock.conversions.Page._
+import Page._
 import SelectOperation._
 
 

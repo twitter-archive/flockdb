@@ -6,9 +6,9 @@ import com.twitter.results.{Cursor, ResultWindow}
 import org.specs.mock.JMocker
 import org.specs.Specification
 import com.twitter.service.flock.State
-import com.twitter.service.flock.thrift.Results
-import com.twitter.service.flock.conversions.Results._
+import conversions.Results._
 import shards.Shard
+import thrift.Results
 
 
 object SimpleQuerySpec extends Specification with JMocker {

@@ -8,7 +8,7 @@ import net.lag.configgy.Configgy
 import org.specs.Specification
 import flockdb.thrift.{QueryTerm, SelectOperation, SelectOperationType}
 import com.twitter.service.flock.Database
-import com.twitter.service.flock.thrift.{Page, Results}
+import thrift.{Page, Results}
 
 
 object IntersectionSpec extends Specification with Eventually with EdgesReset {

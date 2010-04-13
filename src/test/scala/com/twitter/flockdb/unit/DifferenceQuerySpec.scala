@@ -5,11 +5,11 @@ import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import com.twitter.service.flock.State
-import com.twitter.service.flock.conversions.Results._
-import com.twitter.service.flock.thrift.{Results, Page}
 import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
 import org.specs.Specification
+import conversions.Results._
+import thrift.{Results, Page}
 
 
 object DifferenceQuerySpec extends Specification with JMocker {

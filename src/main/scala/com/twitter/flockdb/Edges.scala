@@ -10,10 +10,8 @@ import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.nameserver.{ByteSwapper, NameServer, ShardRepository}
 import com.twitter.gizzard.shards.{ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.service.flock.conversions.Page._
-import com.twitter.service.flock.conversions.Results._
 import com.twitter.results.{Cursor, ResultWindow}
-import com.twitter.ostrich.Stats
+import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.{AutoDisablingQueryEvaluatorFactory, StandardQueryEvaluatorFactory}
@@ -24,8 +22,10 @@ import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
 import com.twitter.flockdb.conversions.ExecuteOperations._
+import com.twitter.flockdb.conversions.Page._
+import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
-import com.twitter.service.flock.thrift.FlockException
+import com.twitter.flockdb.conversions.SelectOperation._
 import com.twitter.xrayspecs.{Duration, Time}
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.{Config, ConfigMap}
@@ -34,8 +34,7 @@ import queries._
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
 import Direction._
-import conversions.SelectOperation._
-import com.twitter.ostrich.W3CStats
+import thrift.FlockException
 
 
 object Edges {
@@ -151,12 +150,12 @@ class Edges(val nameServer: NameServer[shards.Shard], val forwardingManager: For
   }
 
   @deprecated
-  def select(operations: JList[thrift.SelectOperation], page: flock.thrift.Page): flock.thrift.Results = {
+  def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
     selectCompiler(operations.toSeq.map { _.fromThrift }).select(page.fromThrift).toThrift
   }
 
-  def select2(queries: JList[thrift.SelectQuery]): JList[flock.thrift.Results] = {
-    queries.toSeq.parallel(future).map[flock.thrift.Results] { query =>
+  def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {
+    queries.toSeq.parallel(future).map[thrift.Results] { query =>
       selectCompiler(query.fromThrift.operations.toSeq).select(query.page.fromThrift).toThrift
     }.toJavaList
   }

@@ -1,4 +1,4 @@
-package com.twitter.service.flock.conversions
+package com.twitter.flockdb.conversions
 
 import com.twitter.results
 
