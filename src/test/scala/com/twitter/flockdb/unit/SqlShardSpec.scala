@@ -12,12 +12,11 @@ import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
 import org.specs.Specification
+import com.twitter.service.flock.{Database, State, Reset}
 import conversions.Edge._
 import conversions.EdgeResults._
-import thrift.EdgeResults
-import com.twitter.service.flock.conversions.Results._
-import com.twitter.service.flock.thrift.Results
-import com.twitter.service.flock.{Database, State, Reset}
+import conversions.Results._
+import thrift.{Results, EdgeResults}
 import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
 
 

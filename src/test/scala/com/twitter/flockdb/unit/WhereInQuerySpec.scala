@@ -4,11 +4,11 @@ import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import com.twitter.service.flock.State
-import com.twitter.service.flock.thrift.Results
-import com.twitter.service.flock.conversions.Results._
 import org.specs.mock.JMocker
 import org.specs.Specification
+import conversions.Results._
 import shards.Shard
+import thrift.Results
 
 
 object WhereInQuerySpec extends Specification with JMocker {

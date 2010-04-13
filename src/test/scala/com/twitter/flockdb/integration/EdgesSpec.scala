@@ -8,9 +8,8 @@ import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
 import net.lag.smile.kestrel.{KestrelClient, MemoryStore}
 import org.specs.Specification
-import flockdb.thrift.{EdgeQuery, EdgeResults, QueryTerm, SelectOperation, SelectOperationType}
+import thrift._
 import com.twitter.service.flock.State
-import com.twitter.service.flock.thrift.Page
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
 
@@ -27,6 +26,7 @@ object EdgesSpec extends Specification with EdgesReset with Eventually {
 
   "Edge Integration" should {
     doBefore {
+      edges
       reset(Configgy.config.configMap("edges"))
       reset(edges)
       Time.freeze()

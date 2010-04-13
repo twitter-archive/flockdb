@@ -1,7 +1,21 @@
-include 'Flock.thrift'
-
 namespace java com.twitter.flockdb.thrift
 namespace rb Edges
+
+exception FlockException {
+  1: string description
+}
+
+struct Results {
+  # byte-packed list of i64, little-endian:
+  1: binary ids
+  2: i64 next_cursor
+  3: i64 prev_cursor
+}
+
+struct Page {
+  1: i32 count
+  2: i64 cursor
+}
 
 struct Edge {
   1: i64 source_id
@@ -70,12 +84,12 @@ struct ExecuteOperations {
 
 struct SelectQuery {
   1: list<SelectOperation> operations
-  2: Flock.Page page
+  2: Page page
 }
 
 struct EdgeQuery {
   1: QueryTerm term
-  2: Flock.Page page
+  2: Page page
 }
 
 struct EdgeResults {
@@ -85,17 +99,17 @@ struct EdgeResults {
 }
 
 service Edges {
-  bool contains(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: Flock.FlockException ex)
-  Edge get(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: Flock.FlockException ex)
+  bool contains(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
+  Edge get(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
 
-  binary count2(1: list<list<SelectOperation>> queries) throws(1: Flock.FlockException ex)
-  list<Flock.Results> select2(1: list<SelectQuery> queries) throws(1: Flock.FlockException ex)
-  list<EdgeResults> select_edges(1: list<EdgeQuery> queries) throws(1: Flock.FlockException ex)
-  void execute(1: ExecuteOperations operations) throws(1: Flock.FlockException ex)
+  binary count2(1: list<list<SelectOperation>> queries) throws(1: FlockException ex)
+  list<Results> select2(1: list<SelectQuery> queries) throws(1: FlockException ex)
+  list<EdgeResults> select_edges(1: list<EdgeQuery> queries) throws(1: FlockException ex)
+  void execute(1: ExecuteOperations operations) throws(1: FlockException ex)
 
   // deprecated:
-  binary counts_of_destinations_for(1: binary source_ids, 2: i32 graph_id) throws(1: Flock.FlockException ex)
-  binary counts_of_sources_for(1: binary destination_ids, 2: i32 graph_id) throws(1: Flock.FlockException ex)
+  binary counts_of_destinations_for(1: binary source_ids, 2: i32 graph_id) throws(1: FlockException ex)
+  binary counts_of_sources_for(1: binary destination_ids, 2: i32 graph_id) throws(1: FlockException ex)
   i32 count(1: list<SelectOperation> operations)
-  Flock.Results select(1: list<SelectOperation> operations, 2: Flock.Page page)
+  Results select(1: list<SelectOperation> operations, 2: Page page)
 }

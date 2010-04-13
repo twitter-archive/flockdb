@@ -1,7 +1,7 @@
 package com.twitter.flockdb.conversions
 
-import com.twitter.service.flock.conversions.Page._
-import conversions.QueryTerm._
+import Page._
+import QueryTerm._
 
 
 object EdgeQuery {

@@ -5,8 +5,8 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import org.specs.mock.JMocker
 import org.specs.Specification
-import com.twitter.service.flock.conversions.Results._
-import com.twitter.service.flock.thrift.Results
+import conversions.Results._
+import thrift.Results
 
 
 object UnionQuerySpec extends Specification with JMocker {
