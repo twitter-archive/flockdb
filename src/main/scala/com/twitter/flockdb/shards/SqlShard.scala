@@ -12,8 +12,7 @@ import com.twitter.xrayspecs.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
 import net.lag.configgy.ConfigMap
 import net.lag.logging.Logger
-import com.twitter.service.flock.State
-import com.twitter.service.flock.State._
+import State._
 
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)

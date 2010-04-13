@@ -6,7 +6,6 @@ import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import com.twitter.service.flock.State
 import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.single

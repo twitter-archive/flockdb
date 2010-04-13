@@ -8,7 +8,6 @@ import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
 import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
-import com.twitter.service.flock.State
 import thrift._
 
 

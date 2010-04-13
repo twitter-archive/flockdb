@@ -12,7 +12,7 @@ import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
 import org.specs.Specification
-import com.twitter.service.flock.{Database, State, Reset}
+import com.twitter.service.flock.{Database, Reset}
 import conversions.Edge._
 import conversions.EdgeResults._
 import conversions.Results._

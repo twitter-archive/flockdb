@@ -1,4 +1,4 @@
-package com.twitter.service.flock
+package com.twitter.flockdb
 
 abstract case class State(id: Int, name: String, ordinal: Int) {
   def max(s: State) = if (ordinal > s.ordinal) this else s
