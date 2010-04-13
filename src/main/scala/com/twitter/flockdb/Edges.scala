@@ -16,8 +16,7 @@ import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.{AutoDisablingQueryEvaluatorFactory, StandardQueryEvaluatorFactory}
 import com.twitter.querulous.query.{TimingOutQueryFactory, SqlQueryFactory}
-import com.twitter.service.flock
-import com.twitter.service.flock.{OrderedUuidGenerator, TimingOutStatsCollectingQueryFactory, State}
+import com.twitter.service.flock.{TimingOutStatsCollectingQueryFactory}
 import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._

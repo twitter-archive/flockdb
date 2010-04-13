@@ -1,7 +1,6 @@
 package com.twitter.flockdb.jobs.single
 
 import com.twitter.gizzard.jobs.{BoundJobParser, UnboundJob}
-import com.twitter.service.flock.{UuidGenerator, State}
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.logging.Logger

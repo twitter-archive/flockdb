@@ -3,7 +3,6 @@ package com.twitter.flockdb.unit
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
-import com.twitter.service.flock.State
 import org.specs.mock.JMocker
 import org.specs.Specification
 import conversions.Results._

@@ -2,7 +2,6 @@ package com.twitter.flockdb.queries
 
 import scala.util.Sorting
 import com.twitter.results.Cursor
-import com.twitter.service.flock.State
 import net.lag.configgy.Configgy
 import flockdb.shards.Shard
 

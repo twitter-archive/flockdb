@@ -2,7 +2,6 @@ package com.twitter.flockdb
 
 import java.util.{List => JList}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.service.flock.State
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import conversions.ExecuteOperation._

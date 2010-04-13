@@ -1,4 +1,4 @@
-package com.twitter.service.flock
+package com.twitter.flockdb
 
 trait UuidGenerator extends (Long => Long) {
   def apply(updatedAt: Long): Long
