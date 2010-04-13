@@ -9,7 +9,6 @@ import net.lag.configgy.Configgy
 import net.lag.smile.kestrel.{KestrelClient, MemoryStore}
 import org.specs.Specification
 import thrift._
-import com.twitter.service.flock.State
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
 

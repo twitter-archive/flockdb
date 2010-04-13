@@ -3,7 +3,6 @@ package com.twitter.flockdb.queries
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
-import com.twitter.service.flock.State
 import flockdb.shards.Shard
 
 

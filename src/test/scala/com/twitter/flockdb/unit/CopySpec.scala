@@ -5,7 +5,6 @@ import com.twitter.gizzard.nameserver.{NameServer, ShardMigration}
 import com.twitter.gizzard.shards.{Busy, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
-import com.twitter.service.flock.State
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.Specification

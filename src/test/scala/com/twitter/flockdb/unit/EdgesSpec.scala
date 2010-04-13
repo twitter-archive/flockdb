@@ -7,8 +7,6 @@ import com.twitter.gizzard.scheduler.{JobScheduler, PrioritizingJobScheduler}
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.service.flock.State
-import com.twitter.service.flock.State._
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.Specification
@@ -18,6 +16,7 @@ import jobs.single.{Add, Remove}
 import conversions.Edge._
 import shards.Shard
 import thrift.{FlockException, Page, Results}
+import State._
 
 
 object EdgesSpec extends Specification with JMocker with ClassMocker {
