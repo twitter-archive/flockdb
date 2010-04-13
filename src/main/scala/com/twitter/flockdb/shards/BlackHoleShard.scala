@@ -2,7 +2,6 @@ package com.twitter.flockdb.shards
 
 import scala.collection.mutable
 import com.twitter.results.{Cursor, ResultWindow}
-import com.twitter.service.flock.State
 import com.twitter.gizzard.shards
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._

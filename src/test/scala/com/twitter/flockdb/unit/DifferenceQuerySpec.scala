@@ -4,7 +4,6 @@ import scala.collection.mutable
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
-import com.twitter.service.flock.State
 import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
 import org.specs.Specification

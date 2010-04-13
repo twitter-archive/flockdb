@@ -5,7 +5,6 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
 import org.specs.mock.JMocker
 import org.specs.Specification
-import com.twitter.service.flock.State
 import conversions.Results._
 import shards.Shard
 import thrift.Results

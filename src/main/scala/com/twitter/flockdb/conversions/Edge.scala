@@ -1,6 +1,5 @@
 package com.twitter.flockdb.conversions
 
-import com.twitter.service.flock.State
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 
