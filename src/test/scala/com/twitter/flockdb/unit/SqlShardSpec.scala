@@ -4,20 +4,19 @@ import java.sql.SQLException
 import scala.collection.mutable
 import com.twitter.gizzard.shards.{Busy, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import com.twitter.querulous.evaluator.{StandardQueryEvaluatorFactory, QueryEvaluator, QueryEvaluatorFactory}
 import com.twitter.querulous.query.SqlQueryFactory
+import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
 import org.specs.Specification
-import com.twitter.service.flock.{Database, Reset}
 import conversions.Edge._
 import conversions.EdgeResults._
 import conversions.Results._
-import thrift.{Results, EdgeResults}
 import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
+import thrift.{Results, EdgeResults}
 
 
 object SqlShardSpec extends Specification with JMocker with Reset {
