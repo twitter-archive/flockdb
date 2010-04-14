@@ -7,7 +7,7 @@ import com.twitter.gizzard.Future
 import com.twitter.gizzard.jobs._
 import com.twitter.gizzard.scheduler.{KestrelMessageQueue, JobScheduler, PrioritizingJobScheduler}
 import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.nameserver.{ByteSwapper, NameServer, ShardRepository}
+import com.twitter.gizzard.nameserver.{BasicShardRepository, ByteSwapper, NameServer}
 import com.twitter.gizzard.shards.{ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
@@ -52,7 +52,7 @@ object Edges {
     (random.nextInt() & ((1 << 30) - 1)).toInt
   }
 
-  def apply(config: ConfigMap, w3c: W3CStats, databaseFactory: DatabaseFactory) = {
+  def apply(config: ConfigMap, w3c: W3CStats) = {
     val sqlQueryFactory = new SqlQueryFactory
     val stats = new StatsCollector {
       def incr(name: String, count: Int) = w3c.incr(name, count)
@@ -62,16 +62,18 @@ object Edges {
 
     val dbQueryTimeoutDefault              = config("db.query_timeout_default").toLong.millis
     val dbQueryFactory                     = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, dbQueryInfo, dbQueryTimeoutDefault, stats)
+    val dbFactory = AutoDatabaseFactory(config.configMap("db.connection_pool"), Some(stats))
     val dbQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
-      databaseFactory,
+      dbFactory,
       dbQueryFactory),
       config("db.disable.error_count").toInt,
       config("db.disable.seconds").toInt.seconds)
 
     val nameServerQueryTimeoutDefault = config("nameserver.query_timeout_default").toLong.millis
     val nameServerQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, nameServerQueryInfo, nameServerQueryTimeoutDefault, stats)
+    val nameServerDatabaseFactory = AutoDatabaseFactory(config.configMap("nameserver.connection_pool"), Some(stats))
     val nameServerQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
-      databaseFactory,
+      nameServerDatabaseFactory,
       nameServerQueryFactory),
       config("nameserver.disable.error_count").toInt,
       config("nameserver.disable.seconds").toInt.seconds)
@@ -84,34 +86,48 @@ object Edges {
       new nameserver.SqlShard(queryEvaluator)
     } collect
 
-    val shardRepository = new ShardRepository[shards.Shard]
     val log = new ThrottledLogger[String](Logger(), config("throttled_log.period_msec").toInt, config("throttled_log.rate").toInt)
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
+    val shardRepository = new BasicShardRepository[shards.Shard](new shards.ReadWriteShardAdapter(_), log, replicationFuture)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
-    shardRepository += ("com.twitter.flockdb.ReplicatingShard" -> new shards.ReplicatingShardFactory(log, replicationFuture))
 
-    val queueConfig          = config.configMap("edges.queue")
+    /*
+        shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard"   -> new BlackHoleShardFactory)
+        shardRepository += ("com.twitter.service.flock.edges.SqlShard"         -> new SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
+        shardRepository += ("com.twitter.service.flock.edges.ReadOnlyShard"    -> new ReadOnlyShardFactory)
+        shardRepository += ("com.twitter.service.flock.edges.BlockedShard"     -> new BlockedShardFactory)
+        shardRepository += ("com.twitter.service.flock.edges.WriteOnlyShard"   -> new WriteOnlyShardFactory)
+        shardRepository += ("com.twitter.service.flock.edges.ReplicatingShard" -> new ReplicatingShardFactory(throttledLogger, replicatingEdgesFuture))
+    */
+
     val polymorphicJobParser = new PolymorphicJobParser
-    val jobParser            = new JobWithTasksParser(polymorphicJobParser)
+    val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
 
-    val primaryScheduler   = JobScheduler("primary", queueConfig, jobParser, w3c)
-    val copyScheduler      = JobScheduler("copy", queueConfig, jobParser, w3c)
-    val slowScheduler      = JobScheduler("slow", queueConfig, jobParser, w3c)
+    val schedulerMap = new mutable.HashMap[Int, JobScheduler]
+    List((Priority.High, "primary"), (Priority.Medium, "copy"),
+         (Priority.Low, "slow")).foreach { case (priority, configName) =>
+      val queueConfig = config.configMap("edges.queue")
+      val scheduler = JobScheduler(configName, queueConfig, jobParser, w3c)
+      schedulerMap(priority.id) = scheduler
+    }
+    val scheduler = new PrioritizingJobScheduler(schedulerMap)
 
-    val prioritizingJobScheduler =
-      new PrioritizingJobScheduler(Map(Priority.Low.id -> slowScheduler,
-                                       Priority.Medium.id -> copyScheduler,
-                                       Priority.High.id -> primaryScheduler))
+    val replicatingNameServerShardInfo =
+      new ShardInfo("com.twitter.gizzard.nameserver.ReplicatingShard", "", "")
+    val replicatingNameServerShard = new nameserver.ReadWriteShardAdapter(
+      new ReplicatingShard(replicatingNameServerShardInfo, 0, nameServerShards,
+                           new nameserver.LoadBalancer(nameServerShards), log,
+                           replicationFuture))
 
-    val replicatingNameServerShard = new nameserver.ReadWriteShardAdapter(new ReplicatingShard(new ShardInfo("com.twitter.nameserver.ReplicatingShard", "", ""), 0, nameServerShards, new nameserver.LoadBalancer(nameServerShards), log, replicationFuture))
-    val nameServer = new NameServer(replicatingNameServerShard, shardRepository, ByteSwapper, generateShardId)
+    val nameServer = new NameServer(replicatingNameServerShard, shardRepository, ByteSwapper,
+                                    generateShardId)
     val forwardingManager = new ForwardingManager(nameServer)
     val copyFactory = jobs.CopyFactory
     nameServer.reload()
 
     val singleJobParser = new jobs.single.JobParser(forwardingManager, OrderedUuidGenerator)
-    val multiJobParser  = new jobs.multi.JobParser(forwardingManager, prioritizingJobScheduler)
-    val copyJobParser   = new BoundJobParser((nameServer, copyScheduler))
+    val multiJobParser  = new jobs.multi.JobParser(forwardingManager, scheduler)
+    val copyJobParser   = new BoundJobParser((nameServer, schedulerMap(Priority.Medium.id)))
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
@@ -119,9 +135,9 @@ object Edges {
     polymorphicJobParser += ("flockdb\\.jobs\\.single".r, singleJobParser)
     polymorphicJobParser += ("flockdb\\.jobs\\.multi".r, multiJobParser)
 
-    prioritizingJobScheduler.start()
+    scheduler.start()
 
-    new Edges(nameServer, forwardingManager, copyFactory, prioritizingJobScheduler, future)
+    new Edges(nameServer, forwardingManager, copyFactory, scheduler, future)
   }
 }
 
