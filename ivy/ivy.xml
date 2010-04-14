@@ -2,12 +2,11 @@
   <info organisation="com.twitter.service"
         module="flockdb"
         revision="1.0"
-        e:buildpackage="com.twitter.service.flock"
-        e:testclass="com.twitter.service.flock.TestRunner"
-        e:stresstestclass="com.twitter.service.flock.StressTestRunner"
-        e:checktestclass="com.twitter.service.flock.edges.check.EdgesSpec"
-        e:jarclassname="com.twitter.service.flock.Main"
-        e:thriftpackage="com.twitter.service.flock.gen"
+        e:buildpackage="com.twitter.flockdb"
+        e:testclass="com.twitter.flockdb.TestRunner"
+        e:stresstestclass="com.twitter.flockdb.StressTestRunner"
+        e:jarclassname="com.twitter.flockdb.Main"
+        e:thriftpackage="com.twitter.flockdb.thrift"
   />
 
   <configurations>
@@ -26,7 +25,7 @@
     <dependency org="com.twitter" name="json" rev="1.1.1" />
     <dependency org="com.twitter" name="ostrich" rev="1.1.14" />
     <dependency org="com.twitter" name="xrayspecs" rev="1.0.5" />
-    <dependency org="com.twitter" name="querulous" rev="1.1.5" />
+    <dependency org="com.twitter" name="querulous" rev="1.1.6" />
     <dependency org="com.twitter" name="results" rev="1.0" />
     <dependency org="com.twitter" name="gizzard" rev="1.0.3" />
 
