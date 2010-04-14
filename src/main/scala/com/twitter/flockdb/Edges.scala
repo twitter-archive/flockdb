@@ -15,8 +15,7 @@ import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.{AutoDisablingQueryEvaluatorFactory, StandardQueryEvaluatorFactory}
-import com.twitter.querulous.query.{TimingOutQueryFactory, SqlQueryFactory}
-import com.twitter.service.flock.{TimingOutStatsCollectingQueryFactory}
+import com.twitter.querulous.query.{TimingOutQueryFactory, TimingOutStatsCollectingQueryFactory, SqlQueryFactory}
 import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
@@ -60,6 +59,7 @@ object Edges {
       def time[A](name: String)(f: => A): A = w3c.time(name)(f)
     }
     val (dbQueryInfo, nameServerQueryInfo) = (convertConfigMap(config.configMap("db.queries")), convertConfigMap(config.configMap("nameserver.queries")))
+
     val dbQueryTimeoutDefault              = config("db.query_timeout_default").toLong.millis
     val dbQueryFactory                     = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, dbQueryInfo, dbQueryTimeoutDefault, stats)
     val dbQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
@@ -67,6 +67,7 @@ object Edges {
       dbQueryFactory),
       config("db.disable.error_count").toInt,
       config("db.disable.seconds").toInt.seconds)
+
     val nameServerQueryTimeoutDefault = config("nameserver.query_timeout_default").toLong.millis
     val nameServerQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, nameServerQueryInfo, nameServerQueryTimeoutDefault, stats)
     val nameServerQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
@@ -124,7 +125,8 @@ object Edges {
   }
 }
 
-class Edges(val nameServer: NameServer[shards.Shard], val forwardingManager: ForwardingManager, val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
+class Edges(val nameServer: NameServer[shards.Shard], val forwardingManager: ForwardingManager,
+            val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
             val schedule: PrioritizingJobScheduler, future: Future)
   extends thrift.Edges.Iface {
 

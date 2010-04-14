@@ -4,8 +4,6 @@ import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.querulous.evaluator.StandardQueryEvaluatorFactory
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.gizzard.shards.{Busy, ShardInfo}
-import com.twitter.service.flock.Database
-import com.twitter.service.flock.Reset
 
 
 trait EdgesReset extends Reset {

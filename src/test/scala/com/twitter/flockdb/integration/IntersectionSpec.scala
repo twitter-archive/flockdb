@@ -1,14 +1,12 @@
 package com.twitter.flockdb.integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
+import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Eventually
 import net.lag.configgy.Configgy
 import org.specs.Specification
-import flockdb.thrift.{QueryTerm, SelectOperation, SelectOperationType}
-import com.twitter.service.flock.Database
-import thrift.{Page, Results}
+import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 
 object IntersectionSpec extends Specification with Eventually with EdgesReset {
