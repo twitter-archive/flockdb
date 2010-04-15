@@ -310,8 +310,10 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
-                         oldState: State): Int = {
-    val updatedRows = if (oldState != Archived && edge.state == Normal) {
+                         oldEdge: Edge): Int = {
+    if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
+
+    val updatedRows = if (oldEdge.state != Archived && edge.state == Normal) {
       transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                           "position = ?, count = 0, state = ? " +
                           "WHERE source_id = ? AND destination_id = ? AND " +
@@ -337,8 +339,8 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
                               edge.destinationId, edge.updatedAt.inSeconds)
       }
     }
-    if (edge.state != oldState &&
-        (oldState == metadata.state || edge.state == metadata.state)) updatedRows else 0
+    if (edge.state != oldEdge.state &&
+        (oldEdge.state == metadata.state || edge.state == metadata.state)) updatedRows else 0
   }
 
   // returns +1, 0, or -1, depending on how the metadata count should change after this operation.
@@ -346,11 +348,11 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private def writeEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                         predictExistence: Boolean): Int = {
     val countDelta = if (predictExistence) {
-      transaction.selectOne("SELECT state FROM " + tablePrefix + "_edges WHERE source_id = ? " +
+      transaction.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
                             "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
-        State(row.getInt("state"))
-      }.map { oldState =>
-        updateEdge(transaction, metadata, edge, oldState)
+        makeEdge(row)
+      }.map { oldRow =>
+        updateEdge(transaction, metadata, edge, oldRow)
       }.getOrElse {
         insertEdge(transaction, metadata, edge)
       }
@@ -359,11 +361,11 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
         insertEdge(transaction, metadata, edge)
       } catch {
         case e: SQLIntegrityConstraintViolationException =>
-          transaction.selectOne("SELECT state FROM " + tablePrefix + "_edges WHERE source_id = ? " +
+          transaction.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
                                 "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
-            State(row.getInt("state"))
-          }.map { oldState =>
-            updateEdge(transaction, metadata, edge, oldState)
+            makeEdge(row)
+          }.map { oldRow =>
+            updateEdge(transaction, metadata, edge, oldRow)
           }.getOrElse(0)
       }
     }
@@ -465,8 +467,10 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   // FIXME: computeCount could be really expensive. :(
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     atomically(sourceId) { (transaction, metadata) =>
-      transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
-        state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
+      if ((updatedAt != metadata.updatedAt) || ((metadata.state max state) == state)) {
+        transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
+          state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
+      }
     }
   }
 
