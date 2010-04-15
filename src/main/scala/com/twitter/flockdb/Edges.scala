@@ -7,7 +7,6 @@ import com.twitter.gizzard.Future
 import com.twitter.gizzard.jobs._
 import com.twitter.gizzard.scheduler.{KestrelMessageQueue, JobScheduler, PrioritizingJobScheduler}
 import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.nameserver.{BasicShardRepository, ByteSwapper, NameServer}
 import com.twitter.gizzard.shards.{ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
@@ -88,17 +87,12 @@ object Edges {
 
     val log = new ThrottledLogger[String](Logger(), config("throttled_log.period_msec").toInt, config("throttled_log.rate").toInt)
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
-    val shardRepository = new BasicShardRepository[shards.Shard](new shards.ReadWriteShardAdapter(_), log, replicationFuture)
+    val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
+      new shards.ReadWriteShardAdapter(_), log, replicationFuture)
+    shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
-
-    /*
-        shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard"   -> new BlackHoleShardFactory)
-        shardRepository += ("com.twitter.service.flock.edges.SqlShard"         -> new SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
-        shardRepository += ("com.twitter.service.flock.edges.ReadOnlyShard"    -> new ReadOnlyShardFactory)
-        shardRepository += ("com.twitter.service.flock.edges.BlockedShard"     -> new BlockedShardFactory)
-        shardRepository += ("com.twitter.service.flock.edges.WriteOnlyShard"   -> new WriteOnlyShardFactory)
-        shardRepository += ("com.twitter.service.flock.edges.ReplicatingShard" -> new ReplicatingShardFactory(throttledLogger, replicatingEdgesFuture))
-    */
+    shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
+    shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard" -> new shards.BlackHoleShardFactory)
 
     val polymorphicJobParser = new PolymorphicJobParser
     val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
@@ -119,8 +113,8 @@ object Edges {
                            new nameserver.LoadBalancer(nameServerShards), log,
                            replicationFuture))
 
-    val nameServer = new NameServer(replicatingNameServerShard, shardRepository, ByteSwapper,
-                                    generateShardId)
+    val nameServer = new nameserver.NameServer(replicatingNameServerShard, shardRepository,
+      nameserver.ByteSwapper, generateShardId)
     val forwardingManager = new ForwardingManager(nameServer)
     val copyFactory = jobs.CopyFactory
     nameServer.reload()
@@ -141,7 +135,8 @@ object Edges {
   }
 }
 
-class Edges(val nameServer: NameServer[shards.Shard], val forwardingManager: ForwardingManager,
+class Edges(val nameServer: nameserver.NameServer[shards.Shard],
+            val forwardingManager: ForwardingManager,
             val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
             val schedule: PrioritizingJobScheduler, future: Future)
   extends thrift.Edges.Iface {
