@@ -24,9 +24,9 @@ trait EdgesReset extends Reset {
       queryEvaluator.execute("DELETE FROM backward_" + graph + "_edges")
       queryEvaluator.execute("DELETE FROM backward_" + graph + "_metadata")
 
-      val replicatingForwardShardId = edges.nameServer.createShard(new ShardInfo("com.twitter.flockdb.ReplicatingShard",
+      val replicatingForwardShardId = edges.nameServer.createShard(new ShardInfo("com.twitter.gizzard.shards.ReplicatingShard",
         "replicating_forward_" + graph, "localhost", "", ""))
-      val replicatingBackwardShardId = edges.nameServer.createShard(new ShardInfo("com.twitter.flockdb.ReplicatingShard",
+      val replicatingBackwardShardId = edges.nameServer.createShard(new ShardInfo("com.twitter.gizzard.shards.ReplicatingShard",
         "replicating_backward_" + graph, "localhost", "", ""))
       edges.nameServer.addChildShard(replicatingForwardShardId, forwardShardId, 1)
       edges.nameServer.addChildShard(replicatingBackwardShardId, backwardShardId, 1)
