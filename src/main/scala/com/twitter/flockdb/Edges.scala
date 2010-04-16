@@ -59,8 +59,8 @@ object Edges {
     }
     val (dbQueryInfo, nameServerQueryInfo) = (convertConfigMap(config.configMap("db.queries")), convertConfigMap(config.configMap("nameserver.queries")))
 
-    val dbQueryTimeoutDefault              = config("db.query_timeout_default").toLong.millis
-    val dbQueryFactory                     = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, dbQueryInfo, dbQueryTimeoutDefault, stats)
+    val dbQueryTimeoutDefault = config("db.query_timeout_default").toLong.millis
+    val dbQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, dbQueryInfo, dbQueryTimeoutDefault, stats)
     val dbFactory = AutoDatabaseFactory(config.configMap("db.connection_pool"), Some(stats))
     val dbQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
       dbFactory,
@@ -89,8 +89,9 @@ object Edges {
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
       new shards.ReadWriteShardAdapter(_), log, replicationFuture)
-    shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
+    // for backward compat:
+    shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
     shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard" -> new shards.BlackHoleShardFactory)
 
