@@ -17,14 +17,13 @@
     </copy>
   </target>
 
-  <target name="launch" depends="compile">
+  <target name="launch" depends="compile" description="launch flockdb in development mode with a modest memory footprint">
     <java classname="scala.tools.nsc.MainGenericRunner" fork="true" spawn="true">
       <classpath>
         <path refid="test.path" />
         <pathelement location="${target.dir}/classes" />
-        <pathelement location="${target.dir}/test-classes" />
       </classpath>
-      <arg line="com.twitter.service.flock.Main -f config/development.conf"/>
+      <arg line="com.twitter.flockdb.Main -f config/development.conf"/>
       <jvmarg value="-Dstage=development" />
       <jvmarg value="-Xms256m" />
       <jvmarg value="-Xmx256m" />

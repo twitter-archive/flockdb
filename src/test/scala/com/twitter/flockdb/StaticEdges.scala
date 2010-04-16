@@ -8,5 +8,5 @@ import net.lag.logging.Logger
 object StaticEdges {
   import Database._
   val log = Logger.get
-  lazy val edges = Edges(config, new W3CStats(log, config.getList("edges.w3c").toArray), databaseFactory)
+  lazy val edges = Edges(config, new W3CStats(log, config.getList("edges.w3c").toArray))
 }
