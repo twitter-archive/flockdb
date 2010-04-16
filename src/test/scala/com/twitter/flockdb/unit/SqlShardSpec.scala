@@ -352,6 +352,29 @@ object SqlShardSpec extends Specification with JMocker with Reset {
 
             Time(shard.get(alice, bob).get.updatedAt) mustEqual Time.now
           }
+
+          "when the already-existing row is the same age as the row to be inserted" >> {
+            "when the already-existing row is deleted"  >> {
+              shard.remove(alice, bob, 1, Time.now)
+              shard.add(alice, bob, 1, Time.now)
+
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Removed))
+            }
+
+            "when the already-existing row is archived" >> {
+              shard.archive(alice, bob, 1, Time.now)
+              shard.add(alice, bob, 1, Time.now)
+
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Archived))
+            }
+
+            "when the already-existing row is negative" >> {
+              shard.negate(alice, bob, 1, Time.now)
+              shard.add(alice, bob, 1, Time.now)
+
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Negative))
+            }
+          }
         }
       }
 
@@ -473,6 +496,19 @@ object SqlShardSpec extends Specification with JMocker with Reset {
           shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Normal))
         }
 
+        "when the already-existing row is the same age as the row to be archived" >> {
+          "when the already-existing row is removed" >> {
+            shard.remove(alice, bob, 1, Time.now)
+            shard.archive(alice, bob, 1, Time.now)
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Removed))
+          }
+
+          "when the already-existing row is removed" >> {
+            shard.remove(alice, bob, 1, Time.now)
+            shard.archive(alice, bob, 1, Time.now)
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Removed))
+          }
+        }
       }
 
       "decrements a count" >> {
@@ -530,6 +566,48 @@ object SqlShardSpec extends Specification with JMocker with Reset {
         shard.archive(alice, 1.second.ago)
         val metadata = shard.getMetadata(alice).get
         metadata.state mustBe State.Normal
+      }
+
+      "two simultaneous metadata changes" >> {
+        "normal vs. removed" >> {
+          shard.add(alice, Time.now)
+          shard.remove(alice, Time.now)
+          shard.add(alice, Time.now)
+          val metadata = shard.getMetadata(alice).get
+          metadata.state mustBe State.Removed
+        }
+
+        "normal vs. archived" >> {
+          shard.add(alice, Time.now)
+          shard.archive(alice, Time.now)
+          shard.add(alice, Time.now)
+          val metadata = shard.getMetadata(alice).get
+          metadata.state mustBe State.Archived
+        }
+
+        "normal vs. negative" >> {
+          shard.add(alice, Time.now)
+          shard.negate(alice, Time.now)
+          shard.add(alice, Time.now)
+          val metadata = shard.getMetadata(alice).get
+          metadata.state mustBe State.Negative
+        }
+
+        "negative vs. archived" >> {
+          shard.negate(alice, Time.now)
+          shard.archive(alice, Time.now)
+          shard.negate(alice, Time.now)
+          val metadata = shard.getMetadata(alice).get
+          metadata.state mustBe State.Archived
+        }
+
+        "archived vs. removed" >> {
+          shard.archive(alice, Time.now)
+          shard.remove(alice, Time.now)
+          shard.archive(alice, Time.now)
+          val metadata = shard.getMetadata(alice).get
+          metadata.state mustBe State.Removed
+        }
       }
 
       "row changes don't update metadata" >> {
