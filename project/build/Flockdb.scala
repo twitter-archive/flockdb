@@ -35,11 +35,23 @@ class FlockdbProject(info: ProjectInfo) extends DefaultProject(info) {
     "log4j" % "log4j" % "1.2.12"
     from "http://mirrors.ibiblio.org/pub/mirrors/maven2/log4j/log4j/1.2.12/log4j-1.2.12.jar")
 
-  def thriftCompileTask(lang: String, paths: PathFinder) = task {
-    (paths.getPaths.map { path => 
-      execTask { "thrift --gen %s -o %s %s".format(lang, outputPath.absolutePath, path) }
-    } map ( _.run ) flatMap ( _.toList ) toSeq).firstOption
-  }
+  def thriftCompileTask(lang: String, paths: PathFinder) = dynamic({
+    def thriftCompile = {
+      (paths.getPaths.map { path => 
+        execTask { "thrift --gen %s -o %s %s".format(lang, outputPath.absolutePath, path) }
+      } map ( _.run ) flatMap ( _.toList ) toSeq).firstOption
+    }
+
+    val thriftCompilePath = (outputPath / ("gen-"+lang) ##)
+    if (thriftCompilePath.exists) {
+      val thriftCompiledFiles = thriftCompilePath ** "*.java"
+      fileTask(thriftCompiledFiles.get from paths) {
+        thriftCompile
+      }
+    } else {
+      task { thriftCompile }
+    }
+  })
 
   outputPath.asFile.mkdir()
 
