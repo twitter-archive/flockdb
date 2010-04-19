@@ -11,7 +11,9 @@ import conversions.ExecuteOperations._
 import conversions.SelectOperation._
 
 
-object EdgesSpec extends ConfiguredSpecification with EdgesReset with Eventually {
+object EdgesSpec extends ConfiguredSpecification with EdgesDatabase with Eventually {
+  val poolConfig = config.configMap("db.connection_pool")
+
   import StaticEdges._
 
   val FOLLOWS = 1
@@ -21,10 +23,11 @@ object EdgesSpec extends ConfiguredSpecification with EdgesReset with Eventually
   val carl = 3L
   val darcy = 4L
 
+  materialize(config.configMap("edges"))
+
   "Edge Integration" should {
     doBefore {
       edges
-      reset(config.configMap("edges"))
       reset(edges)
       Time.freeze()
     }

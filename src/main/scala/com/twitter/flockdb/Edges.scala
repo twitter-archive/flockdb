@@ -51,17 +51,26 @@ object Edges {
     (random.nextInt() & ((1 << 30) - 1)).toInt
   }
 
-  def apply(config: ConfigMap, w3c: W3CStats) = {
-    val sqlQueryFactory = new SqlQueryFactory
-    val stats = new StatsCollector {
+  def statsCollector(w3c: W3CStats) = {
+    new StatsCollector {
       def incr(name: String, count: Int) = w3c.incr(name, count)
       def time[A](name: String)(f: => A): A = w3c.time(name)(f)
     }
+  }
+
+  def apply(config: ConfigMap, w3c: W3CStats): Edges = {
+    val stats = statsCollector(w3c)
+    val dbFactory = AutoDatabaseFactory(config.configMap("db.connection_pool"), Some(stats))
+    val nameServerDbFactory = AutoDatabaseFactory(config.configMap("nameserver.connection_pool"), Some(stats))
+    apply(config, dbFactory, nameServerDbFactory, w3c, stats)
+  }
+
+  def apply(config: ConfigMap, dbFactory: DatabaseFactory, nameServerDbFactory: DatabaseFactory, w3c: W3CStats, stats: StatsCollector): Edges = {
+    val sqlQueryFactory = new SqlQueryFactory
     val (dbQueryInfo, nameServerQueryInfo) = (convertConfigMap(config.configMap("db.queries")), convertConfigMap(config.configMap("nameserver.queries")))
 
     val dbQueryTimeoutDefault = config("db.query_timeout_default").toLong.millis
     val dbQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, dbQueryInfo, dbQueryTimeoutDefault, stats)
-    val dbFactory = AutoDatabaseFactory(config.configMap("db.connection_pool"), Some(stats))
     val dbQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
       dbFactory,
       dbQueryFactory),
@@ -70,9 +79,8 @@ object Edges {
 
     val nameServerQueryTimeoutDefault = config("nameserver.query_timeout_default").toLong.millis
     val nameServerQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, nameServerQueryInfo, nameServerQueryTimeoutDefault, stats)
-    val nameServerDatabaseFactory = AutoDatabaseFactory(config.configMap("nameserver.connection_pool"), Some(stats))
     val nameServerQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
-      nameServerDatabaseFactory,
+      nameServerDbFactory,
       nameServerQueryFactory),
       config("nameserver.disable.error_count").toInt,
       config("nameserver.disable.seconds").toInt.seconds)

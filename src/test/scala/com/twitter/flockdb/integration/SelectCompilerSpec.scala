@@ -9,7 +9,9 @@ import org.specs.mock.{ClassMocker, JMocker}
 import thrift._
 
 
-object SelectCompilerSpec extends ConfiguredSpecification with Eventually with EdgesReset with JMocker with ClassMocker {
+object SelectCompilerSpec extends ConfiguredSpecification with Eventually with EdgesDatabase with JMocker with ClassMocker {
+  val poolConfig = config.configMap("db.connection_pool")
+
   import StaticEdges._
 
   "SelectCompiler integration" should {
@@ -21,7 +23,6 @@ object SelectCompilerSpec extends ConfiguredSpecification with Eventually with E
     val darcy = 4L
 
     doBefore {
-      reset(config.configMap("edges"))
       reset(edges)
     }
 
