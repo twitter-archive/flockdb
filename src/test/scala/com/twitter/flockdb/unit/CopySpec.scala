@@ -7,13 +7,12 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.{Copy, MetadataCopy}
 import shards.{Metadata, Shard}
 
 
-object CopySpec extends Specification with JMocker with ClassMocker {
+object CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = 10
   val shard2Id = 20
   val count = 2300

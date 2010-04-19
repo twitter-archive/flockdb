@@ -8,7 +8,7 @@ import net.lag.configgy.{ConfigMap, Configgy}
 import org.specs.Specification
 
 
-trait Reset extends Specification {
+trait Reset {
   import Database._
   val queryEvaluatorFactory = new StandardQueryEvaluatorFactory(databaseFactory, new SqlQueryFactory)
 

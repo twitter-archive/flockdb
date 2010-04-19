@@ -9,9 +9,7 @@ import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
-import org.specs.Specification
 import conversions.Edge._
 import conversions.EdgeResults._
 import conversions.Results._
@@ -19,10 +17,9 @@ import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
 import thrift.{Results, EdgeResults}
 
 
-object SqlShardSpec extends Specification with JMocker with Reset {
+object SqlShardSpec extends ConfiguredSpecification with JMocker with Reset {
 
   "Edge SqlShard" should {
-    import Database._
     val alice = 1L
     val bob = 2L
     val carl = 3L

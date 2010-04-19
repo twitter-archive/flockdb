@@ -4,7 +4,6 @@ import scala.collection.jcl.Conversions._
 import scala.collection.mutable
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import queries.SelectCompiler
 import operations.{SelectOperation, SelectOperationType}
@@ -12,7 +11,7 @@ import shards.Shard
 import thrift.{Page, Results}
 
 
-object SelectCompilerSpec extends Specification with JMocker with ClassMocker {
+object SelectCompilerSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "SelectCompiler" should {
     var forwardingManager: ForwardingManager = null
     var shard: Shard = null

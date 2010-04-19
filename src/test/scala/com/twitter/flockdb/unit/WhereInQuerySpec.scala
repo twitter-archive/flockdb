@@ -4,13 +4,12 @@ import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import org.specs.mock.JMocker
-import org.specs.Specification
 import conversions.Results._
 import shards.Shard
 import thrift.Results
 
 
-object WhereInQuerySpec extends Specification with JMocker {
+object WhereInQuerySpec extends ConfiguredSpecification with JMocker {
   "WhereInQuery" should {
     var shard: Shard = null
     var whereInQuery: queries.WhereInQuery = null

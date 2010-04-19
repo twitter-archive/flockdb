@@ -1,7 +1,6 @@
 package com.twitter.flockdb
 
 import com.twitter.ostrich.W3CStats
-import net.lag.configgy.Configgy
 import net.lag.logging.Logger
 
 
