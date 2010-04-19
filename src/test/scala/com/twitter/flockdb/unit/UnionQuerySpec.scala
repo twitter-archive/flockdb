@@ -4,12 +4,11 @@ import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import org.specs.mock.JMocker
-import org.specs.Specification
 import conversions.Results._
 import thrift.Results
 
 
-object UnionQuerySpec extends Specification with JMocker {
+object UnionQuerySpec extends ConfiguredSpecification with JMocker {
   "UnionQuery" should {
     val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10))
     val query2 = new queries.SeqQuery(List(1,2,3,4,11))

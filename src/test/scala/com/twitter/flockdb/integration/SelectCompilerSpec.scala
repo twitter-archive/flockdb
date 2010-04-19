@@ -5,13 +5,11 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.{Time, Eventually}
 import com.twitter.xrayspecs.TimeConversions._
-import net.lag.configgy.Configgy
-import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import thrift._
 
 
-object SelectCompilerSpec extends Specification with Eventually with EdgesReset with JMocker with ClassMocker {
+object SelectCompilerSpec extends ConfiguredSpecification with Eventually with EdgesReset with JMocker with ClassMocker {
   import StaticEdges._
 
   "SelectCompiler integration" should {
@@ -23,7 +21,7 @@ object SelectCompilerSpec extends Specification with Eventually with EdgesReset 
     val darcy = 4L
 
     doBefore {
-      reset(Configgy.config.configMap("edges"))
+      reset(config.configMap("edges"))
       reset(edges)
     }
 

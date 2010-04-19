@@ -6,7 +6,6 @@ import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.single
 import jobs.multi
@@ -14,7 +13,7 @@ import queries.ExecuteCompiler
 import operations.{ExecuteOperations, ExecuteOperation, ExecuteOperationType}
 
 
-object ExecuteCompilerSpec extends Specification with JMocker with ClassMocker {
+object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   def termToProgram(operationType: ExecuteOperationType.Value, term: QueryTerm, time: Option[Time], position: Option[Long]): ExecuteOperations = {
     val operation = new ExecuteOperation(operationType, term, position)
     val operations = List(operation)

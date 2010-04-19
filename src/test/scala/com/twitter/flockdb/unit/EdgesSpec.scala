@@ -9,7 +9,6 @@ import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import org.specs.Specification
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
@@ -19,7 +18,7 @@ import thrift.{FlockException, Page, Results}
 import State._
 
 
-object EdgesSpec extends Specification with JMocker with ClassMocker {
+object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "Edges" should {
     val FOLLOWS = 1
 

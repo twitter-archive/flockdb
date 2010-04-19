@@ -4,12 +4,10 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Eventually
-import net.lag.configgy.Configgy
-import org.specs.Specification
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 
-object IntersectionSpec extends Specification with Eventually with EdgesReset {
+object IntersectionSpec extends ConfiguredSpecification with Eventually with EdgesReset {
   import StaticEdges._
 
   val FOLLOWS = 1
@@ -65,18 +63,18 @@ object IntersectionSpec extends Specification with Eventually with EdgesReset {
 
   "Intersection" should {
     doBefore {
-      reset(Configgy.config.configMap("edges"))
+      reset(config.configMap("edges"))
       reset(edges)
     }
 
     "with a large intersection" >>  {
-      doBefore { Configgy.config("edges.intersection_page_size_max") = 1 }
+      doBefore { config("edges.intersection_page_size_max") = 1 }
 
       intersectAlot
     }
 
     "with a small intersection" >> {
-      doBefore { Configgy.config("edges.intersection_page_size_max") = Integer.MAX_VALUE - 1 }
+      doBefore { config("edges.intersection_page_size_max") = Integer.MAX_VALUE - 1 }
 
       intersectAlot
     }

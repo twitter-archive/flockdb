@@ -4,14 +4,12 @@ import scala.collection.mutable
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
-import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
-import org.specs.Specification
 import conversions.Results._
 import thrift.{Results, Page}
 
 
-object DifferenceQuerySpec extends Specification with JMocker {
+object DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
   "DifferenceQuery" should {
     val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10,11,12))
     val query2 = new queries.SeqQuery(List(3,4,7,11))

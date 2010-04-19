@@ -4,13 +4,12 @@ import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
 import org.specs.mock.JMocker
-import org.specs.Specification
 import conversions.Results._
 import shards.Shard
 import thrift.Results
 
 
-object SimpleQuerySpec extends Specification with JMocker {
+object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
   "SimpleQuery" should {
     var shard: Shard = null
     var simpleQuery: queries.SimpleQuery = null

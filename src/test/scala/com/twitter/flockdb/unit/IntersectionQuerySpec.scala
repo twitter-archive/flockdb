@@ -4,20 +4,18 @@ import scala.util.Sorting
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
-import net.lag.configgy.Configgy
 import org.specs.mock.JMocker
-import org.specs.Specification
 import conversions.Results._
 import thrift.{Results, Page}
 
 
-object IntersectionQuerySpec extends Specification with JMocker {
+object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
   "IntersectionQuery" should {
     val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10))
     val query2 = new queries.SeqQuery(List(1,2,3,4,11))
 
     doBefore {
-      Configgy.config("edges.average_intersection_proportion") = "1.0"
+      config("edges.average_intersection_proportion") = "1.0"
     }
 
     "sizeEstimate" in {

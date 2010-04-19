@@ -5,15 +5,13 @@ import com.twitter.results.Cursor
 import com.twitter.ostrich.Stats
 import com.twitter.xrayspecs.{Eventually, Time}
 import com.twitter.xrayspecs.TimeConversions._
-import net.lag.configgy.Configgy
 import net.lag.smile.kestrel.{KestrelClient, MemoryStore}
-import org.specs.Specification
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
 
 
-object EdgesSpec extends Specification with EdgesReset with Eventually {
+object EdgesSpec extends ConfiguredSpecification with EdgesReset with Eventually {
   import StaticEdges._
 
   val FOLLOWS = 1
@@ -26,7 +24,7 @@ object EdgesSpec extends Specification with EdgesReset with Eventually {
   "Edge Integration" should {
     doBefore {
       edges
-      reset(Configgy.config.configMap("edges"))
+      reset(config.configMap("edges"))
       reset(edges)
       Time.freeze()
     }
