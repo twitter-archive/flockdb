@@ -17,7 +17,8 @@ import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
 import thrift.{Results, EdgeResults}
 
 
-object SqlShardSpec extends ConfiguredSpecification with JMocker with Reset {
+object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatabase {
+  val poolConfig = config.configMap("db.connection_pool")
 
   "Edge SqlShard" should {
     val alice = 1L
@@ -27,7 +28,10 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with Reset {
     val earl = 5L
     val frank = 6L
 
-    val queryEvaluator = queryEvaluatorFactory("localhost", config("edges.db_name"), config("db.username"), config("db.password"))
+    val evalConf = config.configMap("db")
+    evalConf.update("hostname", "localhost")
+    evalConf.update("database", config("edges.db_name"))
+    val queryEvaluator = evaluator(evalConf)
     val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config)
     val shardInfo = new ShardInfo("com.twitter.flockdb.SqlShard",
       "table_001", "localhost", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal, 1)
@@ -35,7 +39,9 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with Reset {
 
     doBefore {
       try {
-        reset(config("edges.db_name"))
+        Time.reset()
+        Time.freeze()
+        reset(config.configMap("db"), config("edges.db_name"))
         shardFactory.materialize(shardInfo)
         shard = shardFactory.instantiate(shardInfo, 1, List[Shard]())
       } catch { case e => e.printStackTrace() }

@@ -7,13 +7,13 @@ import com.twitter.xrayspecs.Eventually
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 
-object IntersectionSpec extends ConfiguredSpecification with Eventually with EdgesReset {
+object IntersectionSpec extends ConfiguredSpecification with Eventually with EdgesDatabase {
+  val poolConfig = config.configMap("db.connection_pool")
+
   import StaticEdges._
 
   val FOLLOWS = 1
 
-  val username = System.getProperty("db.test.user")
-  val password = System.getProperty("db.test.password")
   val alice = 1L
   val bob = 2L
   val carl = 3L
@@ -63,7 +63,6 @@ object IntersectionSpec extends ConfiguredSpecification with Eventually with Edg
 
   "Intersection" should {
     doBefore {
-      reset(config.configMap("edges"))
       reset(edges)
     }
 
