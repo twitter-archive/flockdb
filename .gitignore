@@ -2,7 +2,10 @@ dist/*
 *.log
 flock.ipr
 flock.iws
-target/*
+target/
 .DS_Store
 kestrel/*
 *.hprof.txt
+lib_managed/
+src_managed/
+project/boot/
