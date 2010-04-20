@@ -15,6 +15,7 @@ import conversions.EdgeResults._
 import conversions.Results._
 import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
 import thrift.{Results, EdgeResults}
+import test.EdgesDatabase
 
 
 object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatabase {
