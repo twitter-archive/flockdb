@@ -36,7 +36,9 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
 
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     if (children.size > 0) {
-      children(0).asInstanceOf[Shard].withLock(sourceId)(f)
+      children(0).asInstanceOf[Shard].withLock(sourceId) { (lockedShard, metadata) =>
+        f(this, metadata)
+      }
     } else {
       shard.writeOperation(_.withLock(sourceId)(f))
     }
