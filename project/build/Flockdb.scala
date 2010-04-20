@@ -5,6 +5,8 @@ class FlockdbProject(info: ProjectInfo) extends DefaultProject(info) {
   override def dependencyPath = "lib"
   override def disableCrossPaths = true
 
+  override def managedDependencyPath = ".ivy2cache"
+
   val jbossRepository   = "jboss" at "http://repository.jboss.org/maven2/"
   val lagRepository     = "lag.net" at "http://www.lag.net/repo/"
   val twitterRepository = "twitter.com" at "http://www.lag.net/nest/"
@@ -31,13 +33,11 @@ class FlockdbProject(info: ProjectInfo) extends DefaultProject(info) {
   val thrift    = "thrift" % "libthrift" % "0.2.0"
   val xrayspecs = "com.twitter" % "xrayspecs" % "1.0.7"
 
-  val log4j = (
-    "log4j" % "log4j" % "1.2.12"
-    from "http://mirrors.ibiblio.org/pub/mirrors/maven2/log4j/log4j/1.2.12/log4j-1.2.12.jar")
+  val log4j = "log4j" % "log4j" % "1.2.12"
 
   def thriftCompileTask(lang: String, paths: PathFinder) = dynamic({
     def thriftCompile = {
-      (paths.getPaths.map { path => 
+      (paths.getPaths.map { path =>
         execTask { "thrift --gen %s -o %s %s".format(lang, outputPath.absolutePath, path) }
       } map ( _.run ) flatMap ( _.toList ) toSeq).firstOption
     }
