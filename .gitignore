@@ -9,4 +9,3 @@ kestrel/*
 lib_managed/
 src_managed/
 project/boot/
-.ivy2cache

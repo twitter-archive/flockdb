@@ -6,6 +6,7 @@ import com.twitter.results.Cursor
 import com.twitter.xrayspecs.{Time, Eventually}
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import test.{EdgesDatabase, StaticEdges}
 import thrift._
 
 

@@ -1,4 +1,4 @@
-package com.twitter.flockdb
+package com.twitter.flockdb.test
 
 import com.twitter.gizzard.test.Database
 import com.twitter.ostrich.W3CStats
