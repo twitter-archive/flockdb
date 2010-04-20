@@ -35,9 +35,12 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def archive(sourceId: Long, updatedAt: Time)                                                       = shard.writeOperation(_.archive(sourceId, updatedAt))
 
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
-    if (children.size > 0) {
-      children(0).asInstanceOf[Shard].withLock(sourceId) { (lockedShard, metadata) =>
-        f(this, metadata)
+    if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
+      val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]
+      val lockServer = children.first.asInstanceOf[Shard]
+      val rest = children.drop(1).asInstanceOf[Seq[Shard]]
+      lockServer.withLock(sourceId) { (lock, metadata) =>
+        f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.log, replicatingShard.future)), metadata)
       }
     } else {
       shard.writeOperation(_.withLock(sourceId)(f))
