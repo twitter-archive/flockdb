@@ -31,12 +31,11 @@ object ReadWriteShardAdapterSpec extends ConfiguredSpecification with JMocker wi
 
       expect {
         one(shard2).getMetadata(sourceId) willReturn Some(metadata)
-        one(shard1).add(sourceId, Time.now)
+        one(shard2).add(sourceId, Time.now)
       }
 
       val fake2 = new FakeLockingShard(shard2)
-      val fake3 = new FakeLockingShard(shard3)
-      val fake1 = new FakeReadWriteShard(shard1, null, 1, List[Shard](fake2, fake3))
+      val fake1 = new FakeReadWriteShard(fake2, null, 1, Nil)
       val shard = new ReadWriteShardAdapter(fake1)
       shard.withLock(sourceId) { (innerShard, metadata) =>
         innerShard.add(sourceId, Time.now)
