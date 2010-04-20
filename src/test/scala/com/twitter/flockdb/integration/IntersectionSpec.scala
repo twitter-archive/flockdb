@@ -4,6 +4,7 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Eventually
+import test.{EdgesDatabase, StaticEdges}
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 
