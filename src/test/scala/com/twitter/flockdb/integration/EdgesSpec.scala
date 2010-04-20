@@ -9,6 +9,7 @@ import net.lag.smile.kestrel.{KestrelClient, MemoryStore}
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
+import test.{EdgesDatabase, StaticEdges}
 
 
 object EdgesSpec extends ConfiguredSpecification with EdgesDatabase with Eventually {

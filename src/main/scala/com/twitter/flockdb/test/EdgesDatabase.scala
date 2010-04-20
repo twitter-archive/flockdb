@@ -1,4 +1,4 @@
-package com.twitter.flockdb
+package com.twitter.flockdb.test
 
 import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.querulous.evaluator.StandardQueryEvaluatorFactory
