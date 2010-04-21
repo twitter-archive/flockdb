@@ -3,7 +3,7 @@
 $:.push(File.dirname($0))
 require 'optparse'
 require 'socket'
-require 'simple_thrift'
+require 'simple'
 
 PACKAGE = "com.twitter.service.flock.edges"
 
@@ -21,31 +21,31 @@ SHARD_NAME = Hash[*SHARD_CLASS.map { |a, b| [ b, a ] }.flatten]
 
 DIRECTIONS = [ "backward", "forward" ]
 
-ShardInfo = SimpleThrift.make_struct(:ShardInfo,
-                                     SimpleThrift::Field.new(:class_name, SimpleThrift::STRING, 1),
-                                     SimpleThrift::Field.new(:table_prefix, SimpleThrift::STRING, 2),
-                                     SimpleThrift::Field.new(:hostname, SimpleThrift::STRING, 3),
-                                     SimpleThrift::Field.new(:source_type, SimpleThrift::STRING, 4),
-                                     SimpleThrift::Field.new(:destination_type, SimpleThrift::STRING, 5),
-                                     SimpleThrift::Field.new(:busy, SimpleThrift::I32, 6),
-                                     SimpleThrift::Field.new(:shard_id, SimpleThrift::I32, 7))
+ShardInfo = ThriftClient::Simple.make_struct(:ShardInfo,
+  ThriftClient::Simple::Field.new(:class_name, ThriftClient::Simple::STRING, 1),
+  ThriftClient::Simple::Field.new(:table_prefix, ThriftClient::Simple::STRING, 2),
+  ThriftClient::Simple::Field.new(:hostname, ThriftClient::Simple::STRING, 3),
+  ThriftClient::Simple::Field.new(:source_type, ThriftClient::Simple::STRING, 4),
+  ThriftClient::Simple::Field.new(:destination_type, ThriftClient::Simple::STRING, 5),
+  ThriftClient::Simple::Field.new(:busy, ThriftClient::Simple::I32, 6),
+  ThriftClient::Simple::Field.new(:shard_id, ThriftClient::Simple::I32, 7))
 
-ShardChild = SimpleThrift.make_struct(:ShardChild,
-                                      SimpleThrift::Field.new(:shard_id, SimpleThrift::I32, 1),
-                                      SimpleThrift::Field.new(:weight, SimpleThrift::I32, 2))
+ShardChild = ThriftClient::Simple.make_struct(:ShardChild,
+  ThriftClient::Simple::Field.new(:shard_id, ThriftClient::Simple::I32, 1),
+  ThriftClient::Simple::Field.new(:weight, ThriftClient::Simple::I32, 2))
 
-Forwarding = SimpleThrift.make_struct(:Forwarding,
-                                      SimpleThrift::Field.new(:table_id, SimpleThrift::I32, 1),
-                                      SimpleThrift::Field.new(:base_id, SimpleThrift::I64, 2),
-                                      SimpleThrift::Field.new(:shard_id, SimpleThrift::I32, 3))
+Forwarding = ThriftClient::Simple.make_struct(:Forwarding,
+  ThriftClient::Simple::Field.new(:table_id, ThriftClient::Simple::I32, 1),
+  ThriftClient::Simple::Field.new(:base_id, ThriftClient::Simple::I64, 2),
+  ThriftClient::Simple::Field.new(:shard_id, ThriftClient::Simple::I32, 3))
 
-ShardMigration = SimpleThrift.make_struct(:ShardMigration,
-                                          SimpleThrift::Field.new(:source_shard_id, SimpleThrift::I32, 1),
-                                          SimpleThrift::Field.new(:destination_shard_id, SimpleThrift::I32, 2),
-                                          SimpleThrift::Field.new(:replicating_shard_id, SimpleThrift::I32, 3),
-                                          SimpleThrift::Field.new(:write_only_shard_id, SimpleThrift::I32, 4))
+ShardMigration = ThriftClient::Simple.make_struct(:ShardMigration,
+  ThriftClient::Simple::Field.new(:source_shard_id, ThriftClient::Simple::I32, 1),
+  ThriftClient::Simple::Field.new(:destination_shard_id, ThriftClient::Simple::I32, 2),
+  ThriftClient::Simple::Field.new(:replicating_shard_id, ThriftClient::Simple::I32, 3),
+  ThriftClient::Simple::Field.new(:write_only_shard_id, ThriftClient::Simple::I32, 4))
 
-class ShardManager < SimpleThrift::ThriftService
+class ShardManager < ThriftClient::Simple::ThriftService
   thrift_method :create_shard, i32, field(:shard, struct(ShardInfo), 1)
   thrift_method :find_shard, i32, field(:shard, struct(ShardInfo), 1)
   thrift_method :get_shard, struct(ShardInfo), field(:shard_id, i32, 1)
@@ -80,7 +80,7 @@ class ShardManager < SimpleThrift::ThriftService
   thrift_method :rebuild_schema, void
 end
 
-class JobManager < SimpleThrift::ThriftService
+class JobManager < ThriftClient::Simple::ThriftService
   thrift_method :retry_errors, void
   thrift_method :stop_writes, void
   thrift_method :resume_writes, void
@@ -305,7 +305,7 @@ def make_shard(hostnames, lower_bound, num)
   column_type = "INT UNSIGNED"
   $options[:graphs].each do |graph_id|
     [ 0, 1 ].each do |direction|
-      table_ids << direction == 1 ? graph_id : -graph_id
+      table_ids << (direction == 1 ? graph_id : -graph_id)
       table_names << "edges_#{DIRECTIONS[direction]}_#{graph_id}_%03d" % num
     end
   end
@@ -319,7 +319,7 @@ def make_shard(hostnames, lower_bound, num)
     end
     replica_shard = ShardInfo.new("#{PACKAGE}.#{SHARD_CLASS[:replica]}", "#{table_name}_replicating", "localhost", "", "", 0, 0)
     replica_id = $service.create_shard(replica_shard)
-    shard_id_set.each_with_index { |shard_id, n| $service.add_child_shard(replica_id, shard_id, n, $options[:weight]) }
+    shard_id_set.each_with_index { |shard_id, n| $service.add_child_shard(replica_id, shard_id, (n == 0) ? $options[:weight] : 1) }
 
     $service.set_forwarding(Forwarding.new(table_id, lower_bound, replica_id))
   end
@@ -331,10 +331,12 @@ end
 def show_forwardings
   puts "GRAPH  BASE_USER_ID    SHARD"
   $service.get_forwardings().each do |forwarding|
+    if $options[:graphs] and !$options[:graphs].include?(forwarding.table_id) and !$options[:graphs].include?(-forwarding.table_id)
+      next
+    end
     shard = $service.get_shard(forwarding.shard_id)
-    table_id = forwarding.table_id >= 2**31 - 1 ? forwarding.table_id - 2**32 : forwarding.table_id
-    is_forward = table_id > 0
-    puts "%3d %015x %s %s" % [table_id.abs, forwarding.base_id, is_forward ? "->" : "<-", pp_shard(get_shard(shard)) ]
+    is_forward = forwarding.table_id > 0
+    puts "%3d %015x %s %s" % [forwarding.table_id.abs, forwarding.base_id, is_forward ? "->" : "<-", pp_shard(get_shard(shard)) ]
   end
 end
 
@@ -798,6 +800,12 @@ def parse_args
   rescue
   end
 
+  # let ~/.flockdbs be a default set of databases
+  begin
+    options[:host_lists] = File.open("#{ENV['HOME']}/.flockdbs").readlines.map { |x| x.strip }.select { |x| x.size > 0 }.map { |h| h.split(",") }
+  rescue
+  end
+
   opts = OptionParser.new do |opts|
     opts.banner = "Usage: flocker.rb [options] <command>"
 
@@ -926,9 +934,9 @@ when "setup-dev"
   end
   setup_dev_shards
 when "mkshards"
-  (usage; exit) if ARGV.size < 3 || !options[:graphs]
+  (usage; exit) if ARGV.size < 2 || !options[:graphs] || (ARGV.size < 3 && !options[:host_lists])
   num_shards = ARGV[1].to_i
-  host_lists = ARGV[2].split(";").map { |h| h.split(",") }
+  host_lists = $options[:host_lists] || ARGV[2].split(";").map { |h| h.split(",") }
   if host_lists.any? { |h| h.size != host_lists[0].size }
     puts "Host list sizes are not the same: #{host_lists.inspect}"
     exit 1
