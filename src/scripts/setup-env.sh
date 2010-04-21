@@ -1,11 +1,14 @@
 #!/bin/sh
 
-if java -version 2>&1 |grep "1\.5";
-  then echo "Java must be at least 1.6"
+if java -version 2>&1 |grep "1\.5"; then
+  echo "Java must be at least 1.6"
+  exit 1
 fi
 
-${DB_USERNAME?"Please set DB_USERNAME"}
-${DB_PASSWORD?"Please set DB_PASSWORD"}
+if [ "x$DB_USERNAME" = "x" -o "x$DB_PASSWORD" = "x" ]; then
+  echo "Please set DB_USERNAME and DB_PASSWORD."
+  exit 1
+fi
 
 echo "Killing any running flockdb..."
 curl http://localhost:9990/shutdown >/dev/null 2>/dev/null
