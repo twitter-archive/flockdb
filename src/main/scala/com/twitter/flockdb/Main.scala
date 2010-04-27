@@ -66,8 +66,8 @@ object Main extends Service {
     log.info("Going quiescent.")
     stopThrift()
 
-    while (flock.schedule.size > 0) {
-      log.info("Waiting for job queue to drain: jobs=%d", flock.schedule.size)
+    while (flock.edges.schedule.size > 0) {
+      log.info("Waiting for job queue to drain: jobs=%d", flock.edges.schedule.size)
       Thread.sleep(100)
     }
 
@@ -100,14 +100,15 @@ object Main extends Service {
       thriftServer = TSelectorServer("edges", config("edges.server_port").toInt, processor,
                                      executor, clientTimeout, idleTimeout)
 
-      val shardServer = new ShardManagerService(flock.nameServer, flock.copyFactory,
-                                                flock.schedule(Priority.Medium.id))
+      val shardServer = new ShardManagerService(flock.edges.nameServer,
+                                                flock.edges.copyFactory,
+                                                flock.edges.schedule(Priority.Medium.id))
       val shardProcessor = new ShardManager.Processor(
         FlockExceptionWrappingProxy[ShardManager.Iface](
           LoggingProxy[ShardManager.Iface](Stats, w3c, "EdgesShards", shardServer)))
       shardThriftServer = TSelectorServer("edges-shards", config("edges.shard_server_port").toInt,
                                           shardProcessor, executor, clientTimeout, idleTimeout)
-      val jobServer = new JobManagerService(flock.schedule)
+      val jobServer = new JobManagerService(flock.edges.schedule)
       val jobProcessor = new JobManager.Processor(
         FlockExceptionWrappingProxy[JobManager.Iface](
           LoggingProxy[JobManager.Iface](Stats, w3c, "EdgesJobs", jobServer)))
@@ -137,7 +138,7 @@ object Main extends Service {
   }
 
   def finishShutdown() {
-    flock.schedule.shutdown()
+    flock.edges.schedule.shutdown()
     if (statsLogger ne null) {
       statsLogger.shutdown()
       statsLogger = null

@@ -18,25 +18,25 @@ trait EdgesDatabase extends NameServerDatabase {
       val queryEvaluator = evaluator(config)
 
       for (graph <- (1 until 10)) {
-        val forwardShardId = flock.nameServer.createShard(new ShardInfo("com.twitter.flockdb.SqlShard",
+        val forwardShardId = flock.edges.nameServer.createShard(new ShardInfo("com.twitter.flockdb.SqlShard",
           "forward_" + graph, "localhost", "INT UNSIGNED", "INT UNSIGNED"))
-        val backwardShardId = flock.nameServer.createShard(new ShardInfo("com.twitter.flockdb.SqlShard",
+        val backwardShardId = flock.edges.nameServer.createShard(new ShardInfo("com.twitter.flockdb.SqlShard",
           "backward_" + graph, "localhost", "INT UNSIGNED", "INT UNSIGNED"))
         queryEvaluator.execute("DELETE FROM forward_" + graph + "_edges")
         queryEvaluator.execute("DELETE FROM forward_" + graph + "_metadata")
         queryEvaluator.execute("DELETE FROM backward_" + graph + "_edges")
         queryEvaluator.execute("DELETE FROM backward_" + graph + "_metadata")
 
-        val replicatingForwardShardId = flock.nameServer.createShard(new ShardInfo("com.twitter.gizzard.shards.ReplicatingShard",
+        val replicatingForwardShardId = flock.edges.nameServer.createShard(new ShardInfo("com.twitter.gizzard.shards.ReplicatingShard",
           "replicating_forward_" + graph, "localhost", "", ""))
-        val replicatingBackwardShardId = flock.nameServer.createShard(new ShardInfo("com.twitter.gizzard.shards.ReplicatingShard",
+        val replicatingBackwardShardId = flock.edges.nameServer.createShard(new ShardInfo("com.twitter.gizzard.shards.ReplicatingShard",
           "replicating_backward_" + graph, "localhost", "", ""))
-        flock.nameServer.addChildShard(replicatingForwardShardId, forwardShardId, 1)
-        flock.nameServer.addChildShard(replicatingBackwardShardId, backwardShardId, 1)
-        flock.nameServer.setForwarding(new Forwarding(graph, 0, replicatingForwardShardId))
-        flock.nameServer.setForwarding(new Forwarding(-1 * graph, 0, replicatingBackwardShardId))
+        flock.edges.nameServer.addChildShard(replicatingForwardShardId, forwardShardId, 1)
+        flock.edges.nameServer.addChildShard(replicatingBackwardShardId, backwardShardId, 1)
+        flock.edges.nameServer.setForwarding(new Forwarding(graph, 0, replicatingForwardShardId))
+        flock.edges.nameServer.setForwarding(new Forwarding(-1 * graph, 0, replicatingBackwardShardId))
       }
-      flock.nameServer.reload()
+      flock.edges.nameServer.reload()
     } catch {
       case e =>
         e.printStackTrace()
