@@ -111,23 +111,26 @@ struct EdgeResults {
 }
 
 service FlockDB {
-  // return true if the edge exists.
+  # return true if the edge exists.
   bool contains(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
   
-  // return all data about an edge if it exists (otherwise, throw an exception).
+  # return all data about an edge if it exists (otherwise, throw an exception).
   Edge get(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
 
-  // perform a list of queries in parallel. each query may be paged, and may be compound.
+  # perform a list of queries in parallel. each query may be paged, and may be compound.
   list<Results> select2(1: list<SelectQuery> queries) throws(1: FlockException ex)
 
-  // perform a list of queries in parallel, and return the count 
+  # perform a list of queries in parallel, and return the counts of results.
+  # if the queries are compound, the counts will be estimates.
   binary count2(1: list<list<SelectOperation>> queries) throws(1: FlockException ex)
+
+  # perferm a list of simple queries and return the results as full Edge objects.
+  # compound queries are not supported.
   list<EdgeResults> select_edges(1: list<EdgeQuery> queries) throws(1: FlockException ex)
+
   void execute(1: ExecuteOperations operations) throws(1: FlockException ex)
 
-  // deprecated:
-  binary counts_of_destinations_for(1: binary source_ids, 2: i32 graph_id) throws(1: FlockException ex)
-  binary counts_of_sources_for(1: binary destination_ids, 2: i32 graph_id) throws(1: FlockException ex)
+  # deprecated:
   i32 count(1: list<SelectOperation> operations)
   Results select(1: list<SelectOperation> operations, 2: Page page)
 }
