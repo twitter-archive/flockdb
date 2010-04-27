@@ -9,14 +9,6 @@
   <property name="ivy.settings.file" value="${basedir}/ivy/ivysettings.xml"/>
   <import file="${basedir}/ant/bootstrap.xml"/>
 
-  <property name="install.dir" location="/opt/local/flock"/>
-  <target name="install" depends="package">
-    <mkdir dir="${install.dir}"/>
-    <copy todir="${install.dir}">
-      <fileset dir="${dist.dir}" includes="**"/>
-    </copy>
-  </target>
-
   <target name="launch" depends="compile" description="launch flockdb in development mode with a modest memory footprint">
     <java classname="scala.tools.nsc.MainGenericRunner" fork="true" spawn="true">
       <classpath>
