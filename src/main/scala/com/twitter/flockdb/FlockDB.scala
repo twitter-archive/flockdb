@@ -135,18 +135,11 @@ object FlockDB {
 
     scheduler.start()
 
-    new FlockDB(nameServer, forwardingManager, copyFactory, scheduler, future)
+    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
   }
 }
 
-class FlockDB(val nameServer: nameserver.NameServer[shards.Shard],
-              val forwardingManager: ForwardingManager,
-              val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
-              val schedule: PrioritizingJobScheduler, future: Future)
-  extends thrift.FlockDB.Iface {
-
-  private val edges = new EdgesService(nameServer, forwardingManager, copyFactory, schedule, future)
-
+class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
