@@ -128,7 +128,9 @@ object EdgesSpec extends ConfiguredSpecification with EdgesDatabase with Eventua
       flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
 
-      flock.counts_of_sources_for(List[Long](bob, carl, darcy).pack, FOLLOWS).toList must eventually(be_==(List[Int](1, 1, 1).pack.toList))
+      flock.count2(List(Select((), FOLLOWS, bob).toThrift,
+                        Select((), FOLLOWS, carl).toThrift,
+                        Select((), FOLLOWS, darcy).toThrift).toJavaList).toIntArray.toList must eventually(be_==(List(1, 1, 1)))
     }
 
     "select_edges" in {

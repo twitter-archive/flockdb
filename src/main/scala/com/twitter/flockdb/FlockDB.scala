@@ -148,14 +148,6 @@ class FlockDB(val nameServer: nameserver.NameServer[shards.Shard],
   private val selectCompiler = new SelectCompiler(forwardingManager)
   private val executeCompiler = new ExecuteCompiler(schedule)
 
-  def counts_of_destinations_for(source_ids: Array[Byte], graph_id: Int) = {
-    new shards.MultiShard(forwardingManager, source_ids.toLongArray, graph_id, Forward).counts.pack
-  }
-
-  def counts_of_sources_for(destination_ids: Array[Byte], graph_id: Int) = {
-    new shards.MultiShard(forwardingManager, destination_ids.toLongArray, graph_id, Backward).counts.pack
-  }
-
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     forwardingManager.find(source_id, graph_id, Forward).get(source_id, destination_id).map { edge =>
       edge.state == State.Normal || edge.state == State.Negative

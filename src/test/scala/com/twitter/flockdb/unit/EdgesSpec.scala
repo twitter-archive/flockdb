@@ -33,32 +33,6 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val copyFactory = mock[gizzard.jobs.CopyFactory[Shard]]
     val flock = new FlockDB(nameServer, forwardingManager, copyFactory, scheduler, future)
 
-    "counts_of_destinations_for" in {
-      val list = new mutable.ArrayBuffer[Long]
-      list += bob
-      list += mary
-
-      expect {
-        one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
-        one(forwardingManager).find(mary, FOLLOWS, Direction.Forward) willReturn shard
-        one(shard).counts(list, mutable.Map.empty[Long, Int])
-      }
-      flock.counts_of_destinations_for(list.pack, FOLLOWS).toList mustEqual List(0, 0).pack.toList
-    }
-
-    "counts_of_sources_for" in {
-      val list = new mutable.ArrayBuffer[Long]
-      list += bob
-      list += mary
-
-      expect {
-        one(forwardingManager).find(bob, FOLLOWS, Direction.Backward) willReturn shard
-        one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard
-        one(shard).counts(list, mutable.Map.empty[Long, Int])
-      }
-      flock.counts_of_sources_for(list.pack, FOLLOWS).toList mustEqual List(0, 0).pack.toList
-    }
-
     "add" in {
       Time.freeze()
       val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
