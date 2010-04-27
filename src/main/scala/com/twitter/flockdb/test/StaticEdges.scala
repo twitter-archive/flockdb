@@ -8,13 +8,15 @@ import net.lag.logging.Logger
 
 object StaticEdges extends Database {
   Configgy.configure("config/test.conf")
+
   val poolConfig = Configgy.config.configMap("db.connection_pool")
   val log = Logger.get
   val config = Configgy.config
   val w3c = new W3CStats(log, config.getList("edges.w3c").toArray)
-  val stats = Edges.statsCollector(w3c)
-  lazy val edges = try {
-    Edges(config, databaseFactory, databaseFactory, w3c, stats)
+  val stats = FlockDB.statsCollector(w3c)
+
+  lazy val flock = try {
+    FlockDB(config, databaseFactory, databaseFactory, w3c, stats)
   } catch {
     case e =>
       e.printStackTrace()

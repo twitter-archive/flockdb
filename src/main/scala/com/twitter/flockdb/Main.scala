@@ -22,7 +22,7 @@ object Main extends Service {
   var thriftServer: TSelectorServer = null
   var shardThriftServer: TSelectorServer = null
   var jobThriftServer: TSelectorServer = null
-  var edges: Edges = null
+  var flock: FlockDB = null
 
   var config: ConfigMap = null
 
@@ -66,8 +66,8 @@ object Main extends Service {
     log.info("Going quiescent.")
     stopThrift()
 
-    while (edges.schedule.size > 0) {
-      log.info("Waiting for job queue to drain: jobs=%d", edges.schedule.size)
+    while (flock.schedule.size > 0) {
+      log.info("Waiting for job queue to drain: jobs=%d", flock.schedule.size)
       Thread.sleep(100)
     }
 
@@ -87,27 +87,27 @@ object Main extends Service {
       // there are a bunch of things we report that aren't in the w3c list above.
       w3c.complainAboutUnregisteredFields = false
 
-      edges = Edges(config, w3c)
+      flock = FlockDB(config, w3c)
 
       val clientTimeout = config("edges.client_timeout_msec").toInt.milliseconds
       val idleTimeout = config("edges.idle_timeout_sec").toInt.seconds
 
       val executor = TSelectorServer.makeThreadPoolExecutor(config.configMap("edges"))
 
-      val processor = new thrift.Edges.Processor(
-        FlockExceptionWrappingProxy[thrift.Edges.Iface](
-          LoggingProxy[thrift.Edges.Iface](Stats, w3c, "Edges", edges)))
+      val processor = new thrift.FlockDB.Processor(
+        FlockExceptionWrappingProxy[thrift.FlockDB.Iface](
+          LoggingProxy[thrift.FlockDB.Iface](Stats, w3c, "Edges", flock)))
       thriftServer = TSelectorServer("edges", config("edges.server_port").toInt, processor,
                                      executor, clientTimeout, idleTimeout)
 
-      val shardServer = new ShardManagerService(edges.nameServer, edges.copyFactory,
-                                                edges.schedule(Priority.Medium.id))
+      val shardServer = new ShardManagerService(flock.nameServer, flock.copyFactory,
+                                                flock.schedule(Priority.Medium.id))
       val shardProcessor = new ShardManager.Processor(
         FlockExceptionWrappingProxy[ShardManager.Iface](
           LoggingProxy[ShardManager.Iface](Stats, w3c, "EdgesShards", shardServer)))
       shardThriftServer = TSelectorServer("edges-shards", config("edges.shard_server_port").toInt,
                                           shardProcessor, executor, clientTimeout, idleTimeout)
-      val jobServer = new JobManagerService(edges.schedule)
+      val jobServer = new JobManagerService(flock.schedule)
       val jobProcessor = new JobManager.Processor(
         FlockExceptionWrappingProxy[JobManager.Iface](
           LoggingProxy[JobManager.Iface](Stats, w3c, "EdgesJobs", jobServer)))
@@ -137,7 +137,7 @@ object Main extends Service {
   }
 
   def finishShutdown() {
-    edges.schedule.shutdown()
+    flock.schedule.shutdown()
     if (statsLogger ne null) {
       statsLogger.shutdown()
       statsLogger = null

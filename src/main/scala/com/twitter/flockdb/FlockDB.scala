@@ -34,7 +34,7 @@ import Direction._
 import thrift.FlockException
 
 
-object Edges {
+object FlockDB {
   def convertConfigMap(queryMap: ConfigMap) = {
     val queryInfo = new mutable.HashMap[String, (String, Duration)]
     for (key <- queryMap.keys) {
@@ -53,14 +53,14 @@ object Edges {
     }
   }
 
-  def apply(config: ConfigMap, w3c: W3CStats): Edges = {
+  def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
     val stats = statsCollector(w3c)
     val dbFactory = AutoDatabaseFactory(config.configMap("db.connection_pool"), Some(stats))
     val nameServerDbFactory = AutoDatabaseFactory(config.configMap("nameserver.connection_pool"), Some(stats))
     apply(config, dbFactory, nameServerDbFactory, w3c, stats)
   }
 
-  def apply(config: ConfigMap, dbFactory: DatabaseFactory, nameServerDbFactory: DatabaseFactory, w3c: W3CStats, stats: StatsCollector): Edges = {
+  def apply(config: ConfigMap, dbFactory: DatabaseFactory, nameServerDbFactory: DatabaseFactory, w3c: W3CStats, stats: StatsCollector): FlockDB = {
     val sqlQueryFactory = new SqlQueryFactory
     val (dbQueryInfo, nameServerQueryInfo) = (convertConfigMap(config.configMap("db.queries")), convertConfigMap(config.configMap("nameserver.queries")))
 
@@ -135,15 +135,15 @@ object Edges {
 
     scheduler.start()
 
-    new Edges(nameServer, forwardingManager, copyFactory, scheduler, future)
+    new FlockDB(nameServer, forwardingManager, copyFactory, scheduler, future)
   }
 }
 
-class Edges(val nameServer: nameserver.NameServer[shards.Shard],
-            val forwardingManager: ForwardingManager,
-            val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
-            val schedule: PrioritizingJobScheduler, future: Future)
-  extends thrift.Edges.Iface {
+class FlockDB(val nameServer: nameserver.NameServer[shards.Shard],
+              val forwardingManager: ForwardingManager,
+              val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
+              val schedule: PrioritizingJobScheduler, future: Future)
+  extends thrift.FlockDB.Iface {
 
   private val selectCompiler = new SelectCompiler(forwardingManager)
   private val executeCompiler = new ExecuteCompiler(schedule)
