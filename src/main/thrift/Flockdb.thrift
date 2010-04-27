@@ -1,5 +1,5 @@
 namespace java com.twitter.flockdb.thrift
-namespace rb Edges
+namespace rb Flock
 
 exception FlockException {
   1: string description
@@ -50,6 +50,18 @@ enum EdgeState {
   Archived = 2
 }
 
+# Basic FlockDB query term.
+# Terms can query a specific edge in either direction, or a one-to-many edge in either direction.
+# Wildcard queries can be specified by leaving `destination_ids` empty.
+# Only edges matching the set of given `state_ids` are included.
+#
+# Examples:
+#   (30, 2, true, [40], [Positive])
+#       -- in graph 2, is there an edge from 30 -> 40?
+#   (30, 1, false, [40, 50, 60], [Positive])
+#       -- in graph 1, which of (40 -> 30, 50 -> 30, 60 -> 30) exist?
+#   (30, 3, false, [], [Removed, Archived])
+#       -- in graph 3, which edges point to -> 30, and are either removed or archived?
 struct QueryTerm {
   1: i64 source_id
   2: i32 graph_id
@@ -98,12 +110,18 @@ struct EdgeResults {
   3: i64 prev_cursor
 }
 
-service Edges {
+service FlockDB {
+  // return true if the edge exists.
   bool contains(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
+  
+  // return all data about an edge if it exists (otherwise, throw an exception).
   Edge get(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
 
-  binary count2(1: list<list<SelectOperation>> queries) throws(1: FlockException ex)
+  // perform a list of queries in parallel. each query may be paged, and may be compound.
   list<Results> select2(1: list<SelectQuery> queries) throws(1: FlockException ex)
+
+  // perform a list of queries in parallel, and return the count 
+  binary count2(1: list<list<SelectOperation>> queries) throws(1: FlockException ex)
   list<EdgeResults> select_edges(1: list<EdgeQuery> queries) throws(1: FlockException ex)
   void execute(1: ExecuteOperations operations) throws(1: FlockException ex)
 

@@ -24,23 +24,23 @@ object SelectCompilerSpec extends ConfiguredSpecification with Eventually with E
     val darcy = 4L
 
     doBefore {
-      reset(edges)
+      reset(flock)
     }
 
     def setup1() {
-      edges.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      edges.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      edges.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-      edges.execute(Select(carl, FOLLOWS, bob).add.toThrift)
-      edges.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
-      edges.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
+      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+      flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+      flock.execute(Select(carl, FOLLOWS, bob).add.toThrift)
+      flock.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
+      flock.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
     }
 
     def setup2() {
-      for (i <- 1 until 11) edges.execute(Select(alice, FOLLOWS, i).add.toThrift)
-      for (i <- 1 until 7) edges.execute(Select(bob, FOLLOWS, i * 2).add.toThrift)
-      edges.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
-      edges.count(Select(bob, FOLLOWS, ()).toThrift) must eventually(be_==(6))
+      for (i <- 1 until 11) flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+      for (i <- 1 until 7) flock.execute(Select(bob, FOLLOWS, i * 2).add.toThrift)
+      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
+      flock.count(Select(bob, FOLLOWS, ()).toThrift) must eventually(be_==(6))
     }
 
     "pagination" in {
@@ -57,13 +57,13 @@ object SelectCompilerSpec extends ConfiguredSpecification with Eventually with E
         new SelectOperation(SelectOperationType.Intersection) :: Nil
 
       var result = new Results(List[Long](darcy).pack, darcy, Cursor.End.position)
-      edges.select(program.toJavaList, new Page(1, Cursor.Start.position)) mustEqual result
+      flock.select(program.toJavaList, new Page(1, Cursor.Start.position)) mustEqual result
 
       result = new Results(List[Long](bob).pack, Cursor.End.position, -bob)
-      edges.select(program.toJavaList, new Page(1, darcy)) mustEqual result
+      flock.select(program.toJavaList, new Page(1, darcy)) mustEqual result
 
       result = new Results(List[Long](darcy, bob).pack, Cursor.End.position, Cursor.End.position)
-      edges.select(program.toJavaList, new Page(2, Cursor.Start.position)) mustEqual result
+      flock.select(program.toJavaList, new Page(2, Cursor.Start.position)) mustEqual result
     }
 
     "one list is empty" in {
@@ -79,7 +79,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with Eventually with E
       op2.setTerm(term2)
       var program = op1 :: op2 ::
         new SelectOperation(SelectOperationType.Intersection) :: Nil
-      edges.select(program.toJavaList, new Page(10, Cursor.Start.position)) mustEqual result
+      flock.select(program.toJavaList, new Page(10, Cursor.Start.position)) mustEqual result
     }
 
     "difference" in {
@@ -94,10 +94,10 @@ object SelectCompilerSpec extends ConfiguredSpecification with Eventually with E
       op2.setTerm(term2)
       var program = op1 :: op2 ::
         new SelectOperation(SelectOperationType.Difference) :: Nil
-      edges.select(program.toJavaList, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
-      edges.select(program.toJavaList, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
-      edges.select(program.toJavaList, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
-      edges.select(program.toJavaList, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
+      flock.select(program.toJavaList, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
+      flock.select(program.toJavaList, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
+      flock.select(program.toJavaList, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
+      flock.select(program.toJavaList, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
     }
   }
 }

@@ -31,7 +31,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[PrioritizingJobScheduler]
     val future = mock[Future]
     val copyFactory = mock[gizzard.jobs.CopyFactory[Shard]]
-    val edges = new Edges(nameServer, forwardingManager, copyFactory, scheduler, future)
+    val flock = new FlockDB(nameServer, forwardingManager, copyFactory, scheduler, future)
 
     "counts_of_destinations_for" in {
       val list = new mutable.ArrayBuffer[Long]
@@ -43,7 +43,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(forwardingManager).find(mary, FOLLOWS, Direction.Forward) willReturn shard
         one(shard).counts(list, mutable.Map.empty[Long, Int])
       }
-      edges.counts_of_destinations_for(list.pack, FOLLOWS).toList mustEqual List(0, 0).pack.toList
+      flock.counts_of_destinations_for(list.pack, FOLLOWS).toList mustEqual List(0, 0).pack.toList
     }
 
     "counts_of_sources_for" in {
@@ -56,7 +56,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard
         one(shard).counts(list, mutable.Map.empty[Long, Int])
       }
-      edges.counts_of_sources_for(list.pack, FOLLOWS).toList mustEqual List(0, 0).pack.toList
+      flock.counts_of_sources_for(list.pack, FOLLOWS).toList mustEqual List(0, 0).pack.toList
     }
 
     "add" in {
@@ -65,7 +65,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       expect {
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
-      edges.execute(Select(bob, FOLLOWS, mary).add.toThrift)
+      flock.execute(Select(bob, FOLLOWS, mary).add.toThrift)
     }
 
     "add_at" in {
@@ -73,7 +73,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       expect {
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
-      edges.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
+      flock.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
     }
 
     "remove" in {
@@ -82,7 +82,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       expect {
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
-      edges.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
+      flock.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
     }
 
     "remove_at" in {
@@ -90,7 +90,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       expect {
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
-      edges.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)
+      flock.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)
     }
 
     "contains" in {
@@ -98,7 +98,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
         one(shard).get(bob, mary) willReturn Some(new Edge(bob, mary, 0, Time.now, 1, State.Normal))
       }
-      edges.contains(bob, FOLLOWS, mary) must beTrue
+      flock.contains(bob, FOLLOWS, mary) must beTrue
     }
   }
 }
