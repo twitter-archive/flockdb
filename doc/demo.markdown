@@ -163,9 +163,12 @@ FlockDB can also perform a "mass-action" on all edges going to (or from) a verte
 
 which can be useful when removing a vertex from the system.
 
-Once an edge has been added to the system, it's never deleted. Instead, the state of an edge can be changed to "removed" or "archived". Removing an edge is similar to deleting it, except that the row isn't deleted from mysql for performance reasons.
+Once an edge has been added to the system, it's never deleted. Instead, the state of an edge can be
+changed to "removed" or "archived". Removing an edge is similar to deleting it, except that the row
+isn't deleted from mysql for performance reasons.
 
-Archiving an edge changes its state to "archived", which hides it from normal queries, but allows it to be restored to a normal state by "un-archiving" it.
+Archiving an edge changes its state to "archived", which hides it from normal queries, but allows it
+to be restored to a normal state by "un-archiving" it.
 
     >> flock.archive(229, :follows, nil)
     >> flock.unarchive(229, :follows, nil)

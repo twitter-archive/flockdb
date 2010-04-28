@@ -50,6 +50,11 @@ user 134 is Nick, and user 90 is Robey, then FlockDB can store:
     forward: Nick follows Robey at 9:54 today
     backward: Robey is followed by Nick at 9:54 today
 
+The (source, destination) must be unique: only one edge can point from node A to node B, but the
+position and state may be modified at any time. Position is used only for sorting the results of
+queries, and state is used to mark edges that have been removed or archived (placed into cold
+sleep).
+
 
 # Building
 
