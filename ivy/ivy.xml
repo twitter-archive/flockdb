@@ -27,7 +27,7 @@
     <dependency org="com.twitter" name="xrayspecs" rev="1.0.5" />
     <dependency org="com.twitter" name="querulous" rev="1.1.7" />
     <dependency org="com.twitter" name="results" rev="1.0" />
-    <dependency org="com.twitter" name="gizzard" rev="1.0.5" />
+    <dependency org="com.twitter" name="gizzard" rev="1.0.8" />
 
     <dependency org="net.lag" name="configgy" rev="1.5.2" />
     <dependency org="net.lag" name="smile" rev="0.8.11" />
