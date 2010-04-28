@@ -2,6 +2,7 @@ import sbt._
 import Process._
 import java.io.File
 
+
 class FlockdbProject(info: ProjectInfo) extends DefaultProject(info) {
   override def dependencyPath = "lib"
   override def disableCrossPaths = true
