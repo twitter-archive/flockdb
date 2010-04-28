@@ -344,7 +344,9 @@ end
 
 def show_forwardings
   puts "GRAPH  BASE_USER_ID    SHARD"
-  $service.get_forwardings().each do |forwarding|
+  $service.get_forwardings().sort_by do |f|
+    [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
+  end.each do |forwarding|
     if $options[:graphs] and !$options[:graphs].include?(forwarding.table_id) and !$options[:graphs].include?(-forwarding.table_id)
       next
     end
