@@ -83,18 +83,14 @@ instance of FlockDB. It also shows how to add edges, query them, etc.
 
 # Community
 
+- Twitter: #flockdb
 - IRC: #twinfra on freenode (irc.freenode.net)
-- mailing list: TBA
+- Mailing list: <flockdb@googlegroups.com> [subscribe](http://groups.google.com/group/flockdb)
 
 
 # Contributors
 
-- Nick Kallen
-- Robey Pointer
-- John Kalucki
-- Ed Ceaser
-
-
-
-
-
+- Nick Kallen @nk
+- Robey Pointer @robey
+- John Kalucki @jkalucki
+- Ed Ceaser @asdf
