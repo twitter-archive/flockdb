@@ -18,6 +18,8 @@ If you haven't built flockdb yet, do that first:
 
     $ ant
 
+You may need to set `DB_USERNAME` and `DB_PASSWORD` for tests to complete (see below).
+
 
 ## Setting up shards
 
@@ -155,6 +157,19 @@ It's not a transaction in the database sense, but just a way to bundle multiple 
 single RPC call. Flockdb accepts the collection of modifications with a single "okay" and promises
 to take care of all of them eventually.
 
+FlockDB can also perform a "mass-action" on all edges going to (or from) a vertex:
+
+    >> flock.remove(229, :follows, nil)
+
+which can be useful when removing a vertex from the system.
+
+Once an edge has been added to the system, it's never deleted. Instead, the state of an edge can be changed to "removed" or "archived". Removing an edge is similar to deleting it, except that the row isn't deleted from mysql for performance reasons.
+
+Archiving an edge changes its state to "archived", which hides it from normal queries, but allows it to be restored to a normal state by "un-archiving" it.
+
+    >> flock.archive(229, :follows, nil)
+    >> flock.unarchive(229, :follows, nil)
+
 
 ## Compound queries
 
@@ -187,6 +202,25 @@ If the result set is really long, you may want to page through them.
     => [30, 22]
     >> pager.next_page
     => [21, 20]
+
+For stateless interaction (like websites), you can manually retrieve the next and previous cursor:
+
+    >> query = flock.select(1, :follows, nil).union(nil, :follows, 1)
+    >> page, next_cursor, prev_cursor = query.paginate(2).unapply
+    => [[30, 22], 1334246632933954956, 0]
+    >> page, next_cursor, prev_cursor = query.paginate(2, next_cursor).unapply
+    => [[21, 20], 0, -1334246630353519131]
+
+The client library can also handle pagination automatically for you:
+
+    >> flock.select(1, :follows, nil).union(nil, :follows, 1).paginate(2).each { |n| puts n }
+    30
+    22
+    21
+    20
+
+(The client is fetching a page of 2 results at a time, and querying for the next page every time it
+runs out.)
 
 
 ## Migrations
