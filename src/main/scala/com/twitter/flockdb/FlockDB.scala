@@ -145,7 +145,7 @@ object FlockDB {
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
-    polymorphicJobParser += ("flockdb\\.jobs\\.(Copy|Migrate|MetadataCopy|MetadataMigrate)".r, copyJobParser)
+    polymorphicJobParser += ("\\.jobs\\.(Copy|Migrate|MetadataCopy|MetadataMigrate)".r, copyJobParser)
     polymorphicJobParser += ("flockdb\\.jobs\\.single".r, singleJobParser)
     polymorphicJobParser += ("flockdb\\.jobs\\.multi".r, multiJobParser)
 

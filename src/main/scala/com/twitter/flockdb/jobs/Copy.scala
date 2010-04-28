@@ -52,10 +52,11 @@ class Copy(sourceShardId: Int, destinationShardId: Int, cursor: Copy.Cursor, cou
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.writeCopies(items)
     Stats.incr("edges-copy", items.size)
-    if (newCursor == Copy.END)
+    if (newCursor == Copy.END) {
       None
-    else
+    } else {
       Some(new Copy(sourceShardId, destinationShardId, newCursor, count))
+    }
   }
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
@@ -67,8 +68,12 @@ object MetadataCopy {
   val END = results.Cursor.End
 }
 
-class MetadataCopy(sourceShardId: Int, destinationShardId: Int, cursor: MetadataCopy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: Int, destinationShardId: Int, cursor: MetadataCopy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
+class MetadataCopy(sourceShardId: Int, destinationShardId: Int, cursor: MetadataCopy.Cursor,
+                   count: Int)
+      extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
+  def this(sourceShardId: Int, destinationShardId: Int, cursor: MetadataCopy.Cursor) =
+    this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
+
   def this(attributes: Map[String, AnyVal]) = {
     this(
       attributes("source_shard_id").toInt,
