@@ -28,12 +28,13 @@ echo "Killing any running flockdb..."
 curl http://localhost:9990/shutdown >/dev/null 2>/dev/null
 sleep 3
 
-echo "Launching flock..."
+echo "Launching flockdb..."
+echo "DROP DATABASE IF EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
+echo "CREATE DATABASE IF NOT EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
 ant -q launch
 sleep 5
 
 echo "Creating shards..."
-echo "CREATE DATABASE IF NOT EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
 i=1
 while [ $i -lt 15 ]; do
   echo "DROP TABLE IF EXISTS edges_development.forward_${i}_edges" | mysql -u$DB_USERNAME -p$DB_PASSWORD
