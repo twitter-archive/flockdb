@@ -35,15 +35,33 @@ FlockDB was the result. We've been using it exclusively for about 6 months now.
 
 ## A valiant-er effort
 
-FlockDB stores graphs as sets of edges between nodes identified by 64-bit integers. For a social
-graph, these node IDs will be user IDs, but in a graph storing "favorite" tweets, the destination
-may be a tweet ID. Each edge is also marked with a 32-bit position, used for sorting. (Twitter puts
-a timestamp here for the "following" graph, so that your follower list is displayed latest-first.)
+FlockDB is a database that stores graph data, but it isn't a database optimized for graph-traversal
+operations. Instead, it's optimized for very large adjacency lists, fast reads and writes, and
+page-able set arithmetic queries. We currently store over 13 billion edges and sustain peak traffic
+of 20k writes/second and 100k reads/second.
 
-It isn't meant to be a graph database of the type that optimizes for graph-walking queries. Instead,
-it optimizes for very large adjacency lists, fast reads and writes, and page-able set arithmetic
-queries. We currently store over 13 billion edges and sustain peak traffic of 20k writes/second and
-100k reads/second.
+It stores graphs as sets of edges between nodes identified by 64-bit integers. For a social graph,
+these node IDs will be user IDs, but in a graph storing "favorite" tweets, the destination may be a
+tweet ID. Each edge is also marked with a 32-bit position, used for sorting. (Twitter puts a
+timestamp here for the "following" graph, so that your follower list is displayed latest-first.)
+
+![schema](schema.png)
+
+Instead of deleting rows from MySQL, edges that are "deleted" are just marked as being in the
+deleted state, which has the effect of moving the primary key. Similarly, users who are suspended
+can have their edges put into an archived state, allowing them to be restored later. We keep only a
+compound primary key and a secondary index for each row, and answer all queries from a single index.
+This kind of schema optimization allows MySQL to shine and gives us predictable performance.
+
+Write operations are [idempotent](http://en.wikipedia.org/wiki/Idempotence) and
+[commutative](http://en.wikipedia.org/wiki/Commutative), based on the time they enter the system. We
+can process operations out of order and end up with the same result, so we can paper over temporary
+network and hardware failures, or even replay lost data from minutes or hours ago. This was
+especially helpful during the initial roll-out.
+
+Commutative writes also simplify the process of bringing up new partitions. A new paritition can
+receive write traffic immediately, and receive a dump of data from the old parititions slowly in the
+background. Once the dump is over, the partition is immediately "live" and ready to receive reads.
 
 The app servers (affectionately called "flapps") are written in scala, are stateless, and are
 horizontally scalable. We can add more as query load increases, independent of the databases. They
@@ -52,11 +70,17 @@ client](http://github.com/twitter/flockdb-client) with a much richer interface.
 
 ![it's in the cloud](flockdb-layout.png)
 
-We use [gizzard](http://github.com/twitter/gizzard) to handle the partitioning layer, so a
-forwarding table maps ranges of source IDs to physical databases, and replication is handled by
+We use [the gizzard library](http://github.com/twitter/gizzard) to handle the partitioning layer, so
+a forwarding table maps ranges of source IDs to physical databases, and replication is handled by
 building a tree of such tables under the same forwarding address. Write operations are acknowledged
 after being journalled locally, so that minor database problems are decoupled from website response
 times.
+
+Each edge is actually stored twice: once in the "forward" direction (indexed and partitioned by the
+source ID) and once in the "backward" direction (using the destination ID). That way a query like
+"Who follows me?" is just as efficient as "Who do I follow?", and the answer to each query lives
+entirely on a single partition.
+
 
 ## Lessons learned
 
