@@ -40,10 +40,10 @@ graph, these node IDs will be user IDs, but in a graph storing "favorite" tweets
 may be a tweet ID. Each edge is also marked with a 32-bit position, used for sorting. (Twitter puts
 a timestamp here for the "following" graph, so that your follower list is displayed latest-first.)
 
-It isn't meant to be a "graph database" in the sense that it optimizes for graph-walking queries,
-only in the sense that it stores graph data. It instead optimizes for very large data sets, fast
-reads and writes, and page-able set arithmetic queries. We currently store over 13 billion edges and
-sustain peak traffic of 20k writes/second and 100k reads/second.
+It isn't meant to be a graph database of the type that optimizes for graph-walking queries. Instead,
+it optimizes for very large adjacency lists, fast reads and writes, and page-able set arithmetic
+queries. We currently store over 13 billion edges and sustain peak traffic of 20k writes/second and
+100k reads/second.
 
 The app servers (affectionately called "flapps") are written in scala, are stateless, and are
 horizontally scalable. We can add more as query load increases, independent of the databases. They
