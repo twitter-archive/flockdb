@@ -1,20 +1,21 @@
 
 # Introducing FlockDB
 
-Twitter's interest graph is the network of relationships between people: who you're following, who's
-following you, who you receive phone notifications from, and so on.
+Twitter's stores many graphs of relationships between people: who you're following, who's following
+you, who you receive phone notifications from, and so on.
 
-Early on, we decided that instead of requiring each friendship to be requested and confirmed, you
-can build one-way relationships by just following other people. There's also no limit to how many
-people are allowed to follow you, so one person can have millions of followers. Unfortunately, these
-decisions also made it difficult to scale as we grew.
-
-## A valiant effort
+Some of the features of these graphs have been challenging to store in scalable ways as we grew. For
+example, instead of requiring each friendship to be requested and confirmed, you can build one-way
+relationships by just following other people. There's also no limit to how many people are allowed
+to follow you, so some people have millions of followers (like @aplusk), while others have only a
+few.
 
 To deliver a tweet, we need to be able to look up someone's followers and page through them rapidly.
 But we also need to handle heavy write traffic, as followers are added or removed, or spammers are
-caught and put on ice. And for some operations, like delivering a mention, we need to do set
-arithmetic like "who's following both of these users?"
+caught and put on ice. And for some operations, like delivering a @mention, we need to do set
+arithmetic like "who's following both of these users?" These features are difficult to implement in a traditional relational database.
+
+## A valiant effort
 
 We went through several storage layers in the early days, including abusive use of relational tables and key-value storage of denormalized lists. They were either good at handling write operations or good at paging through giant result sets, but never good at both.
 
@@ -22,8 +23,9 @@ A little over a year ago, we could see that we needed to try something new. Our 
 
 - Write the simplest possible thing that could work.
 
-- Use off-the-shelf MySQL as the storage engine, because we understand its behavior. Give it enough
-  memory to keep everything in cache.
+- Use off-the-shelf MySQL as the storage engine, because we understand its behavior -- in normal use
+  as well as under extreme load and unusual failure conditions. Give it enough memory to keep
+  everything in cache.
 
 - Allow for horizontal partitioning so we can add more database hardware as the corpus grows.
 
@@ -54,11 +56,11 @@ secondary index for each row, and answer all queries from a single index. This k
 optimization allows MySQL to shine and gives us predictable performance.
 
 A complex query like "What's the intersection of people I follow and people who are following
-President Obama?" can be answered quickly be decomposing it into single-user queries ("Who is
+President Obama?" can be answered quickly by decomposing it into single-user queries ("Who is
 following President Obama?"). Data is partitioned by node, so these queries can each be answered by
 a single partition, using an indexed range query. Similarly, paging through long result sets is done
-by using the position field as a cursor, so any page of results for a query uses the same index, and
-is equally fast.
+by using the position field as a cursor, rathor than using `LIMIT/OFFSET`, so any page of results
+for a query is indexed and is equally fast.
 
 Write operations are [idempotent](http://en.wikipedia.org/wiki/Idempotence) and
 [commutative](http://en.wikipedia.org/wiki/Commutative), based on the time they enter the system. We
