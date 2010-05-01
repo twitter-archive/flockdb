@@ -4,11 +4,10 @@
 Twitter's interest graph is the network of relationships between people: who you're following, who's
 following you, who you receive phone notifications from, and so on.
 
-Early on, we decided to handle these relationships a little differently. Instead of requiring a
-siren to confirm her friendship with Odysseus, we let Odysseus follow the siren in a "one-way"
-relationship. There's also no limit to how many people are allowed to follow you, so one user can
-have millions of followers. Unfortunately, these decisions also made it difficult to scale as we
-grew.
+Early on, we decided that instead of requiring each friendship to be requested and confirmed, you
+can build one-way relationships by just following other people. There's also no limit to how many
+people are allowed to follow you, so one person can have millions of followers. Unfortunately, these
+decisions also made it difficult to scale as we grew.
 
 ## A valiant effort
 
@@ -26,32 +25,39 @@ A little over a year ago, we could see that we needed to try something new. Our 
 - Use off-the-shelf MySQL as the storage engine, because we understand its behavior. Give it enough
   memory to keep everything in cache.
 
-- Allow for horizontal partitioning with a lookup table.
+- Allow for horizontal partitioning so we can add more database hardware as the corpus grows.
 
 - Allow write operations to arrive out of order or be processed more than once. (Allow failures to
   result in redundant work rather than lost work.)
 
-FlockDB was the result. We've been using it exclusively for about 6 months now.
+FlockDB was the result. We've been using it exclusively for about 9 months now.
 
 ## A valiant-er effort
 
 FlockDB is a database that stores graph data, but it isn't a database optimized for graph-traversal
 operations. Instead, it's optimized for very large adjacency lists, fast reads and writes, and
-page-able set arithmetic queries. We currently store over 13 billion edges and sustain peak traffic
-of 20k writes/second and 100k reads/second.
+page-able set arithmetic queries.
 
 It stores graphs as sets of edges between nodes identified by 64-bit integers. For a social graph,
 these node IDs will be user IDs, but in a graph storing "favorite" tweets, the destination may be a
-tweet ID. Each edge is also marked with a 32-bit position, used for sorting. (Twitter puts a
+tweet ID. Each edge is also marked with a 64-bit position, used for sorting. (Twitter puts a
 timestamp here for the "following" graph, so that your follower list is displayed latest-first.)
 
 ![schema](schema.png)
 
-Instead of deleting rows from MySQL, edges that are "deleted" are just marked as being in the
-deleted state, which has the effect of moving the primary key. Similarly, users who are suspended
-can have their edges put into an archived state, allowing them to be restored later. We keep only a
-compound primary key and a secondary index for each row, and answer all queries from a single index.
-This kind of schema optimization allows MySQL to shine and gives us predictable performance.
+When an edge is "deleted", the row isn't actually deleted from MySQL; it's just marked as being in
+the deleted state, which has the effect of moving the primary key (a compound key of the source ID,
+state, and position). Similarly, users who are suspended can have their edges put into an archived
+state, allowing them to be restored later. We keep only a compound primary key and a secondary index
+for each row, and answer all queries from a single index. This kind of schema optimization allows
+MySQL to shine and gives us predictable performance.
+
+A complex query like "What's the intersection of people I follow and people who are following
+President Obama?" can be answered quickly be decomposing it into single-user queries ("Who is
+following President Obama?"). Data is partitioned by node, so these queries can each be answered by
+a single partition, using an indexed range query. Similarly, paging through long result sets is done
+by using the position field as a cursor, so any page of results for a query uses the same index, and
+is equally fast.
 
 Write operations are [idempotent](http://en.wikipedia.org/wiki/Idempotence) and
 [commutative](http://en.wikipedia.org/wiki/Commutative), based on the time they enter the system. We
@@ -81,6 +87,9 @@ source ID) and once in the "backward" direction (using the destination ID). That
 "Who follows me?" is just as efficient as "Who do I follow?", and the answer to each query lives
 entirely on a single partition.
 
+The end result is a cluster of commodity servers that we can expand as needed. Over the winter, we
+added 50% database capacity without anyone noticing. We currently store over 13 billion edges and
+sustain peak traffic of 20k writes/second and 100k reads/second.
 
 ## Lessons learned
 
