@@ -30,13 +30,14 @@ A little over a year ago, we could see that we needed to try something new. Our 
 - Allow write operations to arrive out of order or be processed more than once. (Allow failures to
   result in redundant work rather than lost work.)
 
-FlockDB was the result. We've been using it exclusively for about 9 months now.
+FlockDB was the result. We finished migrating to it about 9 months ago and never looked back.
 
 ## A valiant-er effort
 
 FlockDB is a database that stores graph data, but it isn't a database optimized for graph-traversal
-operations. Instead, it's optimized for very large adjacency lists, fast reads and writes, and
-page-able set arithmetic queries.
+operations. Instead, it's optimized for very large [adjacency
+lists](http://en.wikipedia.org/wiki/Adjacency_list), fast reads and writes, and page-able set
+arithmetic queries.
 
 It stores graphs as sets of edges between nodes identified by 64-bit integers. For a social graph,
 these node IDs will be user IDs, but in a graph storing "favorite" tweets, the destination may be a
@@ -47,10 +48,10 @@ timestamp here for the "following" graph, so that your follower list is displaye
 
 When an edge is "deleted", the row isn't actually deleted from MySQL; it's just marked as being in
 the deleted state, which has the effect of moving the primary key (a compound key of the source ID,
-state, and position). Similarly, users who are suspended can have their edges put into an archived
-state, allowing them to be restored later. We keep only a compound primary key and a secondary index
-for each row, and answer all queries from a single index. This kind of schema optimization allows
-MySQL to shine and gives us predictable performance.
+state, and position). Similarly, users who delete their account can have their edges put into an
+archived state, allowing them to be restored later. We keep only a compound primary key and a
+secondary index for each row, and answer all queries from a single index. This kind of schema
+optimization allows MySQL to shine and gives us predictable performance.
 
 A complex query like "What's the intersection of people I follow and people who are following
 President Obama?" can be answered quickly be decomposing it into single-user queries ("Who is
@@ -69,27 +70,27 @@ Commutative writes also simplify the process of bringing up new partitions. A ne
 receive write traffic immediately, and receive a dump of data from the old parititions slowly in the
 background. Once the dump is over, the partition is immediately "live" and ready to receive reads.
 
-The app servers (affectionately called "flapps") are written in scala, are stateless, and are
+The app servers (affectionately called "flapps") are written in Scala, are stateless, and are
 horizontally scalable. We can add more as query load increases, independent of the databases. They
-expose a very small thrift API to clients, though we've written [a ruby
+expose a very small thrift API to clients, though we've written [a Ruby
 client](http://github.com/twitter/flockdb-client) with a much richer interface.
 
 ![it's in the cloud](flockdb-layout.png)
 
-We use [the gizzard library](http://github.com/twitter/gizzard) to handle the partitioning layer, so
-a forwarding table maps ranges of source IDs to physical databases, and replication is handled by
+We use [the Gizzard library](http://github.com/twitter/gizzard) to handle partitioning layer. A
+forwarding layer maps ranges of source IDs to physical databases, and replication is handled by
 building a tree of such tables under the same forwarding address. Write operations are acknowledged
-after being journalled locally, so that minor database problems are decoupled from website response
-times.
+after being journalled locally, so that disruptions in database availability or performance are
+decoupled from website response times.
 
 Each edge is actually stored twice: once in the "forward" direction (indexed and partitioned by the
-source ID) and once in the "backward" direction (using the destination ID). That way a query like
-"Who follows me?" is just as efficient as "Who do I follow?", and the answer to each query lives
-entirely on a single partition.
+source ID) and once in the "backward" direction (indexed and partitioned by the destination ID).
+That way a query like "Who follows me?" is just as efficient as "Who do I follow?", and the answer
+to each query can be found entirely on a single partition.
 
 The end result is a cluster of commodity servers that we can expand as needed. Over the winter, we
-added 50% database capacity without anyone noticing. We currently store over 13 billion edges and
-sustain peak traffic of 20k writes/second and 100k reads/second.
+added 50% database capacity without anyone noticing. We currently store over **13 billion edges**
+and sustain peak traffic of **20k writes/second** and **100k reads/second**.
 
 ## Lessons learned
 
@@ -108,9 +109,10 @@ Some helpful patterns fell out of our experience, even though they weren't goals
   create rarely-tested modules that only kick in during emergencies, when you're least likely to
   feel like trying new things.
 
-  We queue all write operations locally (using kestrel as a library), and any that fail are thrown
-  into a separate error queue. This error queue is periodically flushed back into the write queue,
-  so that retries use the same code path as the initial attempt.
+  We queue all write operations locally (using [Kestrel](http://github.com/robey/kestrel) as a
+  library), and any that fail are thrown into a separate error queue. This error queue is
+  periodically flushed back into the write queue, so that retries use the same code path as the
+  initial attempt.
 
 - **Do nothing automatically at first.**
 
