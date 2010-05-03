@@ -1,14 +1,14 @@
 
 # Introducing FlockDB
 
-Twitter's stores many graphs of relationships between people: who you're following, who's following
+Twitter stores many graphs of relationships between people: who you're following, who's following
 you, who you receive phone notifications from, and so on.
 
-Some of the features of these graphs have been challenging to store in scalable ways as we grew. For
-example, instead of requiring each friendship to be requested and confirmed, you can build one-way
-relationships by just following other people. There's also no limit to how many people are allowed
-to follow you, so some people have millions of followers (like @aplusk), while others have only a
-few.
+Some of the features of these graphs have been challenging to store in scalable ways as we've grown.
+For example, instead of requiring each friendship to be requested and confirmed, you can build
+one-way relationships by just following other people. There's also no limit to how many people are
+allowed to follow you, so some people have millions of followers (like @aplusk), while others have
+only a few.
 
 To deliver a tweet, we need to be able to look up someone's followers and page through them rapidly.
 But we also need to handle heavy write traffic, as followers are added or removed, or spammers are
@@ -17,7 +17,9 @@ arithmetic like "who's following both of these users?" These features are diffic
 
 ## A valiant effort
 
-We went through several storage layers in the early days, including abusive use of relational tables and key-value storage of denormalized lists. They were either good at handling write operations or good at paging through giant result sets, but never good at both.
+We went through several storage layers in the early days, including abusive use of relational tables
+and key-value storage of denormalized lists. They were either good at handling write operations or
+good at paging through giant result sets, but never good at both.
 
 A little over a year ago, we could see that we needed to try something new. Our goals were:
 
@@ -68,8 +70,8 @@ can process operations out of order and end up with the same result, so we can p
 network and hardware failures, or even replay lost data from minutes or hours ago. This was
 especially helpful during the initial roll-out.
 
-Commutative writes also simplify the process of bringing up new partitions. A new paritition can
-receive write traffic immediately, and receive a dump of data from the old parititions slowly in the
+Commutative writes also simplify the process of bringing up new partitions. A new partition can
+receive write traffic immediately, and receive a dump of data from the old partitions slowly in the
 background. Once the dump is over, the partition is immediately "live" and ready to receive reads.
 
 The app servers (affectionately called "flapps") are written in Scala, are stateless, and are
@@ -79,7 +81,7 @@ client](http://github.com/twitter/flockdb-client) with a much richer interface.
 
 ![it's in the cloud](flockdb-layout.png)
 
-We use [the Gizzard library](http://github.com/twitter/gizzard) to handle partitioning layer. A
+We use [the Gizzard library](http://github.com/twitter/gizzard) to handle the partitioning layer. A
 forwarding layer maps ranges of source IDs to physical databases, and replication is handled by
 building a tree of such tables under the same forwarding address. Write operations are acknowledged
 after being journalled locally, so that disruptions in database availability or performance are
