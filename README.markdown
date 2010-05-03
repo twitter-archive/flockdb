@@ -77,7 +77,7 @@ There should be support for building with sbt "soon".
 
 # Running
 
-Check out [the demo](doc/demo.markdown) for instructions on how to start up a local development
+Check out [the demo](http://github.com/twitter/flockdb/blob/master/doc/demo.markdown) for instructions on how to start up a local development
 instance of FlockDB. It also shows how to add edges, query them, etc.
 
 
