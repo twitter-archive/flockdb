@@ -24,7 +24,7 @@ import test.{EdgesDatabase, StaticEdges}
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 
-object IntersectionSpec extends ConfiguredSpecification with Eventually with EdgesDatabase {
+object IntersectionSpec extends ConfiguredSpecification with EdgesDatabase {
   val poolConfig = config.configMap("db.connection_pool")
 
   import StaticEdges._
