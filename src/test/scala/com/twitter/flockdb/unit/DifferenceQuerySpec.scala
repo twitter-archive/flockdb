@@ -25,7 +25,7 @@ import conversions.Results._
 import thrift.{Results, Page}
 
 
-object DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
+class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
   "DifferenceQuery" should {
     val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10,11,12))
     val query2 = new queries.SeqQuery(List(3,4,7,11))

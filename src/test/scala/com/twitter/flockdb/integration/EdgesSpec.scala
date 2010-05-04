@@ -28,8 +28,8 @@ import conversions.SelectOperation._
 import test.{EdgesDatabase, StaticEdges}
 
 
-object EdgesSpec extends ConfiguredSpecification with EdgesDatabase with Eventually {
-  val poolConfig = config.configMap("db.connection_pool")
+class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
+  lazy val poolConfig = config.configMap("db.connection_pool")
 
   import StaticEdges._
 

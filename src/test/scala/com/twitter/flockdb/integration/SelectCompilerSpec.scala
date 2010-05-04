@@ -26,7 +26,7 @@ import test.{EdgesDatabase, StaticEdges}
 import thrift._
 
 
-object SelectCompilerSpec extends ConfiguredSpecification with Eventually with EdgesDatabase with JMocker with ClassMocker {
+object SelectCompilerSpec extends ConfiguredSpecification with EdgesDatabase with JMocker with ClassMocker {
   val poolConfig = config.configMap("db.connection_pool")
 
   import StaticEdges._
