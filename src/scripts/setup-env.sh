@@ -31,7 +31,9 @@ sleep 3
 echo "Launching flockdb..."
 echo "DROP DATABASE IF EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
 echo "CREATE DATABASE IF NOT EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
-ant -q launch
+
+JAVA_OPTS="-Xms256m -Xmx256m -XX:NewSize=64m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -server"
+java -Dstage=development $JAVA_OPTS -jar ./dist/flockdb/flockdb-1.0.jar &
 sleep 5
 
 echo "Creating shards..."
