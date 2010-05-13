@@ -16,14 +16,14 @@
 
 package com.twitter.flockdb
 
-import java.util.concurrent.{CountDownLatch}
+import java.util.concurrent.CountDownLatch
 import scala.actors.Actor.actor
 import org.apache.thrift.TProcessor
 import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.server.{TServer, TThreadPoolServer}
 import org.apache.thrift.transport.{TServerSocket, TTransportFactory}
 import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
-import com.twitter.gizzard.thrift.{JobManager, JobManagerService, ShardManager,
+import com.twitter.gizzard.thrift.{GizzardServices, JobManager, JobManagerService, ShardManager,
   ShardManagerService, TSelectorServer}
 import com.twitter.ostrich.{JsonStatsLogger, Service, ServiceTracker, Stats, StatsMBean, W3CStats}
 import com.twitter.xrayspecs.TimeConversions._
@@ -36,8 +36,7 @@ object Main extends Service {
   val runtime = new RuntimeEnvironment(getClass)
 
   var thriftServer: TSelectorServer = null
-  var shardThriftServer: TSelectorServer = null
-  var jobThriftServer: TSelectorServer = null
+  var gizzardServices: GizzardServices[shards.Shard] = null
   var flock: FlockDB = null
 
   var config: ConfigMap = null
@@ -105,35 +104,18 @@ object Main extends Service {
 
       flock = FlockDB(config, w3c)
 
-      val clientTimeout = config("edges.client_timeout_msec").toInt.milliseconds
-      val idleTimeout = config("edges.idle_timeout_sec").toInt.seconds
-
-      val executor = TSelectorServer.makeThreadPoolExecutor(config.configMap("edges"))
-
       val processor = new thrift.FlockDB.Processor(
         FlockExceptionWrappingProxy[thrift.FlockDB.Iface](
           LoggingProxy[thrift.FlockDB.Iface](Stats, w3c, "Edges", flock)))
-      thriftServer = TSelectorServer("edges", config("edges.server_port").toInt, processor,
-                                     executor, clientTimeout, idleTimeout)
-
-      val shardServer = new ShardManagerService(flock.edges.nameServer,
-                                                flock.edges.copyFactory,
-                                                flock.edges.schedule(Priority.Medium.id))
-      val shardProcessor = new ShardManager.Processor(
-        FlockExceptionWrappingProxy[ShardManager.Iface](
-          LoggingProxy[ShardManager.Iface](Stats, w3c, "EdgesShards", shardServer)))
-      shardThriftServer = TSelectorServer("edges-shards", config("edges.shard_server_port").toInt,
-                                          shardProcessor, executor, clientTimeout, idleTimeout)
-      val jobServer = new JobManagerService(flock.edges.schedule)
-      val jobProcessor = new JobManager.Processor(
-        FlockExceptionWrappingProxy[JobManager.Iface](
-          LoggingProxy[JobManager.Iface](Stats, w3c, "EdgesJobs", jobServer)))
-      jobThriftServer = TSelectorServer("edges-jobs", config("edges.job_server_port").toInt,
-                                        jobProcessor, executor, clientTimeout, idleTimeout)
-
+      thriftServer = TSelectorServer("edges", config("edges.server_port").toInt,
+                                     config.configMap("gizzard_services"), processor)
+      gizzardServices = new GizzardServices(config.configMap("gizzard_services"),
+                                            flock.edges.nameServer,
+                                            flock.edges.copyFactory,
+                                            flock.edges.schedule,
+                                            Priority.Medium.id)
+      gizzardServices.start()
       thriftServer.serve()
-      shardThriftServer.serve()
-      jobThriftServer.serve()
     } catch {
       case e: Exception =>
         log.error(e, "Unexpected exception: %s", e.getMessage)
@@ -145,12 +127,10 @@ object Main extends Service {
     // thrift bug doesn't let worker threads know to close their connection, so we wait for any
     // pending requests to finish.
     log.info("Thrift servers shutting down...")
-    thriftServer.stop()
+    thriftServer.shutdown()
     thriftServer = null
-    shardThriftServer.stop()
-    shardThriftServer = null
-    jobThriftServer.stop()
-    jobThriftServer = null
+    gizzardServices.shutdown()
+    gizzardServices = null
   }
 
   def finishShutdown() {
