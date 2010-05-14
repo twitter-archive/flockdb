@@ -16,7 +16,7 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) {
   val objenesis = "org.objenesis" % "objenesis" % "1.1"
   val ostrich   = "com.twitter" % "ostrich" % "1.1.16"
   val pool      = "commons-pool" % "commons-pool" % "1.3"
-  val querulous = "com.twitter" % "querulous" % "1.1.8"
+  val querulous = "com.twitter" % "querulous" % "1.1.9"
   val results   = "com.twitter" % "results" % "1.0"
   val slf4j     = "org.slf4j" % "slf4j-jdk14" % "1.5.2"
   val slf4jApi  = "org.slf4j" % "slf4j-api" % "1.5.2"
