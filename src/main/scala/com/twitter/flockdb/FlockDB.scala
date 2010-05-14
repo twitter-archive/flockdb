@@ -96,7 +96,7 @@ object FlockDB {
     List((Priority.High, "primary"), (Priority.Medium, "copy"),
          (Priority.Low, "slow")).foreach { case (priority, configName) =>
       val queueConfig = config.configMap("edges.queue")
-      val scheduler = JobScheduler(configName, queueConfig, jobParser, w3c)
+      val scheduler = JobScheduler(configName, queueConfig, jobParser)
       schedulerMap(priority.id) = scheduler
     }
     val scheduler = new PrioritizingJobScheduler(schedulerMap)
