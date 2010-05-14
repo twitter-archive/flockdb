@@ -67,17 +67,14 @@ object FlockDB {
 
   def apply(config: ConfigMap, dbFactory: DatabaseFactory, nameServerDbFactory: DatabaseFactory, w3c: W3CStats, stats: StatsCollector): FlockDB = {
     val dbQueryFactory = QueryFactory.fromConfig(config.configMap("db"), Some(stats))
-    val nameServerDbQueryFactory = QueryFactory.fromConfig(config.configMap("nameserver"), Some(stats))
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), dbFactory, dbQueryFactory)
+    val nameServerDbQueryFactory = QueryFactory.fromConfig(config.configMap("nameserver"), Some(stats))
     val nameServerQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("nameserver"), nameServerDbFactory, nameServerDbQueryFactory)
 
     val nameServerConfig = config.configMap("edges.nameservers")
-    val nameServerShards = (for (key <- nameServerConfig.keys) yield {
-      val map = nameServerConfig.configMap(key)
-      nameServerQueryEvaluatorFactory(map("hostname"), map("database"), map("username"), map("password"))
-    }) map { queryEvaluator =>
-      new nameserver.SqlShard(queryEvaluator)
-    } collect
+    val nameServerShards = nameServerConfig.keys.map { key =>
+      new nameserver.SqlShard(nameServerQueryEvaluatorFactory(nameServerConfig.configMap(key)))
+    }.collect
 
     val log = new ThrottledLogger[String](Logger(), config("throttled_log.period_msec").toInt, config("throttled_log.rate").toInt)
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
