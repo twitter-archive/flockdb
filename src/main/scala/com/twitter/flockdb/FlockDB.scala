@@ -60,16 +60,8 @@ object FlockDB {
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
     val stats = statsCollector(w3c)
-    val dbFactory = DatabaseFactory.fromConfig(config.configMap("db.connection_pool"), Some(stats))
-    val nameServerDbFactory = DatabaseFactory.fromConfig(config.configMap("nameserver.connection_pool"), Some(stats))
-    apply(config, dbFactory, nameServerDbFactory, w3c, stats)
-  }
-
-  def apply(config: ConfigMap, dbFactory: DatabaseFactory, nameServerDbFactory: DatabaseFactory, w3c: W3CStats, stats: StatsCollector): FlockDB = {
-    val dbQueryFactory = QueryFactory.fromConfig(config.configMap("db"), Some(stats))
-    val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), dbFactory, dbQueryFactory)
-    val nameServerDbQueryFactory = QueryFactory.fromConfig(config.configMap("nameserver"), Some(stats))
-    val nameServerQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("nameserver"), nameServerDbFactory, nameServerDbQueryFactory)
+    val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
+    val nameServerQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("nameserver"), Some(stats))
 
     val nameServerConfig = config.configMap("edges.nameservers")
     val nameServerShards = nameServerConfig.keys.map { key =>
