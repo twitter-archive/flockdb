@@ -14,7 +14,7 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) {
   val kestrel   = "net.lag" % "kestrel" % "1.2"
   val mysqljdbc = "mysql" % "mysql-connector-java" % "5.1.6"
   val objenesis = "org.objenesis" % "objenesis" % "1.1"
-  val ostrich   = "com.twitter" % "ostrich" % "1.1.16"
+  val ostrich   = "com.twitter" % "ostrich" % "1.1.17"
   val pool      = "commons-pool" % "commons-pool" % "1.3"
   val querulous = "com.twitter" % "querulous" % "1.1.9"
   val results   = "com.twitter" % "results" % "1.0"
