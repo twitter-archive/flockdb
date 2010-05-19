@@ -18,7 +18,7 @@
   <dependencies>
     <dependency org="org.scala-lang" name="scala-compiler" rev="2.7.7" />
     <dependency org="org.scala-lang" name="scala-library" rev="2.7.7" />
-    <dependency org="org.scala-tools.testing" name="specs" rev="1.6.1" conf="test->*; test->compile" />
+    <dependency org="org.scala-tools.testing" name="specs" rev="1.6.2.1" conf="test->*; test->compile" />
     <dependency org="org.scala-tools.testing" name="scalacheck" rev="1.6" conf="test->*" />
     <dependency org="org.scala-tools" name="vscaladoc" rev="1.1-md-3" conf="bootstrap->*" />
 
