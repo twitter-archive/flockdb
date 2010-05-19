@@ -61,22 +61,20 @@ object FlockDB {
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
     val stats = statsCollector(w3c)
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
-    val nameServerQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("nameserver"), Some(stats))
-
-    val nameServerConfig = config.configMap("edges.nameservers")
-    val nameServerShards = nameServerConfig.keys.map { key =>
-      new nameserver.SqlShard(nameServerQueryEvaluatorFactory(nameServerConfig.configMap(key)))
-    }.collect
+    val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))
 
     val log = new ThrottledLogger[String](Logger(), config("throttled_log.period_msec").toInt, config("throttled_log.rate").toInt)
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
       new shards.ReadWriteShardAdapter(_), log, replicationFuture)
-    shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
+    shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
-    shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
+    shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard" -> new shards.BlackHoleShardFactory)
+
+    val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
+                                           shardRepository, log, replicationFuture)
 
     val polymorphicJobParser = new PolymorphicJobParser
     val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
@@ -90,15 +88,6 @@ object FlockDB {
     }
     val scheduler = new PrioritizingJobScheduler(schedulerMap)
 
-    val replicatingNameServerShardInfo =
-      new ShardInfo("com.twitter.gizzard.nameserver.ReplicatingShard", "", "")
-    val replicatingNameServerShard = new nameserver.ReadWriteShardAdapter(
-      new ReplicatingShard(replicatingNameServerShardInfo, 0, nameServerShards,
-                           new nameserver.LoadBalancer(nameServerShards), log,
-                           replicationFuture))
-
-    val nameServer = new nameserver.NameServer(replicatingNameServerShard, shardRepository,
-      nameserver.ByteSwapper, nameserver.RandomIdGenerator)
     val forwardingManager = new ForwardingManager(nameServer)
     val copyFactory = jobs.CopyFactory
     nameServer.reload()
