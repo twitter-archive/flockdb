@@ -78,23 +78,15 @@ object FlockDB {
 
     val polymorphicJobParser = new PolymorphicJobParser
     val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
-
-    val schedulerMap = new mutable.HashMap[Int, JobScheduler]
-    List((Priority.High, "primary"), (Priority.Medium, "copy"),
-         (Priority.Low, "slow")).foreach { case (priority, configName) =>
-      val queueConfig = config.configMap("edges.queue")
-      val scheduler = JobScheduler(configName, queueConfig, jobParser)
-      schedulerMap(priority.id) = scheduler
-    }
-    val scheduler = new PrioritizingJobScheduler(schedulerMap)
+    val scheduler = PrioritizingJobScheduler(config.configMap("edges.queue"), jobParser,
+      Map(Priority.High.id -> "primary", Priority.Medium.id -> "copy", Priority.Low.id -> "slow"))
 
     val forwardingManager = new ForwardingManager(nameServer)
-    val copyFactory = jobs.CopyFactory
     nameServer.reload()
 
     val singleJobParser = new jobs.single.JobParser(forwardingManager, OrderedUuidGenerator)
     val multiJobParser  = new jobs.multi.JobParser(forwardingManager, scheduler)
-    val copyJobParser   = new BoundJobParser((nameServer, schedulerMap(Priority.Medium.id)))
+    val copyJobParser   = new BoundJobParser((nameServer, scheduler(Priority.Medium.id)))
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
@@ -104,7 +96,7 @@ object FlockDB {
 
     scheduler.start()
 
-    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
+    new FlockDB(new EdgesService(nameServer, forwardingManager, jobs.CopyFactory, scheduler, future))
   }
 }
 
