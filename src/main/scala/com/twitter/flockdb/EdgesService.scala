@@ -30,9 +30,16 @@ import thrift.FlockException
 class EdgesService(val nameServer: NameServer[shards.Shard],
                    val forwardingManager: ForwardingManager,
                    val copyFactory: CopyFactory[shards.Shard],
-                   val schedule: PrioritizingJobScheduler, future: Future) {
+                   val schedule: PrioritizingJobScheduler,
+                   future: Future, replicationFuture: Future) {
   private val selectCompiler = new SelectCompiler(forwardingManager)
   private val executeCompiler = new ExecuteCompiler(schedule)
+
+  def shutdown() {
+    schedule.shutdown()
+    future.shutdown()
+    replicationFuture.shutdown()
+  }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
     forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).map { edge =>
