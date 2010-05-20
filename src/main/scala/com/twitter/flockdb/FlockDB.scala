@@ -96,7 +96,8 @@ object FlockDB {
 
     scheduler.start()
 
-    new FlockDB(new EdgesService(nameServer, forwardingManager, jobs.CopyFactory, scheduler, future))
+    new FlockDB(new EdgesService(nameServer, forwardingManager, jobs.CopyFactory, scheduler,
+                                 future, replicationFuture))
   }
 }
 

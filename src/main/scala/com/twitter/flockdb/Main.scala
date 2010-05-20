@@ -134,7 +134,7 @@ object Main extends Service {
   }
 
   def finishShutdown() {
-    flock.edges.schedule.shutdown()
+    flock.edges.shutdown()
     if (statsLogger ne null) {
       statsLogger.shutdown()
       statsLogger = null
