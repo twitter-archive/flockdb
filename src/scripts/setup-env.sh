@@ -19,18 +19,28 @@ if java -version 2>&1 |grep "1\.5"; then
   exit 1
 fi
 
-if [ "x$DB_USERNAME" = "x" -o "x$DB_PASSWORD" = "x" ]; then
-  echo "Please set DB_USERNAME and DB_PASSWORD."
+if [ "x$DB_USERNAME" = "x" ]; then
+  echo "Please set DB_USERNAME and/or DB_PASSWORD."
   exit 1
 fi
+
+MYSQL_COMMAND=$(if [ "x$DB_PASSWORD" = "x" ]; then
+  echo "mysql -u$DB_USERNAME"
+else
+  echo "mysql -u$DB_USERNAME -p$DB_PASSWORD"
+fi)
+
+function exec_sql {
+  echo $1 | $MYSQL_COMMAND
+}
 
 echo "Killing any running flockdb..."
 curl http://localhost:9990/shutdown >/dev/null 2>/dev/null
 sleep 3
 
 echo "Launching flockdb..."
-echo "DROP DATABASE IF EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
-echo "CREATE DATABASE IF NOT EXISTS flockdb_development" | mysql -u$DB_USERNAME -p$DB_PASSWORD
+exec_sql "DROP DATABASE IF EXISTS flockdb_development"
+exec_sql "CREATE DATABASE IF NOT EXISTS flockdb_development"
 
 JAVA_OPTS="-Xms256m -Xmx256m -XX:NewSize=64m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -server"
 java -Dstage=development $JAVA_OPTS -jar ./dist/flockdb/flockdb-1.0.jar &
@@ -39,10 +49,10 @@ sleep 5
 echo "Creating shards..."
 i=1
 while [ $i -lt 15 ]; do
-  echo "DROP TABLE IF EXISTS edges_development.forward_${i}_edges" | mysql -u$DB_USERNAME -p$DB_PASSWORD
-  echo "DROP TABLE IF EXISTS edges_development.forward_${i}_metadata" | mysql -u$DB_USERNAME -p$DB_PASSWORD
-  echo "DROP TABLE IF EXISTS edges_development.backward_${i}_edges" | mysql -u$DB_USERNAME -p$DB_PASSWORD
-  echo "DROP TABLE IF EXISTS edges_development.backward_${i}_metadata" | mysql -u$DB_USERNAME -p$DB_PASSWORD
+  exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_edges"
+  exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_metadata"
+  exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_edges"
+  exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_metadata"
   i=$((i + 1))
 done
 
