@@ -105,7 +105,7 @@ object FlockDB {
     List((Priority.High, "primary"), (Priority.Medium, "copy"),
          (Priority.Low, "slow")).foreach { case (priority, configName) =>
       val queueConfig = config.configMap("edges.queue")
-      val scheduler = JobScheduler(configName, queueConfig, jobParser, w3c)
+      val scheduler = JobScheduler(configName, queueConfig, jobParser)
       schedulerMap(priority.id) = scheduler
     }
     val scheduler = new PrioritizingJobScheduler(schedulerMap)
@@ -118,7 +118,7 @@ object FlockDB {
                            replicationFuture))
 
     val nameServer = new nameserver.NameServer(replicatingNameServerShard, shardRepository,
-      nameserver.ByteSwapper, nameserver.RandomIdGenerator)
+      nameserver.ByteSwapper)
     val forwardingManager = new ForwardingManager(nameServer)
     val copyFactory = jobs.CopyFactory
     nameServer.reload()
