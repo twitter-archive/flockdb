@@ -23,6 +23,11 @@ trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def selectByPosition(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor): ResultWindow[Long]
   @throws(classOf[shards.ShardException]) def selectEdges(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor): ResultWindow[Edge]
 
+  @throws(classOf[shards.ShardException]) def startEdgeCopy()
+  @throws(classOf[shards.ShardException]) def finishEdgeCopy()
+  @throws(classOf[shards.ShardException]) def startMetadataCopy()
+  @throws(classOf[shards.ShardException]) def finishMetadataCopy()
+  
   @throws(classOf[shards.ShardException]) def writeCopies(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def updateMetadata(metadata: Metadata)
   @throws(classOf[shards.ShardException]) def writeMetadata(metadata: Metadata)

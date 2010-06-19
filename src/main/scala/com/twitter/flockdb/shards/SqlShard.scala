@@ -88,9 +88,9 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     val metadatas = new mutable.ArrayBuffer[Metadata]
     var nextCursor = Cursor.Start
     var returnedCursor = Cursor.End
-
+    
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor, count + 1) { row =>
+    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
         metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
@@ -481,4 +481,12 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private def makeEdge(row: ResultSet): Edge = {
     makeEdge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), row.getInt("count"), row.getInt("state"))
   }
+  
+  def startEdgeCopy() = ()
+  
+  def finishEdgeCopy() = ()
+  
+  def startMetadataCopy() = ()
+  
+  def finishMetadataCopy() = ()
 }

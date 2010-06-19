@@ -61,4 +61,12 @@ class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val child
   def selectByPosition(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor) = new ResultWindow[Long]
 
   def selectEdges(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor) = new ResultWindow[Edge]
+  
+  def startEdgeCopy() = ()
+  
+  def finishEdgeCopy() = ()
+  
+  def startMetadataCopy() = ()
+  
+  def finishMetadataCopy() = ()
 }

@@ -26,6 +26,13 @@ struct Edge {
   6: i32 state_id
 }
 
+struct Metadata {
+  1: i64 source_id
+  2: i32 state_id
+  3: i32 count
+  4: i32 updated_at
+}
+
 enum SelectOperationType {
   SimpleQuery = 1
   Intersection = 2

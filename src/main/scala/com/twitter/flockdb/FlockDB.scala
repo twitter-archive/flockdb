@@ -93,6 +93,8 @@ object FlockDB {
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
       new shards.ReadWriteShardAdapter(_), log, replicationFuture)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))
+    shardRepository += ("com.twitter.flockdb.HdfsBackupShard" -> new shards.MemoizingHdfsBackupShardFactory(new shards.HdfsBackupShardFactory))
+    
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, nameServerQueryEvaluatorFactory, config))

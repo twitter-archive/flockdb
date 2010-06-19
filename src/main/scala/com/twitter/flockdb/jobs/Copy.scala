@@ -33,14 +33,20 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
       attributes("count").toInt)
   }
 
+  // This is called once, at end of shard copy
+  override def finish(nameServer: NameServer[Shard], scheduler: JobScheduler) {
+    nameServer.findShardById(destinationShardId).finishEdgeCopy()
+    super.finish(nameServer, scheduler)
+  }
+  
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    val (items, newCursor) = sourceShard.selectAll(cursor, count)
+    val (items, nextCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.writeCopies(items)
     Stats.incr("edges-copy", items.size)
-    if (newCursor == Copy.END)
-      None
-    else
-      Some(new Copy(sourceShardId, destinationShardId, newCursor, count))
+    nextCursor match {
+      case Copy.END => None
+      case other => Some(new Copy(sourceShardId, destinationShardId, nextCursor, count))
+    }
   }
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
@@ -65,15 +71,28 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
       results.Cursor(attributes("cursor").toInt),
       attributes("count").toInt)
   }
+  
+  // This is called multiple times, but we only want to call startMetadataCopy once
+  override def apply(environment: (NameServer[Shard], JobScheduler)) {
+    val (nameServer, scheduler) = environment
+    if (cursor == MetadataCopy.START) {
+      nameServer.findShardById(destinationShardId).startMetadataCopy()
+    }
+    super.apply(environment)
+  }
 
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    items.foreach { destinationShard.writeMetadata(_) }
-    Stats.incr("edges-copy", items.size)
-    if (newCursor == MetadataCopy.END)
-      Some(new Copy(sourceShardId, destinationShardId, Copy.START))
-    else
-      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count))
+    val (items, nextCursor) = sourceShard.selectAllMetadata(cursor, count)
+    items.foreach { item => destinationShard.writeMetadata(item) }
+    Stats.incr("metadata-copy", items.size)
+    nextCursor match {
+      case MetadataCopy.END => {
+        destinationShard.finishMetadataCopy()
+        destinationShard.startEdgeCopy()
+        Some(new Copy(sourceShardId, destinationShardId, Copy.START))
+      }
+      case other => Some(new MetadataCopy(sourceShardId, destinationShardId, nextCursor, count))
+    }
   }
 
   def serialize = Map("cursor" -> cursor.position)

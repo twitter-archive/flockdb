@@ -22,6 +22,11 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def count(sourceId: Long, states: Seq[State])                                                      = shard.readOperation(_.count(sourceId, states))
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int])                                  = shard.readOperation(_.counts(sourceIds, results))
 
+  def startEdgeCopy()                                                                               = shard.writeOperation(_.startEdgeCopy())
+  def finishEdgeCopy()                                                                              = shard.writeOperation(_.finishEdgeCopy())
+  def startMetadataCopy()                                                                           = shard.writeOperation(_.startMetadataCopy())
+  def finishMetadataCopy()                                                                          = shard.writeOperation(_.finishMetadataCopy())
+
   def writeCopies(edges: Seq[Edge])                                                                  = shard.writeOperation(_.writeCopies(edges))
   def writeMetadata(metadata: Metadata)                                                              = shard.writeOperation(_.writeMetadata(metadata))
   def updateMetadata(metadata: Metadata)                                                             = shard.writeOperation(_.updateMetadata(metadata))
