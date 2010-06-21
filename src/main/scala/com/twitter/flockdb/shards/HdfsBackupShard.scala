@@ -39,9 +39,8 @@ import net.lag.logging.Logger
 import State._
 
 sealed trait CopyState
-case object BeforeCopy extends CopyState
+case object NotCopying extends CopyState
 case object Copying extends CopyState
-case object AfterCopy extends CopyState
 
 class MemoizingHdfsBackupShardFactory(val hdfsBackupShardFactory: HdfsBackupShardFactory) extends ShardFactory[Shard]{
   val shardCache = new HashMap[ShardInfo, HdfsBackupShard]
@@ -83,12 +82,13 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   private var metadataWriter_ : LzoThriftB64LineRecordWriter[thrift.Metadata] = null
   private var metadataPath_ : String = null
   
-  private var edgeCopyState_ : CopyState = BeforeCopy
-  private var metadataCopyState_ : CopyState = BeforeCopy
+  private var edgeCopyState_ : CopyState = NotCopying
+  private var metadataCopyState_ : CopyState = NotCopying
 
   def startEdgeCopy() = {
-    checkStateExecute(edgeCopyState_, BeforeCopy, { () => 
+    checkStateExecute(edgeCopyState_, NotCopying, { () => 
       edgePath_ = path_ + "/edges"
+      fs_.delete(new Path(edgePath_), true)
       edgeWriter_ = new LzoThriftB64LineRecordWriter[thrift.Edge](new TypeRef[thrift.Edge] {}, fs_.create(new Path(edgePath_ + "/data")))
       edgeCopyState_ = Copying
     })
@@ -109,13 +109,14 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
       fs_.create(new Path(edgePath_ + "/_job_finished")).close()
       edgeWriter_.close(null)
       edgePath_ = null      
-      edgeCopyState_ = AfterCopy
+      edgeCopyState_ = NotCopying
     })  
   }
   
   def startMetadataCopy() = {
-    checkStateExecute(metadataCopyState_, BeforeCopy, { () => 
+    checkStateExecute(metadataCopyState_, NotCopying, { () => 
       metadataPath_ = path_ + "/metadata"
+      fs_.delete(new Path(metadataPath_), true)
       metadataWriter_ = new LzoThriftB64LineRecordWriter[thrift.Metadata](new TypeRef[thrift.Metadata] {}, fs_.create(new Path(metadataPath_ + "/data")))
       metadataCopyState_ = Copying
     })
@@ -134,9 +135,13 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
       fs_.create(new Path(metadataPath_ + "/_job_finished")).close()
       metadataWriter_.close(null)
       metadataPath_ = null      
-      metadataCopyState_ = AfterCopy
+      metadataCopyState_ = NotCopying
     })
   }
+  
+  def needsEdgeCopyStart() = edgeCopyState_ == NotCopying
+
+  def needsMetadataCopyStart() = metadataCopyState_ == NotCopying
   
   private def checkStateExecute(current: CopyState, desired: CopyState, function : (() => Unit)) {  
     if (current == desired) 

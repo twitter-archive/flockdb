@@ -489,4 +489,8 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   def startMetadataCopy() = ()
   
   def finishMetadataCopy() = ()
+  
+  def needsEdgeCopyStart() = false
+  
+  def needsMetadataCopyStart() = false
 }

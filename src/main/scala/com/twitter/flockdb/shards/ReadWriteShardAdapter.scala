@@ -26,6 +26,8 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def finishEdgeCopy()                                                                              = shard.writeOperation(_.finishEdgeCopy())
   def startMetadataCopy()                                                                           = shard.writeOperation(_.startMetadataCopy())
   def finishMetadataCopy()                                                                          = shard.writeOperation(_.finishMetadataCopy())
+  def needsEdgeCopyStart()                                                                          = shard.readOperation(_.needsEdgeCopyStart())
+  def needsMetadataCopyStart()                                                                      = shard.readOperation(_.needsMetadataCopyStart())
 
   def writeCopies(edges: Seq[Edge])                                                                  = shard.writeOperation(_.writeCopies(edges))
   def writeMetadata(metadata: Metadata)                                                              = shard.writeOperation(_.writeMetadata(metadata))

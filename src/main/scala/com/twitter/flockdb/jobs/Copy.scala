@@ -32,6 +32,15 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
       (results.Cursor(attributes("cursor1").toInt), results.Cursor(attributes("cursor2").toInt)),
       attributes("count").toInt)
   }
+  
+  // This is called multiple times, but we only want to call startEdgeCopy once
+  override def apply(environment: (NameServer[Shard], JobScheduler)) {
+    val (nameServer, scheduler) = environment
+    if (cursor == Copy.START) {
+      nameServer.findShardById(destinationShardId).startEdgeCopy()
+    }
+    super.apply(environment)
+  }
 
   // This is called once, at end of shard copy
   override def finish(nameServer: NameServer[Shard], scheduler: JobScheduler) {
@@ -40,12 +49,18 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
   }
   
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    val (items, nextCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.writeCopies(items)
-    Stats.incr("edges-copy", items.size)
-    nextCursor match {
-      case Copy.END => None
-      case other => Some(new Copy(sourceShardId, destinationShardId, nextCursor, count))
+    if (destinationShard.needsEdgeCopyStart()) {
+      // If a flapp goes down mid copy, we get a copyPage call without corresponding startEdgeCopy
+      // Do any cleanup in startEdgeCopy
+      Some(new Copy(sourceShardId, destinationShardId, Copy.START, count))
+    } else {
+      val (items, nextCursor) = sourceShard.selectAll(cursor, count)  
+      destinationShard.writeCopies(items)
+      Stats.incr("edges-copy", items.size)
+      nextCursor match {
+        case Copy.END => None
+        case other => Some(new Copy(sourceShardId, destinationShardId, nextCursor, count))
+      }
     }
   }
 
@@ -82,16 +97,21 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
   }
 
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    val (items, nextCursor) = sourceShard.selectAllMetadata(cursor, count)
-    items.foreach { item => destinationShard.writeMetadata(item) }
-    Stats.incr("metadata-copy", items.size)
-    nextCursor match {
-      case MetadataCopy.END => {
-        destinationShard.finishMetadataCopy()
-        destinationShard.startEdgeCopy()
-        Some(new Copy(sourceShardId, destinationShardId, Copy.START))
+    if (destinationShard.needsMetadataCopyStart()) {
+      // If a flapp goes down mid copy, we get a copyPage call without corresponding startMetadataCopy
+      // Do any cleanup in startMetadataCopy
+      Some(new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, count))
+    } else {
+      val (items, nextCursor) = sourceShard.selectAllMetadata(cursor, count)
+      items.foreach { item => destinationShard.writeMetadata(item) }
+      Stats.incr("metadata-copy", items.size)
+      nextCursor match {
+        case MetadataCopy.END => {
+          destinationShard.finishMetadataCopy()
+          Some(new Copy(sourceShardId, destinationShardId, Copy.START))
+        }
+        case other => Some(new MetadataCopy(sourceShardId, destinationShardId, nextCursor, count))
       }
-      case other => Some(new MetadataCopy(sourceShardId, destinationShardId, nextCursor, count))
     }
   }
 
