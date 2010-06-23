@@ -145,61 +145,40 @@ class FlockDB(val nameServer: nameserver.NameServer[shards.Shard],
               val schedule: PrioritizingJobScheduler, future: Future)
   extends thrift.FlockDB.Iface {
 
-  private val selectCompiler = new SelectCompiler(forwardingManager)
-  private val executeCompiler = new ExecuteCompiler(schedule)
+  private val edges = new EdgesService(nameServer, forwardingManager, copyFactory, schedule, future)
 
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
-    forwardingManager.find(source_id, graph_id, Forward).get(source_id, destination_id).map { edge =>
-      edge.state == State.Normal || edge.state == State.Negative
-    }.getOrElse(false)
+    edges.contains(source_id, graph_id, destination_id)
   }
 
   def get(source_id: Long, graph_id: Int, destination_id: Long) = {
-    forwardingManager.find(source_id, graph_id, Forward).get(source_id, destination_id).map {
-      _.toThrift
-    } getOrElse {
-      throw new FlockException("Record not found: (%d, %d, %d)".format(source_id, graph_id, destination_id))
-    }
+    edges.get(source_id, graph_id, destination_id).toThrift
   }
 
   @deprecated
   def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
-    selectCompiler(operations.toSeq.map { _.fromThrift }).select(page.fromThrift).toThrift
+    val queries = List(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift))
+    edges.select(queries).first.toThrift
   }
 
   def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {
-    queries.toSeq.parallel(future).map[thrift.Results] { query =>
-      selectCompiler(query.fromThrift.operations.toSeq).select(query.page.fromThrift).toThrift
-    }.toJavaList
+    edges.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }.toJavaList
   }
 
   def select_edges(queries: JList[thrift.EdgeQuery]) = {
-    queries.toSeq.parallel(future).map[thrift.EdgeResults] { query =>
-      val term = query.term
-      val shard = forwardingManager.find(term.source_id, term.graph_id, Direction(term.is_forward))
-      val states = if (term.isSetState_ids) term.state_ids.toSeq.map(State(_)) else List(State.Normal)
-
-      if (term.destination_ids == null) {
-        shard.selectEdges(term.source_id, states, query.page.count, Cursor(query.page.cursor)).toEdgeResults
-      } else {
-        val results = shard.intersectEdges(term.source_id, states, term.destination_ids.toLongArray)
-        new ResultWindow(results.map { edge => (edge, Cursor(edge.destinationId)) }, query.page.count, Cursor(query.page.cursor)).toEdgeResults
-      }
-    }.toJavaList
+    edges.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }.toJavaList
   }
 
   def execute(operations: thrift.ExecuteOperations) = {
-    executeCompiler(operations.fromThrift)
+    edges.execute(operations.fromThrift)
   }
 
   @deprecated
   def count(query: JList[thrift.SelectOperation]) = {
-    selectCompiler(query.toSeq.map { _.fromThrift }).sizeEstimate
+    edges.count(List(query.toSeq.map { _.fromThrift })).first
   }
 
   def count2(queries: JList[JList[thrift.SelectOperation]]) = {
-    queries.toSeq.parallel(future).map[Int] { query =>
-      selectCompiler(query.toSeq.map { _.fromThrift }).sizeEstimate
-    }.pack
+    edges.count(queries.toSeq.map { _.toSeq.map { _.fromThrift }}).pack
   }
 }
