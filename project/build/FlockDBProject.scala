@@ -8,7 +8,7 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with Subve
   val cglib     = "cglib" % "cglib" % "2.1_3"
   val configgy  = "net.lag" % "configgy" % "1.5.2"
   val dbcp      = "commons-dbcp" % "commons-dbcp" % "1.2.2"
-  val gizzard   = "com.twitter" % "gizzard" % "1.1.0-alpha-4"
+  val gizzard   = "com.twitter" % "gizzard" % "1.1.2"
   val hamcrest  = "org.hamcrest" % "hamcrest-all" % "1.1"
   val jmock     = "org.jmock" % "jmock" % "2.4.0"
   val kestrel   = "net.lag" % "kestrel" % "1.2"
