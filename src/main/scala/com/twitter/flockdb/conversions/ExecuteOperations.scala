@@ -1,7 +1,6 @@
 package com.twitter.flockdb.conversions
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import flockdb.operations
 import conversions.ExecuteOperation._
 import conversions.Priority._
 
