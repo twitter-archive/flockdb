@@ -36,7 +36,7 @@ object IntersectionSpec extends ConfiguredSpecification with EdgesDatabase {
   val darcy = 4L
   var queryEvaluatorFactories: List[QueryEvaluatorFactory] = null
 
-  materialize(config.configMap("nameservers"))
+  materialize(config.configMap("edges.nameservers"))
 
   def intersection_of(user1: Long, user2: Long, page: Page) = {
     val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
