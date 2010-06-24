@@ -18,6 +18,7 @@ package com.twitter.flockdb.jobs
 
 import com.twitter.gizzard.jobs.BoundJobParser
 import com.twitter.gizzard.scheduler.JobScheduler
+import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.results
 import com.twitter.ostrich.Stats
@@ -35,15 +36,15 @@ object Copy {
 }
 
 object CopyFactory extends gizzard.jobs.CopyFactory[Shard] {
-  def apply(sourceShardId: Int, destinationShardId: Int) = new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START)
+  def apply(sourceShardId: ShardId, destinationShardId: ShardId) = new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START)
 }
 
-class Copy(sourceShardId: Int, destinationShardId: Int, cursor: Copy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: Int, destinationShardId: Int, cursor: Copy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
+class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
+  def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
   def this(attributes: Map[String, AnyVal]) = {
     this(
-      attributes("source_shard_id").toInt,
-      attributes("destination_shard_id").toInt,
+      ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
+      ShardId(attributes("destination_shard_hostname").toString, attributes("destination_shard_table_prefix").toString),
       (results.Cursor(attributes("cursor1").toInt), results.Cursor(attributes("cursor2").toInt)),
       attributes("count").toInt)
   }
@@ -68,16 +69,16 @@ object MetadataCopy {
   val END = results.Cursor.End
 }
 
-class MetadataCopy(sourceShardId: Int, destinationShardId: Int, cursor: MetadataCopy.Cursor,
+class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor,
                    count: Int)
       extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: Int, destinationShardId: Int, cursor: MetadataCopy.Cursor) =
+  def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor) =
     this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
 
   def this(attributes: Map[String, AnyVal]) = {
     this(
-      attributes("source_shard_id").toInt,
-      attributes("destination_shard_id").toInt,
+      ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
+      ShardId(attributes("destination_shard_hostname").toString, attributes("destination_shard_table_prefix").toString),
       results.Cursor(attributes("cursor").toInt),
       attributes("count").toInt)
   }

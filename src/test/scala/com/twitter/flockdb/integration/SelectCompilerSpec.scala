@@ -19,7 +19,7 @@ package com.twitter.flockdb.integration
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
-import com.twitter.xrayspecs.{Time, Eventually}
+import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import test.{EdgesDatabase, StaticEdges}
@@ -38,6 +38,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with EdgesDatabase wit
     val bob = 2L
     val carl = 3L
     val darcy = 4L
+
+    materialize(config.configMap("edges.nameservers"))
 
     doBefore {
       reset(flock)
