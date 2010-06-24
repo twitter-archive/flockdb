@@ -71,7 +71,7 @@ object FlockDB {
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), dbFactory, dbQueryFactory)
     val nameServerQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("nameserver"), nameServerDbFactory, nameServerDbQueryFactory)
 
-    val nameServerConfig = config.configMap("edges.nameservers")
+    val nameServerConfig = config.configMap("nameservers.replicas")
     val nameServerShards = (for (key <- nameServerConfig.keys) yield {
       val map = nameServerConfig.configMap(key)
       nameServerQueryEvaluatorFactory(map("hostname"), map("database"), map("username"), map("password"))

@@ -40,7 +40,7 @@ class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
   val carl = 3L
   val darcy = 4L
 
-  materialize(config.configMap("edges"))
+  materialize(config.configMap("nameservers"))
 
   "Edge Integration" should {
     doBefore {
