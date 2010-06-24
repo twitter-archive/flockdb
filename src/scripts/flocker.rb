@@ -1,4 +1,18 @@
 #!/usr/bin/env ruby
+#
+# Copyright 2010 Twitter, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 $:.push(File.dirname($0))
 require 'optparse'
@@ -330,7 +344,9 @@ end
 
 def show_forwardings
   puts "GRAPH  BASE_USER_ID    SHARD"
-  $service.get_forwardings().each do |forwarding|
+  $service.get_forwardings().sort_by do |f|
+    [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
+  end.each do |forwarding|
     if $options[:graphs] and !$options[:graphs].include?(forwarding.table_id) and !$options[:graphs].include?(-forwarding.table_id)
       next
     end

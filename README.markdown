@@ -1,79 +1,96 @@
-# WARNING
 
-This is in the process of being packaged for "outside of twitter use". It is very rough as code is being pushed around. please forgive the mess.
+# FlockDB
 
-# WHAT IS THIS
+FlockDB is a distributed graph database for storing adjancency lists, with goals of supporting:
 
-This is a distributed graph database. we use it to store social graphs (who follows whom, who blocks whom) and secondary indices at twitter. it is much simpler than other graph databases such as neo4j. it scales horizontally and is designed for on-line, low-latency, high throughput environments such as web-sites.
+- a high rate of add/update/remove operations
+- potientially complex set arithmetic queries
+- paging through query result sets containing millions of entries
+- ability to "archive" and later restore archived edges
+- horizontal scaling including replication
+- online data migration
 
-# SOME STATS
+Non-goals include:
 
-Twitter runs FlockDB on a large cluster of machines. There are "Flapp" middleware machines and MySQL backends. (In theory, there are pluggable back-ends.)
+- multi-hop queries (or graph-walking queries)
+- automatic shard migrations
 
-Our FlockDB cluster stores 13+ billion edges, sustains 20k writes/second at peak, 100k reads/second at peak.
+FlockDB is much simpler than other graph databases such as neo4j because it tries to solve fewer
+problems. It scales horizontally and is designed for on-line, low-latency, high throughput
+environments such as web-sites.
 
-# HOW TO RUN TESTS
+Twitter uses FlockDB to store social graphs (who follows whom, who blocks whom) and secondary
+indices. As of April 2010, the Twitter FlockDB cluster stores 13+ billion edges and sustains peak
+traffic of 20k writes/second and 100k reads/second.
 
-mysql> CREATE DATABASE edges_test;
-mysql> CREATE DATABASE flock_edges_test;
 
-% ant test -DDB_USERNAME=fixme -DDB_PASSWORD=fixmetoo
+# It does what?
 
-# HOW TO ACTUALLY USE
+If, for example, you're storing a social graph (user A follows user B), and it's not necessarily
+symmetrical (A can follow B without B following A), then FlockDB can store that relationship as an
+edge: node A points to node B. It stores this edge with a sort position, and in both directions, so
+that it can answer the question "Who follows A?" as well as "Whom is A following?"
 
-we have not yet pulled over the main file so it wont actually start a thrift service. so it can't yet be used.
-but once we do that, you start up the process, then run flocker.rb (our command line tool) to create some new graph configurations and you start manipulating data.
+This is called a directed graph. (Technically, FlockDB stores the adjacency lists of a directed
+graph.) Each edge has a 64-bit source ID, a 64-bit destination ID, a state (normal, removed,
+archived), and a 32-bit position used for sorting. The edges are stored in both a forward and
+backward direction, meaning that an edge can be queried based on either the source or destination
+ID.
 
-the ruby client (gem forthcoming) works like this:
+For example, if node 134 points to node 90, and its sort position is 5, then there are two rows
+written into the backing store:
 
-    nk = User.find_by_screen_name('nk')
-    robey = User.find_by_screen_name('robey')
-    john = User.find_by_screen_name('jkalucki')
-    ed = User.find_by_screen_name('asdf')
+    forward: 134 -> 90 at position 5
+    backward: 90 <- 134 at position 5
 
-    # insert some data:
-    Flock.add(nk.id, :follows, robey.id)
-    Flock.add(nk.id, :follows, john.id)
-    Flock.add(robey.id, :follows, nk.id)
-    Flock.add(ed.id, :follows, john.id)
+If you're storing a social graph, the graph might be called "following", and you might use the
+current time as the position, so that a listing of followers is in recency order. In that case, if
+user 134 is Nick, and user 90 is Robey, then FlockDB can store:
 
-    # query some data:
-    Flock.contains(nk.id, :follows, robey.id) # => true
-    Flock.select(nk.id, :follows, nil) # => [john.id, robey.id] # mnemonic: "nick follows who?"
-    Flock.select(nil, :follows, john.id) # => [nk.id, ed.id] # mnemonic: "who follows john?"
+    forward: Nick follows Robey at 9:54 today
+    backward: Robey is followed by Nick at 9:54 today
 
-    # set algebra:
-    Flock.select(nil, :follows, robey.id).intersect(nil, :follows, john.id) # => [nk.id] # mnemonic who follows both robey and john?
-    # you can do `intersection`, `union`, and `difference` queries.
-    # this is all done "server-side" so as to avoid transmitting huge data.
+The (source, destination) must be unique: only one edge can point from node A to node B, but the
+position and state may be modified at any time. Position is used only for sorting the results of
+queries, and state is used to mark edges that have been removed or archived (placed into cold
+sleep).
 
-    # some hints for performance:
-    Flock.select(nk.id, :follows, nil).paginate(1000).each { ... } # => gather all results, 1000 items at a time
 
-    # pagination, 20 items per page:
-    nick_follows_who = Flock.select(nk.id, :follows, nil)
-    first_page, next_cursor, prev_cursor = nick_follows_who.paginate(20, :start).unapply
-    second_page, next_cursor, prev_cursor = nick_follows_who.paginate(20, next_cursor).unapply
+# Building
 
-    # perform a "mass-action"
-    Flock.delete(nk.id, :follows, nil) # => have nick unfollow everybody
+In theory, building is as simple as
 
-    # edges have multiple "colors". we do this for spam:
-    Flock.archive(nk.id, :follows, nil) # => archive all edges emanating from nick
-    Flock.unarchive(nk.id, :follows, nil) # => unarchive all edges emanating from nick. this will restore all archived edges that WEREN'T deleted.
+    $ ant
 
-    # perform a transaction/bulk-write:
-    Flock.transaction do |t|
-      t.add(robey.id, :blocks, nk.id)
-      t.delete(nk.id, :follows, robey.id)
-      t.delete(nk.id, :follows_on_his_phone, robey.id)
-      t.delete(robey.id, :follows, nick.id)
-      t.delete(robey.id, :follows_on_his_phone, nick.id)
-    end
+but there are some pre-requisites. You need:
 
-# CONTRIBUTORS
+- java 1.6
+- ant 1.7
 
-* Nick Kallen
-* Robey Pointer
-* John Kalucki
-* Ed Ceaser
+In addition, the tests require a local mysql instance to be running, and for `DB_USERNAME` and
+`DB_PASSWORD` env vars to contain login info for it. You can skip the tests if you want:
+
+    $ ant -Dskip.test=1
+
+There should be support for building with sbt "soon".
+
+
+# Running
+
+Check out [the demo](doc/demo.markdown) for instructions on how to start up a local development
+instance of FlockDB. It also shows how to add edges, query them, etc.
+
+
+# Community
+
+- Twitter: #flockdb
+- IRC: #twinfra on freenode (irc.freenode.net)
+- Mailing list: <flockdb@googlegroups.com> [subscribe](http://groups.google.com/group/flockdb)
+
+
+# Contributors
+
+- Nick Kallen @nk
+- Robey Pointer @robey
+- John Kalucki @jkalucki
+- Ed Ceaser @asdf
