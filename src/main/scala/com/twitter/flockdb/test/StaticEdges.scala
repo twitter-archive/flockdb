@@ -23,8 +23,6 @@ import net.lag.logging.Logger
 
 
 object StaticEdges extends Database {
-  Configgy.configure("config/test.conf")
-
   val poolConfig = Configgy.config.configMap("db.connection_pool")
   val log = Logger.get
   val config = Configgy.config

@@ -28,8 +28,8 @@ import conversions.SelectOperation._
 import test.{EdgesDatabase, StaticEdges}
 
 
-object EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
-  val poolConfig = config.configMap("db.connection_pool")
+class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
+  lazy val poolConfig = config.configMap("db.connection_pool")
 
   import StaticEdges._
 
@@ -40,7 +40,7 @@ object EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
   val carl = 3L
   val darcy = 4L
 
-  materialize(config.configMap("nameservers"))
+  materialize(config.configMap("edges"))
 
   "Edge Integration" should {
     doBefore {

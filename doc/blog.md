@@ -61,7 +61,7 @@ A complex query like "What's the intersection of people I follow and people who 
 President Obama?" can be answered quickly by decomposing it into single-user queries ("Who is
 following President Obama?"). Data is partitioned by node, so these queries can each be answered by
 a single partition, using an indexed range query. Similarly, paging through long result sets is done
-by using the position field as a cursor, rathor than using `LIMIT/OFFSET`, so any page of results
+by using the position field as a cursor, rather than using `LIMIT/OFFSET`, so any page of results
 for a query is indexed and is equally fast.
 
 Write operations are [idempotent](http://en.wikipedia.org/wiki/Idempotence) and

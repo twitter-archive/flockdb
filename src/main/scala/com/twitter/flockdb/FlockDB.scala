@@ -29,8 +29,8 @@ import com.twitter.results.{Cursor, ResultWindow}
 import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
-import com.twitter.querulous.evaluator.{AutoDisablingQueryEvaluatorFactory, StandardQueryEvaluatorFactory}
-import com.twitter.querulous.query.{TimingOutQueryFactory, TimingOutStatsCollectingQueryFactory, SqlQueryFactory}
+import com.twitter.querulous.evaluator.QueryEvaluatorFactory
+import com.twitter.querulous.query.QueryFactory
 import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
@@ -51,17 +51,6 @@ import thrift.FlockException
 
 
 object FlockDB {
-  def convertConfigMap(queryMap: ConfigMap) = {
-    val queryInfo = new mutable.HashMap[String, (String, Duration)]
-    for (key <- queryMap.keys) {
-      val pair = queryMap.getList(key)
-      val query = pair(0)
-      val timeout = pair(1).toLong.millis
-      queryInfo += (query -> (key, timeout))
-    }
-    queryInfo
-  }
-
   def statsCollector(w3c: W3CStats) = {
     new StatsCollector {
       def incr(name: String, count: Int) = w3c.incr(name, count)
@@ -71,32 +60,18 @@ object FlockDB {
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
     val stats = statsCollector(w3c)
-    val dbFactory = AutoDatabaseFactory(config.configMap("db.connection_pool"), Some(stats))
-    val nameServerDbFactory = AutoDatabaseFactory(config.configMap("nameserver.connection_pool"), Some(stats))
+    val dbFactory = DatabaseFactory.fromConfig(config.configMap("db.connection_pool"), Some(stats))
+    val nameServerDbFactory = DatabaseFactory.fromConfig(config.configMap("nameserver.connection_pool"), Some(stats))
     apply(config, dbFactory, nameServerDbFactory, w3c, stats)
   }
 
   def apply(config: ConfigMap, dbFactory: DatabaseFactory, nameServerDbFactory: DatabaseFactory, w3c: W3CStats, stats: StatsCollector): FlockDB = {
-    val sqlQueryFactory = new SqlQueryFactory
-    val (dbQueryInfo, nameServerQueryInfo) = (convertConfigMap(config.configMap("db.queries")), convertConfigMap(config.configMap("nameservers.queries")))
+    val dbQueryFactory = QueryFactory.fromConfig(config.configMap("db"), Some(stats))
+    val nameServerDbQueryFactory = QueryFactory.fromConfig(config.configMap("nameserver"), Some(stats))
+    val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), dbFactory, dbQueryFactory)
+    val nameServerQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("nameserver"), nameServerDbFactory, nameServerDbQueryFactory)
 
-    val dbQueryTimeoutDefault = config("db.query_timeout_default").toLong.millis
-    val dbQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, dbQueryInfo, dbQueryTimeoutDefault, stats)
-    val dbQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
-      dbFactory,
-      dbQueryFactory),
-      config("db.disable.error_count").toInt,
-      config("db.disable.seconds").toInt.seconds)
-
-    val nameServerQueryTimeoutDefault = config("nameservers.query_timeout_default").toLong.millis
-    val nameServerQueryFactory = new TimingOutStatsCollectingQueryFactory(sqlQueryFactory, nameServerQueryInfo, nameServerQueryTimeoutDefault, stats)
-    val nameServerQueryEvaluatorFactory = new AutoDisablingQueryEvaluatorFactory(new StandardQueryEvaluatorFactory(
-      nameServerDbFactory,
-      nameServerQueryFactory),
-      config("nameservers.disable.error_count").toInt,
-      config("nameservers.disable.seconds").toInt.seconds)
-
-    val nameServerConfig = config.configMap("nameservers.replicas")
+    val nameServerConfig = config.configMap("edges.nameservers")
     val nameServerShards = (for (key <- nameServerConfig.keys) yield {
       val map = nameServerConfig.configMap(key)
       nameServerQueryEvaluatorFactory(map("hostname"), map("database"), map("username"), map("password"))
