@@ -18,7 +18,7 @@ package com.twitter.flockdb.unit
 
 import java.sql.SQLException
 import scala.collection.mutable
-import com.twitter.gizzard.shards.{Busy, ShardInfo}
+import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.{StandardQueryEvaluatorFactory, QueryEvaluator, QueryEvaluatorFactory}
 import com.twitter.querulous.query.SqlQueryFactory
@@ -50,8 +50,8 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
     evalConf.update("database", config("edges.db_name"))
     val queryEvaluator = evaluator(evalConf)
     val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config)
-    val shardInfo = new ShardInfo("com.twitter.flockdb.SqlShard",
-      "table_001", "localhost", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal, 1)
+    val shardInfo = ShardInfo(ShardId("localhost", "table_001"), "com.twitter.flockdb.SqlShard",
+      "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
     var shard: Shard = null
 
     doBefore {
@@ -66,8 +66,8 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
 
     "create" in {
       val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config)
-      val createShardInfo = new ShardInfo("com.twitter.flockdb.SqlShard",
-        "create_test", "localhost", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal, 1)
+      val createShardInfo = ShardInfo(ShardId("localhost", "create_test"), "com.twitter.flockdb.SqlShard",
+        "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
       val createShard = new SqlShard(queryEvaluator, createShardInfo, 1, Nil, config)
 
       "when the database doesn't exist" >> {

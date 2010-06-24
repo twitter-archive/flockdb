@@ -53,6 +53,10 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     }
   }
 
+  def select(query: SelectQuery): ResultWindow[Long] = {
+    selectCompiler(query.operations).select(query.page)
+  }
+
   def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
     queries.parallel(future).map { query =>
       selectCompiler(query.operations).select(query.page)

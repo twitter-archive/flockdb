@@ -19,7 +19,6 @@ package com.twitter.flockdb.integration
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import com.twitter.results.Cursor
-import com.twitter.xrayspecs.Eventually
 import test.{EdgesDatabase, StaticEdges}
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
@@ -36,6 +35,8 @@ object IntersectionSpec extends ConfiguredSpecification with EdgesDatabase {
   val carl = 3L
   val darcy = 4L
   var queryEvaluatorFactories: List[QueryEvaluatorFactory] = null
+
+  materialize(config.configMap("edges.nameservers"))
 
   def intersection_of(user1: Long, user2: Long, page: Page) = {
     val op1 = new SelectOperation(SelectOperationType.SimpleQuery)

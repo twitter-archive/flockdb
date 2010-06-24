@@ -19,7 +19,7 @@ package com.twitter.flockdb.integration
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
 import com.twitter.ostrich.Stats
-import com.twitter.xrayspecs.{Eventually, Time}
+import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.smile.kestrel.{KestrelClient, MemoryStore}
 import thrift._
