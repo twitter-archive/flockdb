@@ -66,6 +66,7 @@ but there are some pre-requisites. You need:
 
 - java 1.6
 - ant 1.7
+- thrift 0.2.0
 
 In addition, the tests require a local mysql instance to be running, and for `DB_USERNAME` and
 `DB_PASSWORD` env vars to contain login info for it. You can skip the tests if you want:
