@@ -39,7 +39,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with EdgesDatabase wit
     val carl = 3L
     val darcy = 4L
 
-    materialize(config.configMap("nameservers"))
+    materialize(config.configMap("edges.nameservers"))
 
     doBefore {
       reset(flock)
