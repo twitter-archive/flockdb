@@ -1,3 +1,19 @@
+/*
+ * Copyright 2010 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.twitter.flockdb.shards
 
 import java.sql.{ResultSet, SQLException, SQLIntegrityConstraintViolationException}
@@ -90,7 +106,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = Cursor.End
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor, count + 1) { row =>
+    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
         metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))

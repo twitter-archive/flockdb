@@ -1,3 +1,19 @@
+/*
+ * Copyright 2010 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.twitter.flockdb
 
 import java.lang.{Long => JLong, String}
@@ -129,24 +145,17 @@ object FlockDB {
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
-    polymorphicJobParser += ("flockdb\\.jobs\\.(Copy|Migrate|MetadataCopy|MetadataMigrate)".r, copyJobParser)
+    polymorphicJobParser += ("\\.jobs\\.(Copy|Migrate|MetadataCopy|MetadataMigrate)".r, copyJobParser)
     polymorphicJobParser += ("flockdb\\.jobs\\.single".r, singleJobParser)
     polymorphicJobParser += ("flockdb\\.jobs\\.multi".r, multiJobParser)
 
     scheduler.start()
 
-    new FlockDB(nameServer, forwardingManager, copyFactory, scheduler, future)
+    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
   }
 }
 
-class FlockDB(val nameServer: nameserver.NameServer[shards.Shard],
-              val forwardingManager: ForwardingManager,
-              val copyFactory: gizzard.jobs.CopyFactory[shards.Shard],
-              val schedule: PrioritizingJobScheduler, future: Future)
-  extends thrift.FlockDB.Iface {
-
-  private val edges = new EdgesService(nameServer, forwardingManager, copyFactory, schedule, future)
-
+class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
