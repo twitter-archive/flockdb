@@ -25,7 +25,7 @@
     <dependency org="com.twitter" name="json" rev="1.1.1" />
     <dependency org="com.twitter" name="ostrich" rev="1.1.15" />
     <dependency org="com.twitter" name="xrayspecs" rev="1.0.7" />
-    <dependency org="com.twitter" name="querulous" rev="1.1.7" />
+    <dependency org="com.twitter" name="querulous" rev="1.1.11" />
     <dependency org="com.twitter" name="results" rev="1.0" />
     <dependency org="com.twitter" name="gizzard" rev="1.0.13" />
 
