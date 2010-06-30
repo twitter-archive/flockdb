@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+VERSION="1.0.3"
+
 if java -version 2>&1 |grep "1\.5"; then
   echo "Java must be at least 1.6"
   exit 1
@@ -21,6 +23,14 @@ fi
 
 if [ "x$DB_USERNAME" = "x" ]; then
   echo "Please set DB_USERNAME and/or DB_PASSWORD."
+  exit 1
+fi
+
+if gizzmo --help > /dev/null; then
+  GIZZMO="gizzmo -h localhost -p 7917"
+else
+  echo "Make sure you have gizzmo available on your path."
+  echo "(link to gizzmo here)"
   exit 1
 fi
 
@@ -43,17 +53,23 @@ exec_sql "DROP DATABASE IF EXISTS flockdb_development"
 exec_sql "CREATE DATABASE IF NOT EXISTS flockdb_development"
 
 JAVA_OPTS="-Xms256m -Xmx256m -XX:NewSize=64m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -server"
-java -Dstage=development $JAVA_OPTS -jar ./dist/flockdb/flockdb-1.0.jar &
-sleep 5
+java -Dstage=development $JAVA_OPTS -jar ./dist/flockdb/flockdb-${VERSION}.jar &
+sleep 10
 
 echo "Creating shards..."
 i=1
-while [ $i -lt 15 ]; do
+while [ $i -le 15 ]; do
+  /bin/echo -n "$i "
   exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_edges"
   exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_metadata"
   exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_edges"
   exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_metadata"
+  forward_shard=$($GIZZMO create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "forward_${i}" "com.twitter.flockdb.SqlShard")
+  backward_shard=$($GIZZMO create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "backward_${i}" "com.twitter.flockdb.SqlShard")
+  $GIZZMO forward -- $i 0 $forward_shard
+  $GIZZMO forward -- -$i 0 $backward_shard
   i=$((i + 1))
 done
-
-./src/scripts/flocker.rb -D setup-dev
+echo
+$GIZZMO -b reload
+echo "Done."
