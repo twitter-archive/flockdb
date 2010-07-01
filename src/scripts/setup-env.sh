@@ -27,7 +27,7 @@ if [ "x$DB_USERNAME" = "x" ]; then
 fi
 
 if gizzmo --help > /dev/null; then
-  GIZZMO="gizzmo -h localhost -p 7917"
+  gizzmo="gizzmo -H localhost -P 7917"
 else
   echo "Make sure you have gizzmo available on your path."
   echo "(link to gizzmo here)"
@@ -64,12 +64,12 @@ while [ $i -le 15 ]; do
   exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_metadata"
   exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_edges"
   exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_metadata"
-  forward_shard=$($GIZZMO create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "forward_${i}" "com.twitter.flockdb.SqlShard")
-  backward_shard=$($GIZZMO create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "backward_${i}" "com.twitter.flockdb.SqlShard")
-  $GIZZMO forward -- $i 0 $forward_shard
-  $GIZZMO forward -- -$i 0 $backward_shard
+  forward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "forward_${i}" "com.twitter.flockdb.SqlShard")
+  backward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "backward_${i}" "com.twitter.flockdb.SqlShard")
+  $gizzmo addforwarding -- $i 0 $forward_shard
+  $gizzmo addforwarding -- -$i 0 $backward_shard
   i=$((i + 1))
 done
 echo
-$GIZZMO -b reload
+$gizzmo -f reload
 echo "Done."
