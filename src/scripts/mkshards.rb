@@ -16,69 +16,74 @@
 
 $:.push(File.dirname($0))
 require 'optparse'
+require 'yaml'
 
-$options = {
-  :primary_file => "databases.txt",
-  :weight => 9,
+options = {
+  :config_filename => ENV['HOME'] + "/.shards.yml",
+  :count => 500,
 }
+override = {}
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: #{$0} [options] <graph_id> <count>"
-  opts.separator "Example: #{$0} -d databases.txt 11 500"
+  opts.banner = "Usage: #{$0} [options] <graph_id>"
+  opts.separator "Example: #{$0} -f shards.yml 11"
 
-  opts.on("-d", "--primary=FILENAME", "read primary db hostnames from FILENAME (default: #{$options[:primary_file]})") do |filename|
-    $options[:primary_file] = filename
+  opts.on("-f", "--config=FILENAME", "load shard database config (default: #{options[:config_filename]})") do |filename|
+    options[:config_filename] = filename
   end
-  opts.on("-s", "--secondary=FILENAME", "read secondary db hostnames from FILENAME (default: none)") do |filename|
-    $options[:secondary_file] = filename
-  end
-  opts.on("-w", "--weight=WEIGHT", "use weight for primary (default: #{$options[:weight]})") do |weight|
-    $options[:weight] = weight.to_i
+  opts.on("-n", "--count=N", "create N bins (default: #{options[:count]})") do |count|
+    options[:count] = count.to_i
   end
 end
 
 parser.parse!(ARGV)
 
-if ARGV.size < 2
+if ARGV.size < 1
   puts
   puts parser
   puts
   exit 1
 end
 
-graph_id = ARGV[0].to_i
-count = ARGV[1].to_i
+config = YAML.load($options[:config_filename]) rescue {}
 
-primary_databases = File.open($options[:primary_file]).readlines.map { |x| x.strip }.select { |x| x.size > 0 }
-secondary_databases = if $options[:secondary_file]
-  File.open($options[:secondary_file]).readlines.map { |x| x.strip }.select { |x| x.size > 0 }
-else
-  nil
+config.merge!(override)
+
+app_host, app_port = (config['app_host'] || 'localhost').split(':')
+app_port ||= 7917
+
+namespace = config['namespace'] || nil
+db_trees = Array(config['databases'] || 'localhost')
+graph_id = ARGV[0].to_i
+
+gizzmo = lambda do |cmd|
+  `gizzmo --host=#{app_host} --port=#{app_port} #{cmd}`
 end
+
 
 print "Creating bins"
 STDOUT.flush
-count.times do |i|
-  primary_bin_hostname = primary_databases[i % primary_databases.size]
-  secondary_bin_hostname = secondary_databases ? secondary_databases[i % secondary_databases.size] : nil
-  lower_bound = (1 << 60) / count * i
-  table_names = [ "edges_forward_#{graph_id}_#{'%03d' % i}", "edges_backward_#{graph_id}_#{'%03d' % i}" ]
+options[:count].times do |i|
+  table_name = [ namespace, "edges_#{graph_id}_%04d" % i ].compact.join("_")
+  hosts = Array(db_trees[i % db_trees.size])
+  lower_bound = (1 << 60) / options[:count] * i
+  types = "-s 'INT UNSIGNED' -d 'INT UNSIGNED'"
 
-  table_names.each do |table_name|
-    `gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "#{primary_bin_hostname}" "#{table_name}" "com.twitter.flockdb.SqlShard"`
-    if secondary_bin_hostname
-      `gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "#{secondary_bin_hostname}" "#{table_name}_2" "com.twitter.flockdb.SqlShard"`
-    end
+  [ "forward", "backward" ].each do |direction|
+    gizzmo.call "create localhost #{table_name}_#{direction}_replicating com.twitter.gizzard.shards.ReplicatingShard"
 
-    `gizzmo create "localhost" "#{table_name}_replicating" "com.twitter.gizzard.shards.ReplicatingShard"`
-    `gizzmo addlink "localhost/#{table_name}_replicating" #{primary_bin_hostname}/#{table_name} #{$options[:weight]}`
-    if secondary_bin_hostname
-      `gizzmo addlink "localhost/#{table_name}_replicating" "#{secondary_bin_hostname}/#{table_name}_2" 1`
+    distinct = 1
+    hosts.each do |host|
+      host, weight = host.split(':')
+      weight ||= 4
+      gizzmo.call "create #{types} #{host} #{table_name}_#{direction}_#{distinct} com.twitter.flockdb.SqlShard"
+      gizzmo.call "addlink localhost/#{table_name}_#{direction}_replicating #{host}/#{table_name}_#{direction}_#{distinct} #{weight}"
+      distinct += 1
     end
   end
 
-  `gizzmo addforwarding -- #{graph_id} #{lower_bound} localhost/#{table_names[0]}_replicating`
-  `gizzmo addforwarding -- -#{graph_id} #{lower_bound} localhost/#{table_names[1]}_replicating`
+  gizzmo.call "addforwarding -- #{graph_id} #{lower_bound} localhost/#{table_name}_forward_replicating"
+  gizzmo.call "addforwarding -- -#{graph_id} #{lower_bound} localhost/#{table_name}_backward_replicating"
 
   print "."
   print "#{i+1}" if (i + 1) % 100 == 0
