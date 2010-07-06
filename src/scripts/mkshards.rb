@@ -22,7 +22,6 @@ options = {
   :config_filename => ENV['HOME'] + "/.shards.yml",
   :count => 500,
 }
-override = {}
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options] <graph_id>"
@@ -45,9 +44,7 @@ if ARGV.size < 1
   exit 1
 end
 
-config = YAML.load($options[:config_filename]) rescue {}
-
-config.merge!(override)
+config = YAML.load_file(options[:config_filename]) rescue {}
 
 app_host, app_port = (config['app_host'] || 'localhost').split(':')
 app_port ||= 7917
