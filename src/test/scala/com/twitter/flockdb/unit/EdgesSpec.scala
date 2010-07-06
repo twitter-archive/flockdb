@@ -53,6 +53,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       Time.freeze()
       val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
       expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).add.toThrift)
@@ -61,6 +62,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     "add_at" in {
       val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
       expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
@@ -70,6 +72,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       Time.freeze()
       val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
       expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
@@ -78,6 +81,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     "remove_at" in {
       val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
       expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)

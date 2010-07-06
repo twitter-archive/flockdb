@@ -34,6 +34,7 @@ class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
   import StaticEdges._
 
   val FOLLOWS = 1
+  val BORKEN = 900
 
   val alice = 1L
   val bob = 2L
@@ -50,18 +51,24 @@ class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
     }
 
     "add" in {
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      val term = new QueryTerm(alice, FOLLOWS, true)
-      term.setDestination_ids(List[Long](bob).pack)
-      term.setState_ids(List[Int](State.Normal.id).toJavaList)
-      val op = new SelectOperation(SelectOperationType.SimpleQuery)
-      op.setTerm(term)
-      val page = new Page(1, Cursor.Start.position)
-      flock.select(List(op).toJavaList, page).ids.size must eventually(be_>(0))
-      Time.advance(1.second)
-      flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
-      flock.select(List(op).toJavaList, page).ids.size must eventually(be_==(0))
-      flock.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
+      "existing graph" in {
+        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        val term = new QueryTerm(alice, FOLLOWS, true)
+        term.setDestination_ids(List[Long](bob).pack)
+        term.setState_ids(List[Int](State.Normal.id).toJavaList)
+        val op = new SelectOperation(SelectOperationType.SimpleQuery)
+        op.setTerm(term)
+        val page = new Page(1, Cursor.Start.position)
+        flock.select(List(op).toJavaList, page).ids.size must eventually(be_>(0))
+        Time.advance(1.second)
+        flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
+        flock.select(List(op).toJavaList, page).ids.size must eventually(be_==(0))
+        flock.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
+      }
+
+      "nonexistent graph" in {
+        flock.execute(Select(alice, BORKEN, bob).add.toThrift) must throwA[FlockException]
+      }
     }
 
     "remove" in {

@@ -19,6 +19,7 @@ package com.twitter.flockdb.queries
 import scala.collection.mutable
 import com.twitter.gizzard.jobs.{Schedulable, SchedulableWithTasks}
 import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
@@ -27,7 +28,8 @@ import jobs.multi
 import flockdb.operations.{ExecuteOperations, ExecuteOperationType}
 
 
-class ExecuteCompiler(schedule: PrioritizingJobScheduler) {
+class ExecuteCompiler(schedule: PrioritizingJobScheduler, forwardingManager: ForwardingManager) {
+  @throws(classOf[ShardException])
   def apply(program: ExecuteOperations) {
     val now = Time.now
     val operations = program.operations
@@ -38,6 +40,9 @@ class ExecuteCompiler(schedule: PrioritizingJobScheduler) {
       val term = op.term
       val time = program.executeAt.map { x => Time(x.seconds) }.getOrElse(Time.now)
       val position = op.position.getOrElse(Time.now.inMillis)
+
+      // force an exception for nonexistent graphs
+      forwardingManager.find(0, term.graphId, Direction.Forward)
 
       results ++= (op.operationType match {
         case ExecuteOperationType.Add =>

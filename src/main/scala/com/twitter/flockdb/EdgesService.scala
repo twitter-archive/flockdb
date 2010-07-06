@@ -33,7 +33,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
                    val schedule: PrioritizingJobScheduler,
                    future: Future, replicationFuture: Future) {
   private val selectCompiler = new SelectCompiler(forwardingManager)
-  private val executeCompiler = new ExecuteCompiler(schedule)
+  private val executeCompiler = new ExecuteCompiler(schedule, forwardingManager)
 
   def shutdown() {
     schedule.shutdown()

@@ -23,6 +23,7 @@ import shards.Shard
 
 
 class ForwardingManager(nameServer: NameServer[Shard]) {
+  @throws(classOf[ShardException])
   def find(sourceId: Long, graphId: Int, direction: Direction) = {
     nameServer.findCurrentForwarding(translate(graphId, direction), sourceId)
   }
@@ -35,6 +36,7 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
     }
   }
 
+  @throws(classOf[ShardException])
   def findCurrentForwarding(tableId: List[Int], id: Long): Shard = {
     find(id, tableId(0), if (tableId(1) > 0) Direction.Forward else Direction.Backward)
   }
