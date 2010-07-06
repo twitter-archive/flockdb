@@ -18,6 +18,7 @@ package com.twitter.flockdb.unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.jobs.SchedulableWithTasks
+import com.twitter.gizzard.nameserver.InvalidShard
 import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
@@ -47,36 +48,59 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
     val carl = 3L
     var scheduler: PrioritizingJobScheduler = null
     var executeCompiler: ExecuteCompiler = null
+    var forwardingManager: ForwardingManager = null
 
     doBefore {
       Time.freeze()
       scheduler = mock[PrioritizingJobScheduler]
-      executeCompiler = new ExecuteCompiler(scheduler)
+      forwardingManager = mock[ForwardingManager]
+      executeCompiler = new ExecuteCompiler(scheduler, forwardingManager)
     }
 
     "without execute_at present" in {
       val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None)
-      expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now)))) }
+      expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+      }
       executeCompiler(program)
     }
 
     "without position present" in {
       val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None, None)
-      expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now)))) }
+      expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+      }
       executeCompiler(program)
+    }
+
+    "with an invalid graph" in {
+      val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None)
+      expect {
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward) willThrow(new InvalidShard)
+//        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+      }
+      executeCompiler(program) must throwA[InvalidShard]
     }
 
     "compile add operations" in {
       "single" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
       }
@@ -84,13 +108,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "aggregate" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
       }
@@ -99,6 +129,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
             one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
               single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
               single.Add(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
@@ -109,6 +140,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
             one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
               single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
               single.Add(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
@@ -122,13 +154,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "single" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
       }
@@ -136,13 +174,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "aggregate" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
       }
@@ -151,6 +195,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
             one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
               new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
               new single.Remove(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
@@ -161,6 +206,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
             one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
               new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
               new single.Remove(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))
@@ -175,13 +221,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "single" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
       }
@@ -189,13 +241,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "aggregate" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Archive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Archive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Archive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Archive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
       }
@@ -204,6 +262,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
             one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
               single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
               single.Archive(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
@@ -213,9 +272,11 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-            single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
-            single.Archive(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
+              single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
+              single.Archive(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
           }
           executeCompiler(program)
         }
@@ -226,13 +287,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "single" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+          }
           executeCompiler(program)
         }
       }
@@ -240,13 +307,19 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       "aggregate" >> {
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Negate(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Negate(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Negate(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low)))) }
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Negate(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+          }
           executeCompiler(program)
         }
       }
@@ -255,6 +328,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         "forward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
             one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
               single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
               single.Negate(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
@@ -264,9 +338,11 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
-          expect { one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-            single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
-            single.Negate(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+          expect {
+            one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
+              single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
+              single.Negate(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
           }
           executeCompiler(program)
         }
