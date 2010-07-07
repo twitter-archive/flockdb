@@ -1,7 +1,7 @@
 <ivy-module version="1.0" xmlns:e="http://ant.apache.org/ivy/extra">
   <info organisation="com.twitter.service"
         module="flockdb"
-        revision="1.0"
+        revision="1.0.4"
         e:buildpackage="com.twitter.flockdb"
         e:testclass="com.twitter.flockdb.TestRunner"
         e:stresstestclass="com.twitter.flockdb.StressTestRunner"
