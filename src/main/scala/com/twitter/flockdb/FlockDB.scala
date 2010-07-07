@@ -23,7 +23,7 @@ import com.twitter.gizzard.Future
 import com.twitter.gizzard.jobs._
 import com.twitter.gizzard.scheduler.{KestrelMessageQueue, JobScheduler, PrioritizingJobScheduler}
 import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.shards.{ShardInfo, ReplicatingShard}
+import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
 import com.twitter.ostrich.{Stats, W3CStats}
@@ -125,7 +125,12 @@ class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
   }
 
   def execute(operations: thrift.ExecuteOperations) = {
-    edges.execute(operations.fromThrift)
+    try {
+      edges.execute(operations.fromThrift)
+    } catch {
+      case e: ShardException =>
+        throw new FlockException(e.toString)
+    }
   }
 
   @deprecated
