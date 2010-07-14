@@ -30,7 +30,7 @@ if gizzmo --help > /dev/null; then
   gizzmo="gizzmo -H localhost -P 7917"
 else
   echo "Make sure you have gizzmo available on your path."
-  echo "(link to gizzmo here)"
+  echo "Find it here: http://github.com/twitter/gizzmo"
   exit 1
 fi
 
