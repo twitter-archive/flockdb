@@ -5,18 +5,19 @@ This demo will walk through setting up a local development flockdb instance and 
 via the ruby client. To play along, you need:
 
 - java 1.6
-- ant 1.7
+- sbt 0.7.4
 - ruby 1.8
 - mysql 5.0
+- [gizzmo](http://github.com/twitter/gizzmo)
 
-Newer versions should work for all of the above.
+Newer versions should work for all of the above. Make sure to put the gizzmo binary on your path.
 
 
 ## Building it
 
 If you haven't built flockdb yet, do that first:
 
-    $ ant
+    $ sbt update package-dist
 
 You may need to set `DB_USERNAME` and `DB_PASSWORD` for tests to complete (see below).
 
@@ -36,30 +37,36 @@ Now run `setup-env.sh`:
     $ ./src/scripts/setup-env.sh
 
 It kills and restarts flockdb, creates the `flockdb_development` database if necessary, and runs
-`flocker.rb` to create shard configurations for graphs 1-15.
+`gizzmo` to create shard configurations for graphs 1-15.
 
 You can tell flockdb is running because it will create a `flock.log` file in the current folder, and
 it will respond to `server_info` queries:
 
     $ curl localhost:9990/server_info.txt
-    build: 20100427-172426
-    build_revision: 3156f9d26776bd2ddb02e78385e92cf1a271abb2
+    build: 20100713-165811
+    build_revision: 4b2443968d131b7967885b0b0cb62dde04ab5455
     name: flockdb
-    start_time: Tue Apr 27 17:24:27 PDT 2010
-    uptime: 155343
-    version: 1.0
+    start_time: Tue Jul 13 17:01:33 PDT 2010
+    uptime: 440837
+    version: 1.0.4
 
-You should also be able to see that `flocker.rb` created a forward and backward shard for each of 15
-made-up graphs, by asking it to show you the forwarding table:
+You should also be able to see that `gizzmo` created a forward and backward shard for each of 15
+made-up graphs, by asking it to show you the forwarding table. First, set up a default host & port
+in your `.gizzmorc` to make the rest of the demo easier:
 
-    $ ./src/scripts/flocker.rb -D show
-    GRAPH  BASE_USER_ID    SHARD
-      1 000000000000000 -> localhost/forward_1
-      1 000000000000000 <- localhost/backward_1
-      2 000000000000000 -> localhost/forward_2
+    $ cat ~/.gizzmorc
+    host: localhost
+    port: 7917
+
+Then:
+
+    $ gizzmo forwardings
+    1	0	localhost/forward_1
+    -1 0 localhost/backward_1
+    2	0	localhost/forward_2
     ...
-     15 000000000000000 -> localhost/forward_15
-     15 000000000000000 <- localhost/backward_15
+    15 0 localhost/forward_15
+    -15	0	localhost/backward_15
 
 The shard config is necessary so that flockdb knows where to write edges for a graph. If no
 forwarding info is provided for a graph, any operation on that graph will throw an exception.
@@ -106,17 +113,15 @@ Notice that the results are given in recency order, most recent first.
 
 ## Under the hood
 
-You can ask flocker where a shard is stored:
+You can ask `gizzmo` where a shard is stored:
 
-    $ ./src/scripts/flocker.rb -D find 1 --graph 1
-    User_id 1, graph 1
-      Forward: localhost/forward_1
-      Backward: localhost/backward_1
+    $ gizzmo lookup 1 1
+    localhost/forward_1
+    $ gizzmo lookup -- -1 1
+    localhost/backward_1
 
 In development mode, all forward edges from graph 1 are stored in a single table, so we didn't
 really need to ask, but it can be useful when you have a lot of shards for a graph.
-
-The `-D` means "development mode", which tells it that the flockdb is probably running on localhost.
 
     mysql> use edges_development;
     mysql> select * from backward_1_metadata where source_id=1;
@@ -233,42 +238,31 @@ to a new database.
 
 To create 10 shards for the new graph:
 
-    $ ./src/scripts/flocker.rb -D mkshards 10 "localhost" --graph 99
-    Creating shards...
-    ..........Done.
+    $ ./src/scripts/mkshards.rb -n 10 99
+    Creating bins..........Done.
 
 And to verify that they were created:
 
-    $ ./src/scripts/flocker.rb -D show --graph 99
-    GRAPH  BASE_USER_ID    SHARD
-     99 000000000000000 -> edges-replica(localhost/edges_forward_99_000_A)
-     99 199999999999999 -> edges-replica(localhost/edges_forward_99_001_A)
-     99 333333333333332 -> edges-replica(localhost/edges_forward_99_002_A)
-     99 4cccccccccccccb -> edges-replica(localhost/edges_forward_99_003_A)
-     99 666666666666664 -> edges-replica(localhost/edges_forward_99_004_A)
-     99 7fffffffffffffd -> edges-replica(localhost/edges_forward_99_005_A)
-     99 999999999999996 -> edges-replica(localhost/edges_forward_99_006_A)
-     99 b3333333333332f -> edges-replica(localhost/edges_forward_99_007_A)
-     99 cccccccccccccc8 -> edges-replica(localhost/edges_forward_99_008_A)
-     99 e66666666666661 -> edges-replica(localhost/edges_forward_99_009_A)
-     99 000000000000000 <- edges-replica(localhost/edges_backward_99_000_A)
-     99 199999999999999 <- edges-replica(localhost/edges_backward_99_001_A)
-     99 333333333333332 <- edges-replica(localhost/edges_backward_99_002_A)
-     99 4cccccccccccccb <- edges-replica(localhost/edges_backward_99_003_A)
-     99 666666666666664 <- edges-replica(localhost/edges_backward_99_004_A)
-     99 7fffffffffffffd <- edges-replica(localhost/edges_backward_99_005_A)
-     99 999999999999996 <- edges-replica(localhost/edges_backward_99_006_A)
-     99 b3333333333332f <- edges-replica(localhost/edges_backward_99_007_A)
-     99 cccccccccccccc8 <- edges-replica(localhost/edges_backward_99_008_A)
-     99 e66666666666661 <- edges-replica(localhost/edges_backward_99_009_A)
+    $ gizzmo forwardings -t 99
+    99	0	localhost/edges_99_0000_forward_replicating
+    99	115292150460684697	localhost/edges_99_0001_forward_replicating
+    99	230584300921369394	localhost/edges_99_0002_forward_replicating
+    99	345876451382054091	localhost/edges_99_0003_forward_replicating
+    99	461168601842738788	localhost/edges_99_0004_forward_replicating
+    99	576460752303423485	localhost/edges_99_0005_forward_replicating
+    99	691752902764108182	localhost/edges_99_0006_forward_replicating
+    99	807045053224792879	localhost/edges_99_0007_forward_replicating
+    99	922337203685477576	localhost/edges_99_0008_forward_replicating
+    99	1037629354146162273	localhost/edges_99_0009_forward_replicating
 
-(Flocker assumes that most shards will be replicated, so when creating shards manually, it always
-puts them behind a replicating shard.)
+(`mkshards.rb` assumes that most shards will be replicated, so when creating shards manually, it
+always puts them behind a replicating shard.)
 
 Make sure the local flockdb instance reloads the forwarding tables:
 
-    $ ./src/scripts/flocker.rb -D push
-    Reloading forwardings on localhost
+    $ gizzmo reload
+    Are you sure? Reloading will affect production services immediately! (Type 'yes')
+    yes
 
 Make a client with our new graph, and add some edges:
 
@@ -279,51 +273,58 @@ Make a client with our new graph, and add some edges:
 
 What shard is user 123456 on?
 
-    $ ./src/scripts/flocker.rb -D --graph 99 find 123456 --ids
-    User_id 123456, graph 99
-      Forward: [132148697]edges-replica([508882612]localhost/edges_forward_99_008_A)
-      Backward: [978782308]edges-replica([844087219]localhost/edges_backward_99_008_A)
+    $ gizzmo --subtree lookup 99 123456
+    localhost/edges_99_0008_forward_replicating
+      localhost/edges_99_0008_forward_1
 
 Hm, but localhost has been behaving strangely lately. Let's move that shard to 127.0.0.1, which is
-really lightly loaded.
+really lightly loaded. First, create the new shard:
 
-    $ ./src/scripts/flocker.rb -D migrate-one 508882612 127.0.0.1
-    Setup migration: shard 508882612 -> 996146524
-    Ready to push new shard config to flapps (localhost)? [Y] 
-    Reloading forwardings on localhost
-    Ready to start the migration? [Y] 
-    Migration started!
-    No busy shards.
+    $ gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" 127.0.0.1 edges_99_0008_new com.twitter.flockdb.SqlShard
+    127.0.0.1/edges_99_0008_new
 
-The migration happens really quick because there's hardly any data in the shard.
+Then, setup a migration:
 
-    $ ./src/scripts/flocker.rb -D show --graph 99
-    GRAPH  BASE_USER_ID    SHARD
-     99 000000000000000 -> edges-replica(localhost/edges_forward_99_000_A)
-     99 199999999999999 -> edges-replica(localhost/edges_forward_99_001_A)
-     99 333333333333332 -> edges-replica(localhost/edges_forward_99_002_A)
-     99 4cccccccccccccb -> edges-replica(localhost/edges_forward_99_003_A)
-     99 666666666666664 -> edges-replica(localhost/edges_forward_99_004_A)
-     99 7fffffffffffffd -> edges-replica(localhost/edges_forward_99_005_A)
-     99 999999999999996 -> edges-replica(localhost/edges_forward_99_006_A)
-     99 b3333333333332f -> edges-replica(localhost/edges_forward_99_007_A)
-     99 cccccccccccccc8 -> edges-replica(127.0.0.1/edges_forward_99_008_A_copy)
-     99 e66666666666661 -> edges-replica(localhost/edges_forward_99_009_A)
-     99 000000000000000 <- edges-replica(localhost/edges_backward_99_000_A)
-     99 199999999999999 <- edges-replica(localhost/edges_backward_99_001_A)
-     99 333333333333332 <- edges-replica(localhost/edges_backward_99_002_A)
-     99 4cccccccccccccb <- edges-replica(localhost/edges_backward_99_003_A)
-     99 666666666666664 <- edges-replica(localhost/edges_backward_99_004_A)
-     99 7fffffffffffffd <- edges-replica(localhost/edges_backward_99_005_A)
-     99 999999999999996 <- edges-replica(localhost/edges_backward_99_006_A)
-     99 b3333333333332f <- edges-replica(localhost/edges_backward_99_007_A)
-     99 cccccccccccccc8 <- edges-replica(localhost/edges_backward_99_008_A)
-     99 e66666666666661 <- edges-replica(localhost/edges_backward_99_009_A)
+    $ gizzmo setup-migrate localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
+    localhost/edges_99_0008_new_migrate_replica
 
-    robey@arya:~/twitter/flockdb (master)$ ./src/scripts/flocker.rb -D --graph 99 find 123456 --ids
-    User_id 123456, graph 99
-      Forward: [132148697]edges-replica([996146524]127.0.0.1/edges_forward_99_008_A_copy)
-      Backward: [978782308]edges-replica([844087219]localhost/edges_backward_99_008_A)
+If you look at the replication subtree for `localhost/edges_99_0008_forward_replicating`, you can
+see that it's added a layer of replication between the old shard and the new one, and the new one is
+behind a write-only barrier:
+
+    $ gizzmo subtree localhost/edges_99_0008_forward_replicating
+    localhost/edges_99_0008_forward_replicating
+      localhost/edges_99_0008_new_migrate_replica
+        localhost/edges_99_0008_forward_1
+        localhost/edges_99_0008_new_migrate_write_only
+          127.0.0.1/edges_99_0008_new
+
+So let's reload the forwarding table to make sure everyone starts using this replication:
+
+    $ gizzmo reload
+
+Now, all writes are going to both places and we can start the copy:
+
+    $ gizzmo copy localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
+
+The destination shard will be marked "busy" during the copy, but because we only had 3 edges in it,
+the copy will probably be done before we can even check:
+
+    $ gizzmo busy
+
+Yep, no busy shards. We can finish the migration, then, to remove the replication layer and the
+source shard.
+
+    $ gizzmo finish-migrate localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
+    $ gizzmo subtree localhost/edges_99_0008_forward_replicating
+    localhost/edges_99_0008_forward_replicating
+      127.0.0.1/edges_99_0008_new
+
+Sweet! Reload to tell flockdb to stop writing to the old shard.
+
+    $ gizzmo reload
+
+And make sure the data is still there.
 
     >> flock.select(123456, :loves, nil).to_a
     => [800]
