@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION="1.0.3"
+VERSION="1.0.5"
 
 if java -version 2>&1 |grep "1\.5"; then
   echo "Java must be at least 1.6"

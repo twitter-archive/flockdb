@@ -17,7 +17,7 @@
 package com.twitter.flockdb.unit
 
 import com.twitter.gizzard.scheduler.JobScheduler
-import com.twitter.gizzard.nameserver.{NameServer, ShardMigration}
+import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
