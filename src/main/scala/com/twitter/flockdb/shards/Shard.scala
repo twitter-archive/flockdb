@@ -41,10 +41,10 @@ trait Shard extends shards.Shard {
 
   @throws(classOf[shards.ShardException]) def startEdgeCopy()
   @throws(classOf[shards.ShardException]) def finishEdgeCopy()
-  @throws(classOf[shards.ShardException]) def needsEdgeCopyStart(): Boolean
+  @throws(classOf[shards.ShardException]) def needsEdgeCopyRestart(): Boolean
   @throws(classOf[shards.ShardException]) def startMetadataCopy()
   @throws(classOf[shards.ShardException]) def finishMetadataCopy()
-  @throws(classOf[shards.ShardException]) def needsMetadataCopyStart(): Boolean
+  @throws(classOf[shards.ShardException]) def needsMetadataCopyRestart(): Boolean
   
   @throws(classOf[shards.ShardException]) def writeCopies(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def updateMetadata(metadata: Metadata)

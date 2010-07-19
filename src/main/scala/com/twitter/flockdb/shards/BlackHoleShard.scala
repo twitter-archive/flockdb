@@ -86,7 +86,7 @@ class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val child
   
   def finishMetadataCopy() = ()
   
-  def needsEdgeCopyStart() = false
+  def needsEdgeCopyRestart() = false
   
-  def needsMetadataCopyStart() = false
+  def needsMetadataCopyRestart() = false
 }

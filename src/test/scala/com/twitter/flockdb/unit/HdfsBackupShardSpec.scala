@@ -63,7 +63,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
         )
         writeEdges(TEST_REL_PATH, FILE_SYSTEM, edges)
         val checkEdges = readEdges("/" + TEST_REL_PATH + "/edges/data", deserializer, base64)
-        seqEqual(edges, checkEdges) mustEqual true
+        edges mustEqual checkEdges
         new File("/" + TEST_REL_PATH + "/edges/_job_finished").exists() mustEqual true
       }
       
@@ -71,7 +71,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
         val edges = List()
         writeEdges(TEST_REL_PATH, FILE_SYSTEM, edges)        
         val checkEdges = readEdges("/" + TEST_REL_PATH + "/edges/data", deserializer, base64)
-        seqEqual(edges, checkEdges) mustEqual true
+        edges mustEqual checkEdges
         new File("/" + TEST_REL_PATH + "/edges/_job_finished").exists() mustEqual true
       }
     }
@@ -84,7 +84,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
         )
         writeMetadatas(TEST_REL_PATH, FILE_SYSTEM, metadatas)
         val checkMetadatas = readMetadatas("/" + TEST_REL_PATH + "/metadata/data", deserializer, base64)
-        seqEqual(metadatas, checkMetadatas) mustEqual true
+        metadata mustEqual checkMetadatas
         new File("/" + TEST_REL_PATH + "/metadata/_job_finished").exists() mustEqual true
       }
     }
@@ -125,15 +125,6 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
       val thriftMetadata = new thrift.Metadata
       deserializer.deserialize(thriftMetadata, bytes)
       new com.twitter.flockdb.conversions.Metadata.RichThriftMetadata(thriftMetadata).fromThrift
-    }
-  }
-  
-  def seqEqual(first: Seq[Any], second: Seq[Any]): Boolean = {
-    (first, second) match {
-      case (Nil, Nil) => true
-      case (head::tail, Nil) => false
-      case (Nil, head::tail) => false
-      case (firstHead::firstTail, secondHead::secondTail) => if (firstHead equals secondHead) seqEqual(firstTail, secondTail) else false
     }
   }
 }
