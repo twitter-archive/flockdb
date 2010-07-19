@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION="1.0.3"
+VERSION="1.0.4"
 
 if java -version 2>&1 |grep "1\.5"; then
   echo "Java must be at least 1.6"
@@ -30,7 +30,7 @@ if gizzmo --help > /dev/null; then
   gizzmo="gizzmo -H localhost -P 7917"
 else
   echo "Make sure you have gizzmo available on your path."
-  echo "(link to gizzmo here)"
+  echo "Find it here: http://github.com/twitter/gizzmo"
   exit 1
 fi
 
