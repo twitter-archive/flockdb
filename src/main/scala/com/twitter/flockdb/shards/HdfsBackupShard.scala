@@ -21,6 +21,9 @@ import java.io.DataOutputStream
 import java.net.URI
 
 import scala.collection.mutable.{HashMap, Map}
+import com.twitter.flockdb.conversions.Edge.RichFlockEdge
+import com.twitter.flockdb.conversions.Metadata.RichFlockMetadata
+
 import com.twitter.gizzard.shards.{ShardInfo, ShardException, ShardFactory}
 import com.twitter.xrayspecs.Time
 import com.twitter.results.{Cursor, ResultWindow}
@@ -94,7 +97,7 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   def writeCopies(edges: Seq[Edge]) = {
     checkStateExecute(edgeCopyState, Copying, { () => 
       edges foreach { edge => 
-        val thriftEdge = new com.twitter.flockdb.conversions.Edge.RichFlockEdge(edge).toThrift
+        val thriftEdge = new RichFlockEdge(edge).toThrift
         edgeThriftWritable.set(thriftEdge)
         edgeWriter.write(NullWritable get, edgeThriftWritable) 
       }
@@ -105,13 +108,13 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
     checkStateExecute(edgeCopyState, Copying, { () => 
       fs.create(new Path(edgePath + "/_job_finished")).close()
       edgeWriter.close(null)
-      edgePath = null      
+      edgePath = null
       edgeCopyState = NotCopying
-    })  
+    })
   }
   
   def startMetadataCopy() = {
-    checkStateExecute(metadataCopyState, NotCopying, { () => 
+    checkStateExecute(metadataCopyState, NotCopying, { () =>
       metadataPath = path + "/metadata"
       fs.delete(new Path(metadataPath), true)
       metadataWriter = new LzoThriftB64LineRecordWriter[thrift.Metadata](new TypeRef[thrift.Metadata] {}, fs.create(new Path(metadataPath + "/data")))
@@ -120,8 +123,8 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   }
 
   def writeMetadata(metadata: Metadata) = {
-    checkStateExecute(metadataCopyState, Copying, { () => 
-      val thriftMetadata = new com.twitter.flockdb.conversions.Metadata.RichFlockMetadata(metadata).toThrift
+    checkStateExecute(metadataCopyState, Copying, { () =>
+      val thriftMetadata = new RichFlockMetadata(metadata).toThrift
       metadataThriftWritable.set(thriftMetadata)
       metadataWriter.write(NullWritable get, metadataThriftWritable)
     })
