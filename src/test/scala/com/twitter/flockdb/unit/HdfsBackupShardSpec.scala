@@ -25,7 +25,8 @@ import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.elephantbird.util.TypeRef
 import com.twitter.elephantbird.mapreduce.output.LzoThriftB64LineRecordWriter
 import com.twitter.elephantbird.mapreduce.io.ThriftB64LineWritable
-import com.twitter.flockdb.conversions.{Edge, Metadata}
+import com.twitter.flockdb.conversions.Metadata.RichThriftMetadata
+import com.twitter.flockdb.conversions.Edge.RichThriftEdge
 import com.twitter.flockdb.shards.HdfsBackupShard
 import com.twitter.flockdb.shards.Metadata
 import com.twitter.xrayspecs.Time
@@ -105,7 +106,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
       val bytes = base64.decode(line.toString.getBytes("UTF-8"))
       val thriftEdge = new thrift.Edge
       deserializer.deserialize(thriftEdge, bytes)
-      new Edge.RichThriftEdge(thriftEdge).fromThrift
+      new RichThriftEdge(thriftEdge).fromThrift
     }
   }
   
@@ -124,7 +125,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
       val bytes = base64.decode(line.toString.getBytes("UTF-8"))
       val thriftMetadata = new thrift.Metadata
       deserializer.deserialize(thriftMetadata, bytes)
-      new com.twitter.flockdb.conversions.Metadata.RichThriftMetadata(thriftMetadata).fromThrift
+      new RichThriftMetadata(thriftMetadata).fromThrift
     }
   }
 }
