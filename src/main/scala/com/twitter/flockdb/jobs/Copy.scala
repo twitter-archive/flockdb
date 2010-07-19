@@ -65,7 +65,7 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
   }
   
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    if (destinationShard.needsEdgeCopyStart()) {
+    if (destinationShard.needsEdgeCopyRestart()) {
       // If a flapp goes down mid copy, we get a copyPage call without corresponding startEdgeCopy
       // Do any cleanup in startEdgeCopy
       Some(new Copy(sourceShardId, destinationShardId, Copy.START, count))
@@ -113,7 +113,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
   }
 
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    if (destinationShard.needsMetadataCopyStart()) {
+    if (destinationShard.needsMetadataCopyRestart()) {
       // If a flapp goes down mid copy, we get a copyPage call without corresponding startMetadataCopy
       // Do any cleanup in startMetadataCopy
       Some(new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, count))
