@@ -84,7 +84,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
         )
         writeMetadatas(TEST_REL_PATH, FILE_SYSTEM, metadatas)
         val checkMetadatas = readMetadatas("/" + TEST_REL_PATH + "/metadata/data", deserializer, base64)
-        metadata mustEqual checkMetadatas
+        metadatas mustEqual checkMetadatas
         new File("/" + TEST_REL_PATH + "/metadata/_job_finished").exists() mustEqual true
       }
     }
