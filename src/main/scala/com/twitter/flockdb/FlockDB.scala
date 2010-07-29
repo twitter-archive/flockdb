@@ -84,15 +84,29 @@ object FlockDB {
     val forwardingManager = new ForwardingManager(nameServer)
     nameServer.reload()
 
-    val singleJobParser = new jobs.single.JobParser(forwardingManager, OrderedUuidGenerator)
-    val multiJobParser  = new jobs.multi.JobParser(forwardingManager, scheduler)
-    val copyJobParser   = new BoundJobParser((nameServer, scheduler(Priority.Medium.id)))
+    val singleJobEnvironment = (forwardingManager, OrderedUuidGenerator)
+    List((jobs.single.AddParser, "single.Add".r), (jobs.single.RemoveParser, "single.Remove".r),
+         (jobs.single.ArchiveParser, "single.Archive".r), (jobs.single.NegateParser, "single.Negate".r)).foreach {
+      case (unboundJobParser, regex) =>
+        val boundJobParser = new BoundJobParser(unboundJobParser, singleJobEnvironment)
+        polymorphicJobParser += (regex, boundJobParser)
+    }
+
+    val multiJobEnvironment = (forwardingManager, scheduler)
+    List((jobs.multi.ArchiveParser, "multi.Archive".r), (jobs.multi.UnarchiveParser, "multi.Unarchive".r),
+         (jobs.multi.RemoveAllParser, "multi.RemoveAll".r), (jobs.multi.NegateParser, "multi.Negate".r)).foreach {
+      case (unboundJobParser, regex) =>
+        val boundJobParser = new BoundJobParser(unboundJobParser, multiJobEnvironment)
+        polymorphicJobParser += (regex, boundJobParser)
+    }
+
+    val copyJobParser         = new BoundJobParser(jobs.CopyParser, (nameServer, scheduler(Priority.Medium.id)))
+    val metadataCopyJobParser = new BoundJobParser(jobs.MetadataCopyParser, (nameServer, scheduler(Priority.Medium.id)))
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
-    polymorphicJobParser += ("\\.jobs\\.(Copy|Migrate|MetadataCopy|MetadataMigrate)".r, copyJobParser)
-    polymorphicJobParser += ("flockdb\\.jobs\\.single".r, singleJobParser)
-    polymorphicJobParser += ("flockdb\\.jobs\\.multi".r, multiJobParser)
+    polymorphicJobParser += ("(Copy|Migrate)".r, copyJobParser)
+    polymorphicJobParser += ("(MetadataCopy|MetadataMigrate)".r, metadataCopyJobParser)
 
     scheduler.start()
 

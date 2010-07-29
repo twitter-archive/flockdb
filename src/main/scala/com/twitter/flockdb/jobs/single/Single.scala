@@ -16,13 +16,49 @@
 
 package com.twitter.flockdb.jobs.single
 
-import com.twitter.gizzard.jobs.{BoundJobParser, UnboundJob}
+import com.twitter.gizzard.jobs.{UnboundJobParser, UnboundJob}
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.logging.Logger
 
 
-class JobParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends BoundJobParser((forwardingManager, uuidGenerator))
+abstract class SingleJobParser extends UnboundJobParser[(ForwardingManager, UuidGenerator)] {
+  def apply(attributes: Map[String, Any]) = {
+    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
+    createJob(
+      casted("source_id").toLong,
+      casted("graph_id").toInt,
+      casted("destination_id").toLong,
+      casted("position").toLong,
+      Time(casted("updated_at").toInt.seconds))
+  }
+
+  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time): Single
+}
+
+object AddParser extends SingleJobParser {
+  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
+    new Add(sourceId, graphId, destinationId, position, updatedAt)
+  }
+}
+
+object RemoveParser extends SingleJobParser {
+  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
+    new Remove(sourceId, graphId, destinationId, position, updatedAt)
+  }
+}
+
+object ArchiveParser extends SingleJobParser {
+  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
+    new Archive(sourceId, graphId, destinationId, position, updatedAt)
+  }
+}
+
+object NegateParser extends SingleJobParser {
+  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
+    new Negate(sourceId, graphId, destinationId, position, updatedAt)
+  }
+}
 
 abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends UnboundJob[(ForwardingManager, UuidGenerator)] {
   def toMap = {
@@ -64,47 +100,17 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
 }
 
 case class Add(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
-  def this(attributes: Map[String, AnyVal]) = {
-    this(
-      attributes("source_id").toLong,
-      attributes("graph_id").toInt,
-      attributes("destination_id").toLong,
-      attributes("position").toLong,
-      Time(attributes("updated_at").toInt.seconds))
-  }
-
   def preferredState = State.Normal
 }
 
 case class Remove(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
-  def this(attributes: Map[String, AnyVal]) = this(
-    attributes("source_id").toLong,
-    attributes("graph_id").toInt,
-    attributes("destination_id").toLong,
-    attributes("position").toLong,
-    Time(attributes("updated_at").toInt.seconds))
-
   def preferredState = State.Removed
 }
 
 case class Archive(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
-  def this(attributes: Map[String, AnyVal]) = this(
-    attributes("source_id").toLong,
-    attributes("graph_id").toInt,
-    attributes("destination_id").toLong,
-    attributes("position").toLong,
-    Time(attributes("updated_at").toInt.seconds))
-
   def preferredState = State.Archived
 }
 
 case class Negate(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
-  def this(attributes: Map[String, AnyVal]) = this(
-    attributes("source_id").toLong,
-    attributes("graph_id").toInt,
-    attributes("destination_id").toLong,
-    attributes("position").toLong,
-    Time(attributes("updated_at").toInt.seconds))
-
   def preferredState = State.Negative
 }
