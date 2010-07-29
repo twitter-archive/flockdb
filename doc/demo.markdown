@@ -34,7 +34,7 @@ These are also used by `config/development.conf` in flockdb.
 
 Now run `setup-env.sh`:
 
-    $ ./src/scripts/setup-env.sh
+    $ ./dist/flockdb/scripts/setup-env.sh
 
 It kills and restarts flockdb, creates the `flockdb_development` database if necessary, and runs
 `gizzmo` to create shard configurations for graphs 1-15.
