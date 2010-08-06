@@ -72,7 +72,7 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   
   val log = Logger.get(getClass.getName)
   
-  private val path = shardInfo.hostname + "/" + shardInfo.tablePrefix
+  private val path = shardInfo.hostname + "/" + shardInfo.tablePrefix.replace("_", "/")
   private val fs = FileSystem.get(URI.create(path), new Configuration)
   private val edgeThriftWritable = new ThriftB64LineWritable(new TypeRef[thrift.Edge] {})  
   private val metadataThriftWritable = new ThriftB64LineWritable(new TypeRef[thrift.Metadata] {})

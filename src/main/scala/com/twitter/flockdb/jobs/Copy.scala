@@ -134,7 +134,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
     }
     super.apply(environment)
   }
-g
+
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     if (destinationShard.needsMetadataCopyRestart()) {
       // If a flapp goes down mid copy, we get a copyPage call without corresponding startMetadataCopy
