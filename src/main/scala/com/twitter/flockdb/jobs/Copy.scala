@@ -65,10 +65,6 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
   }
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
-  
-  def progress = {
-    cursor._1.position
-  }
 }
 
 object MetadataCopy {
@@ -105,7 +101,4 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
   }
 
   def serialize = Map("cursor" -> cursor.position)
-  def progress = {
-    cursor.position
-  }
 }
