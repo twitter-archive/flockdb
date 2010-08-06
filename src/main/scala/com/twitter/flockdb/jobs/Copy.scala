@@ -39,8 +39,20 @@ object CopyFactory extends gizzard.jobs.CopyFactory[Shard] {
   def apply(sourceShardId: ShardId, destinationShardId: ShardId) = new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START)
 }
 
+object CopyParser extends gizzard.jobs.CopyParser[Shard] {
+  def apply(attributes: Map[String, Any]) = {
+    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
+    new Copy(
+      ShardId(casted("source_shard_hostname").toString, casted("source_shard_table_prefix").toString),
+      ShardId(casted("destination_shard_hostname").toString, casted("destination_shard_table_prefix").toString),
+      (results.Cursor(casted("cursor1").toInt), results.Cursor(casted("cursor2").toInt)),
+      casted("count").toInt)
+  }
+}
+
 class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
+
   def this(attributes: Map[String, AnyVal]) = {
     this(
       ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
@@ -87,6 +99,17 @@ object MetadataCopy {
   type Cursor = results.Cursor
   val START = results.Cursor.Start
   val END = results.Cursor.End
+}
+
+object MetadataCopyParser extends gizzard.jobs.CopyParser[Shard] {
+  def apply(attributes: Map[String, Any]) = {
+    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
+    new MetadataCopy(
+      ShardId(casted("source_shard_hostname").toString, casted("source_shard_table_prefix").toString),
+      ShardId(casted("destination_shard_hostname").toString, casted("destination_shard_table_prefix").toString),
+      results.Cursor(casted("cursor").toInt),
+      casted("count").toInt)
+  }
 }
 
 class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor,
