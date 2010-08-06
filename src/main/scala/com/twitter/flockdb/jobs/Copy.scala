@@ -52,6 +52,7 @@ object CopyParser extends gizzard.jobs.CopyParser[Shard] {
 
 class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
+
   def this(attributes: Map[String, AnyVal]) = {
     this(
       ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
@@ -130,10 +131,10 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
     val (nameServer, scheduler) = environment
     if (cursor == MetadataCopy.START) {
       nameServer.findShardById(destinationShardId).startMetadataCopy()
-    }g
+    }
     super.apply(environment)
   }
-
+g
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     if (destinationShard.needsMetadataCopyRestart()) {
       // If a flapp goes down mid copy, we get a copyPage call without corresponding startMetadataCopy
