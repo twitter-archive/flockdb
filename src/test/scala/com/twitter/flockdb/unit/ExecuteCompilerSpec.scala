@@ -78,7 +78,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
     "with an invalid graph" in {
       val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None)
       expect {
-        one(forwardingManager).find(0, FOLLOWS, Direction.Forward) willThrow(new InvalidShard)
+        one(forwardingManager).find(0, FOLLOWS, Direction.Forward) willThrow(new InvalidShard("message"))
 //        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
       }
       executeCompiler(program) must throwA[InvalidShard]

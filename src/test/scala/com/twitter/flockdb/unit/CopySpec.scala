@@ -17,7 +17,7 @@
 package com.twitter.flockdb.unit
 
 import com.twitter.gizzard.scheduler.JobScheduler
-import com.twitter.gizzard.nameserver.{NameServer, ShardMigration}
+import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.Cursor
@@ -86,11 +86,6 @@ object CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
       val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count)
       val json = job.toJson
       json mustMatch "Copy"
-      json mustMatch "\"source_shard_hostname\":\"%s\"".format(shard1Id.hostname)
-      json mustMatch "\"source_shard_table_prefix\":\"%s\"".format(shard1Id.tablePrefix)
-      json mustMatch "\"destination_shard_hostname\":\"%s\"".format(shard2Id.hostname)
-      json mustMatch "\"destination_shard_table_prefix\":\"%s\"".format(shard2Id.tablePrefix)
-      json mustMatch "\"count\":" + count
       json mustMatch "\"cursor1\":" + cursor1.position
       json mustMatch "\"cursor2\":" + cursor2.position
     }
@@ -137,11 +132,6 @@ object CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
       val job = new MetadataCopy(shard1Id, shard2Id, cursor, count)
       val json = job.toJson
       json mustMatch "MetadataCopy"
-      json mustMatch "\"source_shard_hostname\":\"%s\"".format(shard1Id.hostname)
-      json mustMatch "\"source_shard_table_prefix\":\"%s\"".format(shard1Id.tablePrefix)
-      json mustMatch "\"destination_shard_hostname\":\"%s\"".format(shard2Id.hostname)
-      json mustMatch "\"destination_shard_table_prefix\":\"%s\"".format(shard2Id.tablePrefix)
-      json mustMatch "\"count\":" + count
       json mustMatch "\"cursor\":" + cursor.position
     }
   }

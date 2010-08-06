@@ -60,20 +60,19 @@ sleep).
 
 In theory, building is as simple as
 
-    $ ant
+    $ sbt clean update package-dist
 
 but there are some pre-requisites. You need:
 
 - java 1.6
-- ant 1.7
+- sbt 0.7.4
 - thrift 0.2.0
 
 In addition, the tests require a local mysql instance to be running, and for `DB_USERNAME` and
-`DB_PASSWORD` env vars to contain login info for it. You can skip the tests if you want:
+`DB_PASSWORD` env vars to contain login info for it. You can skip the tests if you want (but you
+should feel a pang of guilt):
 
-    $ ant -Dskip.test=1
-
-There should be support for building with sbt "soon".
+    $ NO_TESTS=1 sbt package-dist
 
 
 # Running

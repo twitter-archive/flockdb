@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION="1.0.4"
+VERSION="@VERSION@"
 
 if java -version 2>&1 |grep "1\.5"; then
   echo "Java must be at least 1.6"
@@ -64,8 +64,8 @@ while [ $i -le 15 ]; do
   exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_metadata"
   exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_edges"
   exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_metadata"
-  forward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "forward_${i}" "com.twitter.flockdb.SqlShard")
-  backward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "localhost" "backward_${i}" "com.twitter.flockdb.SqlShard")
+  forward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "com.twitter.flockdb.SqlShard" "localhost/forward_${i}")
+  backward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "com.twitter.flockdb.SqlShard" "localhost/backward_${i}")
   $gizzmo addforwarding -- $i 0 $forward_shard
   $gizzmo addforwarding -- -$i 0 $backward_shard
   i=$((i + 1))
