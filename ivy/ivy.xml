@@ -1,0 +1,64 @@
+<ivy-module version="1.0" xmlns:e="http://ant.apache.org/ivy/extra">
+  <info organisation="com.twitter.service"
+        module="flockdb"
+        revision="1.0.4"
+        e:buildpackage="com.twitter.flockdb"
+        e:testclass="com.twitter.flockdb.TestRunner"
+        e:stresstestclass="com.twitter.flockdb.StressTestRunner"
+        e:jarclassname="com.twitter.flockdb.Main"
+        e:thriftpackage="com.twitter.flockdb.thrift"
+  />
+
+  <configurations>
+    <conf name="bootstrap" visibility="private" description="load scala compiler and libraries" />
+    <conf name="default" description="normal build" />
+    <conf name="test" visibility="private" description="build and run tests" />
+  </configurations>
+
+  <dependencies>
+    <dependency org="org.scala-lang" name="scala-compiler" rev="2.7.7" />
+    <dependency org="org.scala-lang" name="scala-library" rev="2.7.7" />
+    <dependency org="org.scala-tools.testing" name="specs" rev="1.6.2.1" conf="test->*; test->compile" />
+    <dependency org="org.scala-tools.testing" name="scalacheck" rev="1.6" conf="test->*" />
+    <dependency org="org.scala-tools" name="vscaladoc" rev="1.1-md-3" conf="bootstrap->*" />
+
+    <dependency org="com.twitter" name="json" rev="1.1.1" />
+    <dependency org="com.twitter" name="ostrich" rev="1.1.21" />
+    <dependency org="com.twitter" name="xrayspecs" rev="1.0.7" />
+    <dependency org="com.twitter" name="querulous" rev="1.1.11" />
+    <dependency org="com.twitter" name="results" rev="1.0" />
+    <dependency org="com.twitter" name="gizzard" rev="1.0.13" />
+    <dependency org="com.twitter" name="elephant-bird" rev="1.0" />
+
+    <dependency org="org.apache" name="hadoop-core" rev="0.20.1+133" />
+    <dependency org="org.apache" name="log4j" rev="1.2.15" />
+    <dependency org="org.apache" name="commons-codec" rev="1.3" />
+
+    <dependency org="net.lag" name="configgy" rev="1.5.2" />
+    <dependency org="net.lag" name="smile" rev="0.8.11" />
+    <dependency org="net.lag" name="naggati" rev="0.6" />
+
+    <!-- thrift dependencies -->
+    <dependency org="org.slf4j" name="slf4j-jdk14" rev="1.5.2" />
+    <dependency org="org.slf4j" name="slf4j-api" rev="1.5.2" />
+    <dependency org="thrift" name="libthrift" rev="0.2.0" conf="*" />
+
+    <dependency org="mysql" name="mysql-connector-java" rev="5.1.6" />
+    <dependency org="commons-logging" name="commons-logging" rev="1.1" />
+    <dependency org="commons-lang" name="commons-lang" rev="2.2" />
+    <dependency org="org.apache.mina" name="mina-core" rev="2.0.0-M3"/>
+    <dependency org="org.slf4j" name="slf4j-jdk14" rev="1.5.2"/>
+    <dependency org="org.slf4j" name="slf4j-api" rev="1.5.2"/>
+    <dependency org="commons-dbcp" name="commons-dbcp" rev="1.2.2" />
+    <dependency org="commons-pool" name="commons-pool" rev="1.3" />
+
+    <dependency org="net.lag" name="kestrel" rev="1.2" />
+
+    <dependency org="org.jmock" name="jmock" rev="2.4.0" conf="test->*" />
+    <!--dependency org="org.mockito" name="mockito-core" rev="1.7" conf="test->*" /-->
+    <dependency org="org.hamcrest" name="hamcrest-all" rev="1.1" conf="test->*" />
+    <dependency org="cglib" name="cglib" rev="2.1_3" conf="test->*" />
+    <dependency org="asm" name="asm" rev="1.5.3" conf="test->*" />
+    <dependency org="org.objenesis" name="objenesis" rev="1.1" conf="test->*" />
+  </dependencies>
+</ivy-module>

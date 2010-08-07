@@ -88,7 +88,6 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   def startEdgeCopy() = {
     checkStateExecute(edgeCopyState, NotCopying, { () => 
       edgePath = path + "/edges"
-      println("Starting edge copy")
       fs.delete(new Path(edgePath), true)
       edgeWriter = new LzoThriftB64LineRecordWriter[thrift.Edge](new TypeRef[thrift.Edge] {}, fs.create(new Path(edgePath + "/data")))
       edgeCopyState = Copying
@@ -98,7 +97,6 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   def writeCopies(edges: Seq[Edge]) = {
     checkStateExecute(edgeCopyState, Copying, { () => 
       edges foreach { edge => 
-        println("Writing edge")
         val thriftEdge = new RichFlockEdge(edge).toThrift
         edgeThriftWritable.set(thriftEdge)
         edgeWriter.write(NullWritable get, edgeThriftWritable) 
@@ -109,7 +107,6 @@ class HdfsBackupShard(val shardInfo: ShardInfo, val weight: Int, val children: S
   def finishEdgeCopy() = {
     checkStateExecute(edgeCopyState, Copying, { () => 
       fs.create(new Path(edgePath + "/_job_finished")).close()
-      println("Finished edge copy")
       edgeWriter.close(null)
       edgePath = null
       edgeCopyState = NotCopying
