@@ -43,7 +43,7 @@ import State._
 object HdfsBackupShardSpec extends ConfiguredSpecification {  
   "Edge HdfsBackupShard" should {
     val FILE_SYSTEM = "file://"
-    val TEST_REL_PATH = "tmp/flock_backup"
+    val TEST_REL_PATH = "tmp/flock/backup"
 
     val conf = new JobConf
     conf.set("fs.default.name", FILE_SYSTEM + "/")
@@ -70,7 +70,7 @@ object HdfsBackupShardSpec extends ConfiguredSpecification {
       
       "when there are no edges" >> {
         val edges = List()
-        writeEdges(TEST_REL_PATH, FILE_SYSTEM, edges)        
+        writeEdges(TEST_REL_PATH, FILE_SYSTEM, edges)
         val checkEdges = readEdges("/" + TEST_REL_PATH + "/edges/data", deserializer, base64)
         edges mustEqual checkEdges
         new File("/" + TEST_REL_PATH + "/edges/_job_finished").exists() mustEqual true
