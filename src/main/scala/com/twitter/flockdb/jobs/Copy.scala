@@ -84,7 +84,7 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
     } else {
       val (items, nextCursor) = sourceShard.selectAll(cursor, count)  
       destinationShard.writeCopies(items)
-      val newCount = (count * 1.01).toInt + 1      // Upward pressure on page size
+      val newCount = Math.min((count * 1.01).toInt + 1, Copy.COUNT)     // Upward pressure on page size
       Stats.incr("edges-copy", items.size)
       nextCursor match {
         case Copy.END => None
@@ -144,7 +144,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
     } else {
       val (items, nextCursor) = sourceShard.selectAllMetadata(cursor, count)
       items.foreach { item => destinationShard.writeMetadata(item) }
-      val newCount = (count * 1.01).toInt + 1      // Upward pressure on page size
+      val newCount = Math.min((count * 1.01).toInt + 1, Copy.COUNT)  // Upward pressure on page size
       Stats.incr("metadata-copy", items.size)
       nextCursor match {
         case MetadataCopy.END => {
