@@ -42,7 +42,7 @@ import com.twitter.flockdb.conversions.SelectOperation._
 import com.twitter.xrayspecs.{Duration, Time}
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.{Config, ConfigMap}
-import net.lag.logging.{Logger, ThrottledLogger}
+import net.lag.logging.Logger
 import queries._
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
@@ -63,10 +63,9 @@ object FlockDB {
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
     val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))
 
-    val log = new ThrottledLogger[String](Logger(), config("throttled_log.period_msec").toInt, config("throttled_log.rate").toInt)
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), log, replicationFuture)
+      new shards.ReadWriteShardAdapter(_), replicationFuture)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
@@ -75,7 +74,7 @@ object FlockDB {
     shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard" -> new shards.BlackHoleShardFactory)
 
     val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository, log, replicationFuture)
+                                           shardRepository, replicationFuture)
 
     val polymorphicJobParser = new PolymorphicJobParser
     val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))

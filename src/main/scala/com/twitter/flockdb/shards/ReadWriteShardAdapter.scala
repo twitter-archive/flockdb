@@ -63,7 +63,7 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
       val lockServer = children.first.asInstanceOf[Shard]
       val rest = children.drop(1).asInstanceOf[Seq[Shard]]
       lockServer.withLock(sourceId) { (lock, metadata) =>
-        f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.log, replicatingShard.future)), metadata)
+        f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.future)), metadata)
       }
     } else {
       shard.writeOperation(_.withLock(sourceId)(f))
