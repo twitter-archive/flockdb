@@ -53,14 +53,43 @@ object CopyParser extends gizzard.jobs.CopyParser[Shard] {
 class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
 
+  def this(attributes: Map[String, AnyVal]) = {
+    this(
+      ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
+      ShardId(attributes("destination_shard_hostname").toString, attributes("destination_shard_table_prefix").toString),
+      (results.Cursor(attributes("cursor1").toInt), results.Cursor(attributes("cursor2").toInt)),
+      attributes("count").toInt)
+  }
+  
+  // This is called multiple times, but we only want to call startEdgeCopy once
+  override def apply(environment: (NameServer[Shard], JobScheduler)) {
+    val (nameServer, scheduler) = environment
+    if (cursor == Copy.START) {
+      nameServer.findShardById(destinationShardId).startEdgeCopy()
+    }
+    super.apply(environment)
+  }
+
+  // This is called once, at end of shard copy
+  override def finish(nameServer: NameServer[Shard], scheduler: JobScheduler) {
+    nameServer.findShardById(destinationShardId).finishEdgeCopy()
+    super.finish(nameServer, scheduler)
+  }
+  
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    val (items, newCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.writeCopies(items)
-    Stats.incr("edges-copy", items.size)
-    if (newCursor == Copy.END) {
-      None
+    if (destinationShard.needsEdgeCopyRestart()) {
+      // If a flapp goes down mid copy, we get a copyPage call without corresponding startEdgeCopy
+      // Do any cleanup in startEdgeCopy
+      Some(new Copy(sourceShardId, destinationShardId, Copy.START, count))
     } else {
-      Some(new Copy(sourceShardId, destinationShardId, newCursor, count))
+      val (items, nextCursor) = sourceShard.selectAll(cursor, count)  
+      destinationShard.writeCopies(items)
+      val newCount = Math.min((count * 1.01).toInt + 1, Copy.COUNT)     // Upward pressure on page size
+      Stats.incr("edges-copy", items.size)
+      nextCursor match {
+        case Copy.END => None
+        case other => Some(new Copy(sourceShardId, destinationShardId, nextCursor, newCount))
+      }
     }
   }
 
@@ -90,14 +119,41 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor) =
     this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
 
+  def this(attributes: Map[String, AnyVal]) = {
+    this(
+      ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
+      ShardId(attributes("destination_shard_hostname").toString, attributes("destination_shard_table_prefix").toString),
+      results.Cursor(attributes("cursor").toInt),
+      attributes("count").toInt)
+  }
+  
+  // This is called multiple times, but we only want to call startMetadataCopy once
+  override def apply(environment: (NameServer[Shard], JobScheduler)) {
+    val (nameServer, scheduler) = environment
+    if (cursor == MetadataCopy.START) {
+      nameServer.findShardById(destinationShardId).startMetadataCopy()
+    }
+    super.apply(environment)
+  }
+
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
-    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    items.foreach { destinationShard.writeMetadata(_) }
-    Stats.incr("edges-copy", items.size)
-    if (newCursor == MetadataCopy.END)
-      Some(new Copy(sourceShardId, destinationShardId, Copy.START))
-    else
-      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count))
+    if (destinationShard.needsMetadataCopyRestart()) {
+      // If a flapp goes down mid copy, we get a copyPage call without corresponding startMetadataCopy
+      // Do any cleanup in startMetadataCopy
+      Some(new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, count))
+    } else {
+      val (items, nextCursor) = sourceShard.selectAllMetadata(cursor, count)
+      items.foreach { item => destinationShard.writeMetadata(item) }
+      val newCount = Math.min((count * 1.01).toInt + 1, Copy.COUNT)  // Upward pressure on page size
+      Stats.incr("metadata-copy", items.size)
+      nextCursor match {
+        case MetadataCopy.END => {
+          destinationShard.finishMetadataCopy()
+          Some(new Copy(sourceShardId, destinationShardId, Copy.START))
+        }
+        case other => Some(new MetadataCopy(sourceShardId, destinationShardId, nextCursor, newCount))
+      }
+    }
   }
 
   def serialize = Map("cursor" -> cursor.position)
