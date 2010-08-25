@@ -18,7 +18,7 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) {
   val smile     = "net.lag" % "smile" % "0.8.11"
   val thrift    = "thrift" % "libthrift" % "0.2.0"
   val xrayspecs = "com.twitter" % "xrayspecs" % "1.0.7"
-  val log4j     = "log4j" % "log4j" % "1.2.12"
+  val log4j     = "log4j" % "log4j" % "1.2.15"
 
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
   val cglib     = "cglib" % "cglib" % "2.1_3" % "test"
@@ -26,4 +26,8 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) {
   val jmock     = "org.jmock" % "jmock" % "2.4.0" % "test"
   val objenesis = "org.objenesis" % "objenesis" % "1.1" % "test"
   val specs     = "org.scala-tools.testing" % "specs" % "1.6.2.1" % "test"
+
+  // for optional hdfs support:
+  val elephant_bird = "com.twitter" % "elephant-bird" % "1.0"
+  val hadoop_core = "org.apache" % "hadoop-core" % "0.20.1+133"
 }
