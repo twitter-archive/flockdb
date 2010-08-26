@@ -60,7 +60,7 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
       (results.Cursor(attributes("cursor1").toInt), results.Cursor(attributes("cursor2").toInt)),
       attributes("count").toInt)
   }
-  
+
   // This is called multiple times, but we only want to call startEdgeCopy once
   override def apply(environment: (NameServer[Shard], JobScheduler)) {
     val (nameServer, scheduler) = environment
@@ -75,14 +75,14 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
     nameServer.findShardById(destinationShardId).finishEdgeCopy()
     super.finish(nameServer, scheduler)
   }
-  
+
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     if (destinationShard.needsEdgeCopyRestart()) {
       // If a flapp goes down mid copy, we get a copyPage call without corresponding startEdgeCopy
       // Do any cleanup in startEdgeCopy
       Some(new Copy(sourceShardId, destinationShardId, Copy.START, count))
     } else {
-      val (items, nextCursor) = sourceShard.selectAll(cursor, count)  
+      val (items, nextCursor) = sourceShard.selectAll(cursor, count)
       destinationShard.writeCopies(items)
       val newCount = Math.min((count * 1.01).toInt + 1, Copy.COUNT)     // Upward pressure on page size
       Stats.incr("edges-copy", items.size)
@@ -126,7 +126,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
       results.Cursor(attributes("cursor").toInt),
       attributes("count").toInt)
   }
-  
+
   // This is called multiple times, but we only want to call startMetadataCopy once
   override def apply(environment: (NameServer[Shard], JobScheduler)) {
     val (nameServer, scheduler) = environment
