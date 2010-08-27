@@ -49,9 +49,10 @@ enum SelectOperationType {
   Difference = 4
 }
 
-# Add and Negate are both "normal" states. you can use them to track 2 different "flavors" of existing edge.
-# Remove is an edge which no longer exists.
-# Archive is an edge which refers to a node that's been removed.
+# Add and Negate set an edge positive or negative, which are both "normal" states. You can use them
+# to track 2 different "colors" of edge. Often, negative means private.
+# Archive will change positive/negative edges to archived.
+# Remove will change any edge to removed.
 enum ExecuteOperationType {
   Add = 1
   Remove = 2
