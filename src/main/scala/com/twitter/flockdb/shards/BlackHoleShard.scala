@@ -29,6 +29,7 @@ class BlackHoleShardFactory extends shards.ShardFactory[Shard] {
   def materialize(shardInfo: shards.ShardInfo) = ()
 }
 
+// Black hole shard... won't you come... and wash away the rain...
 class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val children: Seq[Shard]) extends Shard {
   def remove(sourceId: Long, updatedAt: Time) = ()
 
