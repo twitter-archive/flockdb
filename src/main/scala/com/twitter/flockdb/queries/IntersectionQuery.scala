@@ -43,9 +43,14 @@ class IntersectionQuery(query1: Query, query2: Query) extends Query {
     } else {
       val guessedPageSize = (count / config("edges.average_intersection_proportion").toDouble).toInt
       val internalPageSize = guessedPageSize min config("edges.intersection_page_size_max").toInt
-
+      val timeout = config("edges.intersection_timeout_ms").toInt
+      
+      val now = System.currentTimeMillis
       var resultWindow = pageIntersection(smallerQuery, largerQuery, internalPageSize, count, cursor)
-      while (resultWindow.page.size < count && resultWindow.continueCursor != Cursor.End) {
+      while (resultWindow.page.size < count && 
+             resultWindow.continueCursor != Cursor.End && 
+             System.currentTimeMillis - now < timeout
+      ) {
         resultWindow = resultWindow ++ pageIntersection(smallerQuery, largerQuery, internalPageSize, count, resultWindow.continueCursor)
       }
       resultWindow
