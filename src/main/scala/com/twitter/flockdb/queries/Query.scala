@@ -26,4 +26,6 @@ trait Query {
   def selectPageByDestinationId(count: Int, cursor: Cursor): ResultWindow[Long]
 
   protected def selectPage(count: Int, cursor: Cursor): ResultWindow[Long]
+  
+  val userTimeoutMS: Int
 }

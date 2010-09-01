@@ -20,7 +20,7 @@ import com.twitter.results.Cursor
 import net.lag.configgy.Configgy
 
 
-class DifferenceQuery(query1: Query, query2: Query) extends Query {
+class DifferenceQuery(query1: Query, query2: Query, val userTimeoutMS: Int) extends Query {
   val config = Configgy.config
 
   def sizeEstimate = query1.sizeEstimate

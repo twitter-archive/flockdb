@@ -22,7 +22,7 @@ import net.lag.configgy.Configgy
 
 
 
-class IntersectionQuery(query1: Query, query2: Query) extends Query {
+class IntersectionQuery(query1: Query, query2: Query, val userTimeoutMS: Int) extends Query {
   val config = Configgy.config
   val count1 = query1.sizeEstimate
   val count2 = query2.sizeEstimate

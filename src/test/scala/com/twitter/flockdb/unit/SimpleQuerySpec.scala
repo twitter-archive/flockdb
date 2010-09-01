@@ -30,6 +30,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
     var shard: Shard = null
     var simpleQuery: queries.SimpleQuery = null
     val sourceId = 900
+    val timeout = 0
 
     doBefore {
       shard = mock[Shard]
@@ -40,7 +41,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
         expect {
           one(shard).count(sourceId, List(State.Normal)) willReturn 10
         }
-        simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
+        simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal), timeout)
         simpleQuery.sizeEstimate() mustEqual 10
       }
 
@@ -48,7 +49,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
         expect {
           one(shard).count(sourceId, List(State.Removed)) willReturn 10
         }
-        simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Removed))
+        simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Removed), timeout)
         simpleQuery.sizeEstimate() mustEqual 10
       }
     }
@@ -58,7 +59,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
       expect {
         one(shard).intersect(sourceId, List(State.Normal), page) willReturn List(1L, 2L)
       }
-      simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
+      simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal), timeout)
       simpleQuery.selectWhereIn(page).toList mustEqual List(1L, 2L)
     }
 
@@ -69,7 +70,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
       expect {
         allowing(shard).selectByPosition(sourceId, List(State.Normal), count, cursor) willReturn new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor)
       }
-      simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
+      simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal), timeout)
       simpleQuery.selectPage(count, cursor).toThrift mustEqual new Results(edges.pack, Cursor.End.position, Cursor.End.position)
     }
 
@@ -80,7 +81,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
       expect {
         allowing(shard).selectByDestinationId(sourceId, List(State.Normal), count, cursor) willReturn new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor)
       }
-      simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
+      simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal), timeout)
       simpleQuery.selectPageByDestinationId(count, cursor).toThrift mustEqual new Results(edges.pack, Cursor.End.position, Cursor.End.position)
     }
   }

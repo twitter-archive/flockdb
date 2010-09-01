@@ -57,7 +57,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
     queries.parallel(future).map { query =>
-      selectCompiler(query.operations).select(query.page)
+      selectCompiler(query).select(query.page)
     }
   }
 
@@ -79,10 +79,17 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   def execute(operations: ExecuteOperations) {
     executeCompiler(operations)
   }
-
-  def count(queries: Seq[Seq[SelectOperation]]): Seq[Int] = {
+  
+  def count2(queries: Seq[SelectQuery]) = {
     queries.parallel(future).map { query =>
       selectCompiler(query).sizeEstimate
     }
+  }
+
+  def count(ops: Seq[Seq[SelectOperation]]): Seq[Int] = {
+    val queries = ops.map { op => 
+      new SelectQuery(op, new results.Page(0, new Cursor(0)), 0) 
+    }
+    count2(queries)
   }
 }

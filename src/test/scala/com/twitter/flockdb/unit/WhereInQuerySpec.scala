@@ -31,13 +31,14 @@ object WhereInQuerySpec extends ConfiguredSpecification with JMocker {
     var whereInQuery: queries.WhereInQuery = null
     val sourceId = 900
     val destinationIds = List(55L, 60L, 65L, 70L, 75L, 80L, 85L)
+    val timeout = 0
 
     doBefore {
       shard = mock[Shard]
     }
 
     "sizeEstimate" in {
-      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
+      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds, timeout)
       whereInQuery.sizeEstimate() mustEqual destinationIds.size
     }
 
@@ -46,7 +47,7 @@ object WhereInQuerySpec extends ConfiguredSpecification with JMocker {
       expect {
         one(shard).intersect(sourceId, List(State.Normal), List(60L, 65L)) willReturn List(60L)
       }
-      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
+      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds, timeout)
       whereInQuery.selectWhereIn(page).toList mustEqual List(60L)
     }
 
@@ -55,7 +56,7 @@ object WhereInQuerySpec extends ConfiguredSpecification with JMocker {
         allowing(shard).intersect(sourceId, List(State.Normal), destinationIds) willReturn List(85L, 75L, 65L, 55L)
       }
 
-      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
+      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds, timeout)
       whereInQuery.selectPage(10, Cursor(90L)).toThrift mustEqual new Results(List[Long](85L, 75L, 65L, 55L).pack, Cursor.End.position, Cursor.End.position)
       whereInQuery.selectPage(10, Cursor(75L)).toThrift mustEqual new Results(List[Long](65L, 55L).pack, Cursor.End.position, -65L)
       whereInQuery.selectPage(2, Cursor(-65L)).toThrift mustEqual new Results(List[Long](85L, 75L).pack, 75L, Cursor.End.position)

@@ -114,6 +114,7 @@ struct ExecuteOperations {
 struct SelectQuery {
   1: list<SelectOperation> operations
   2: Page page
+  3: optional i32 user_timeout_ms
 }
 
 struct EdgeQuery {

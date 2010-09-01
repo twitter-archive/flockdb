@@ -21,7 +21,7 @@ import net.lag.configgy.Configgy
 import com.twitter.results.Cursor
 
 
-class UnionQuery(query1: Query, query2: Query) extends Query {
+class UnionQuery(query1: Query, query2: Query, val userTimeoutMS: Int) extends Query {
   val config = Configgy.config
 
   def sizeEstimate() = query1.sizeEstimate max query2.sizeEstimate

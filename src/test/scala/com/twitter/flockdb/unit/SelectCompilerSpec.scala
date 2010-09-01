@@ -25,7 +25,7 @@ import queries.SelectCompiler
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard
 import thrift.{Page, Results}
-
+import com.twitter.results._
 
 object SelectCompilerSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "SelectCompiler" should {
@@ -57,10 +57,24 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
           one(shard).count(sourceId, states) willReturn 23
         }
         val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) :: Nil
-        val query = selectCompiler(program)
+        val selectQuery = new SelectQuery(program, new results.Page(0, new Cursor(0)), 200)
+        val query = selectCompiler(selectQuery)
         query.getClass.getName mustMatch "SimpleQuery"
         query.sizeEstimate mustEqual 23
       }
+      
+      "should receive the timeout value" >> {
+        expect {
+          one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
+          // one(shard).count(sourceId, states) willReturn 23
+        }
+        val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) :: Nil
+        val selectQuery = new SelectQuery(program, new results.Page(0, new Cursor(0)), 200)
+        val query = selectCompiler(selectQuery)
+        query.getClass.getName mustMatch "SimpleQuery"
+        query.userTimeoutMS mustEqual 200
+      }
+      
     }
 
     "execute a simple list query" in {
@@ -68,7 +82,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
         one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
       }
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, Some(List[Long](12, 13)), List(State.Normal)))) :: Nil
-      val query = selectCompiler(program)
+      val selectQuery = new SelectQuery(program, new results.Page(0, new Cursor(0)), 200)
+      val query = selectCompiler(selectQuery)
       query.getClass.getName mustMatch "WhereInQuery"
       query.sizeEstimate mustEqual 2
     }
@@ -82,7 +97,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, false, Some(List[Long](12, 13)), List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.Intersection, None) :: Nil
-      val query = selectCompiler(program)
+      val selectQuery = new SelectQuery(program, new results.Page(0, new Cursor(0)), 200)
+      val query = selectCompiler(selectQuery)
       query.getClass.getName mustMatch "IntersectionQuery"
       (query.asInstanceOf[queries.IntersectionQuery]).config("edges.average_intersection_proportion") = "1.0"
       query.sizeEstimate mustEqual 2
@@ -101,7 +117,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
         new SelectOperation(SelectOperationType.Intersection, None) ::
         new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId + 1, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.Union, None) :: Nil
-      val query = selectCompiler(program)
+      val selectQuery = new SelectQuery(program, new results.Page(0, new Cursor(0)), 200)
+      val query = selectCompiler(selectQuery)
       query.getClass.getName mustMatch "UnionQuery"
       query.sizeEstimate mustEqual 25
     }
@@ -116,7 +133,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId + 1, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.Difference, None) :: Nil
-      val query = selectCompiler(program)
+      val selectQuery = new SelectQuery(program, new results.Page(0, new Cursor(0)), 200)
+      val query = selectCompiler(selectQuery)
       query.getClass.getName mustMatch "DifferenceQuery"
       query.sizeEstimate mustEqual 10
     }

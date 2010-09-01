@@ -125,7 +125,7 @@ class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
 
   @deprecated
   def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
-    edges.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift)).toThrift
+    edges.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift, 0)).toThrift
   }
 
   def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {

@@ -21,7 +21,7 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
 
 
-class SeqQuery(s: Seq[Long]) extends Query {
+class SeqQuery(s: Seq[Long], val userTimeoutMS: Int) extends Query {
   val seq = sort(s)
   def sizeEstimate = seq.size
   def selectWhereIn(i: Seq[Long]) = sort(seq.toList intersect i.toList).toList

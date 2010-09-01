@@ -26,26 +26,27 @@ import thrift.{Results, Page}
 
 
 object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
+  val timeout = 0
   "IntersectionQuery" should {
-    val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10))
-    val query2 = new queries.SeqQuery(List(1,2,3,4,11))
+    val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10), timeout)
+    val query2 = new queries.SeqQuery(List(1,2,3,4,11), timeout)
 
     doBefore {
       config("edges.average_intersection_proportion") = "1.0"
     }
 
     "sizeEstimate" in {
-      val intersectionQuery = new queries.IntersectionQuery(query1, query2)
+      val intersectionQuery = new queries.IntersectionQuery(query1, query2, timeout)
       intersectionQuery.sizeEstimate() mustEqual 5
     }
 
     "selectWhereIn" in {
-      val intersectionQuery = new queries.IntersectionQuery(query1, query2)
+      val intersectionQuery = new queries.IntersectionQuery(query1, query2, timeout)
       intersectionQuery.selectWhereIn(List(1, 2, 12, 13)) mustEqual List(2, 1)
     }
 
     "selectPage" in {
-      val intersectionQuery = new queries.IntersectionQuery(query1, query2)
+      val intersectionQuery = new queries.IntersectionQuery(query1, query2, timeout)
       intersectionQuery.selectPage(5, Cursor.Start).toThrift mustEqual new Results(List[Long](4, 3, 2, 1).pack, Cursor.End.position, Cursor.End.position)
     }
   }

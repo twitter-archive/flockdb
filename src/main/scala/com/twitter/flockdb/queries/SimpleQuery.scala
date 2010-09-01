@@ -22,7 +22,7 @@ import net.lag.configgy.Configgy
 import flockdb.shards.Shard
 
 
-class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
+class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State], val userTimeoutMS: Int) extends Query {
   val config = Configgy.config
 
   def sizeEstimate() = shard.count(sourceId, states)

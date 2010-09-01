@@ -25,8 +25,10 @@ import thrift.FlockException
 class InvalidQueryException(reason: String) extends FlockException(reason)
 
 class SelectCompiler(forwardingManager: ForwardingManager) {
-  def apply(program: Seq[SelectOperation]): Query = {
+  def apply(input: SelectQuery): Query = {
+    val program = input.operations
     val stack = new mutable.Stack[Query]
+    val userTimeoutMS = input.userTimeoutMS
 
     for (op <- program) op.operationType match {
       case SelectOperationType.SimpleQuery =>
@@ -34,22 +36,22 @@ class SelectCompiler(forwardingManager: ForwardingManager) {
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
         val query = if (term.destinationIds.isDefined) {
-          new WhereInQuery(shard, term.sourceId, states, term.destinationIds.get)
+          new WhereInQuery(shard, term.sourceId, states, term.destinationIds.get, userTimeoutMS)
         } else {
-          new SimpleQuery(shard, term.sourceId, states)
+          new SimpleQuery(shard, term.sourceId, states, userTimeoutMS)
         }
         stack.push(query)
       case SelectOperationType.Intersection =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
-        stack.push(new IntersectionQuery(stack.pop, stack.pop))
+        stack.push(new IntersectionQuery(stack.pop, stack.pop, userTimeoutMS))
       case SelectOperationType.Union =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
-        stack.push(new UnionQuery(stack.pop, stack.pop))
+        stack.push(new UnionQuery(stack.pop, stack.pop, userTimeoutMS))
       case SelectOperationType.Difference =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
         val rightSide = stack.pop
         val leftSide = stack.pop
-        stack.push(new DifferenceQuery(leftSide, rightSide))
+        stack.push(new DifferenceQuery(leftSide, rightSide, userTimeoutMS))
       case n =>
         throw new InvalidQueryException("Unknown operation " + n)
     }
