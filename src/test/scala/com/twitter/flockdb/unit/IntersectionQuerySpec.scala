@@ -24,15 +24,30 @@ import org.specs.mock.JMocker
 import conversions.Results._
 import thrift.{Results, Page}
 
+class SlowQuery(s: Seq[Long], userTimeoutMS: Int) extends queries.SeqQuery(s: Seq[Long], userTimeoutMS: Int) {
+  override def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+    Thread.sleep(userTimeoutMS * 2)
+    super.selectPageByDestinationId(count, cursor)
+  }
+}
 
 object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
-  val timeout = 0
+  val timeout = 100
   "IntersectionQuery" should {
     val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10), timeout)
     val query2 = new queries.SeqQuery(List(1,2,3,4,11), timeout)
+    val slow = new SlowQuery(List(1,2,3,4,11), timeout)
 
     doBefore {
       config("edges.average_intersection_proportion") = "1.0"
+    }
+
+    "slow queries should make progress" in {
+      config("edges.intersection_page_size_max") = "3"
+      val intersectionQuery = new queries.IntersectionQuery(query1, slow, timeout)
+      val window = intersectionQuery.selectPage(5, Cursor.Start)
+      window.data.length mustEqual 2
+      window.continueCursor mustEqual new Cursor(3)
     }
 
     "sizeEstimate" in {

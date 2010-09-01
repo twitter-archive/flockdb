@@ -44,8 +44,12 @@ class IntersectionQuery(query1: Query, query2: Query, val userTimeoutMS: Int) ex
       val guessedPageSize = (count / config("edges.average_intersection_proportion").toDouble).toInt
       val internalPageSize = guessedPageSize min config("edges.intersection_page_size_max").toInt
 
+      val now = System.currentTimeMillis
+
       var resultWindow = pageIntersection(smallerQuery, largerQuery, internalPageSize, count, cursor)
-      while (resultWindow.page.size < count && resultWindow.continueCursor != Cursor.End) {
+      while (resultWindow.page.size < count &&
+             resultWindow.continueCursor != Cursor.End &&
+             (userTimeoutMS <= 0 || System.currentTimeMillis - now < userTimeoutMS)) {
         resultWindow = resultWindow ++ pageIntersection(smallerQuery, largerQuery, internalPageSize, count, resultWindow.continueCursor)
       }
       resultWindow
