@@ -3,10 +3,10 @@ import Process._
 import com.twitter.sbt.{SubversionRepository, StandardProject}
 
 
-class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionRepository{
+class FlockDBProject(info: ProjectInfo) extends StandardProject(info) {
   val configgy  = "net.lag" % "configgy" % "1.6.1"
   val dbcp      = "commons-dbcp" % "commons-dbcp" % "1.2.2"
-  val gizzard   = "com.twitter" % "gizzard" % "1.3.11"
+  val gizzard   = "com.twitter" % "gizzard" % "1.3.12"
   val kestrel   = "net.lag" % "kestrel" % "1.2"
   val mysqljdbc = "mysql" % "mysql-connector-java" % "5.1.6"
   val ostrich   = "com.twitter" % "ostrich" % "1.2.1"
