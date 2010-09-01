@@ -3,7 +3,7 @@ import Process._
 import com.twitter.sbt.{SubversionRepository, StandardProject}
 
 
-class FlockDBProject(info: ProjectInfo) extends StandardProject(info) {
+class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionRepository{
   val configgy  = "net.lag" % "configgy" % "1.6.1"
   val dbcp      = "commons-dbcp" % "commons-dbcp" % "1.2.2"
   val gizzard   = "com.twitter" % "gizzard" % "1.3.11"
