@@ -27,11 +27,13 @@ import com.twitter.gizzard.test.NameServerDatabase
 trait EdgesDatabase extends NameServerDatabase {
   def reset(flock: FlockDB) {
     try {
+      materialize(Configgy.config.configMap("edges.nameservers"))
       reset(Configgy.config.configMap("edges.nameservers"))
       val config = Configgy.config.configMap("db")
       config.update("database", Configgy.config("edges.db_name"))
       config.update("hostname", "localhost")
       val queryEvaluator = evaluator(config)
+      flock.edges.nameServer.reload()
 
       for (graph <- (1 until 10)) {
         val forwardShardId = ShardId("localhost", "forward_" + graph)
