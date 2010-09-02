@@ -1,12 +1,11 @@
 import sbt._
 import Process._
-import com.twitter.sbt.{SubversionRepository, StandardProject}
+import com.twitter.sbt._
 
-
-class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionRepository{
+class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher {
   val configgy  = "net.lag" % "configgy" % "1.6.1"
   val dbcp      = "commons-dbcp" % "commons-dbcp" % "1.2.2"
-  val gizzard   = "com.twitter" % "gizzard" % "1.3.11"
+  val gizzard   = "com.twitter" % "gizzard" % "1.3.16"
   val kestrel   = "net.lag" % "kestrel" % "1.2"
   val mysqljdbc = "mysql" % "mysql-connector-java" % "5.1.6"
   val ostrich   = "com.twitter" % "ostrich" % "1.2.1"
@@ -26,4 +25,6 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with Subve
   val jmock     = "org.jmock" % "jmock" % "2.4.0" % "test"
   val objenesis = "org.objenesis" % "objenesis" % "1.1" % "test"
   val specs     = "org.scala-tools.testing" % "specs" % "1.6.2.1" % "test"
+
+  override def subversionRepository = Some("http://svn.local.twitter.com/maven-public/")
 }
