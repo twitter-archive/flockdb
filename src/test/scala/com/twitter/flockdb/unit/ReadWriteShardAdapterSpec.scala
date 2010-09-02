@@ -17,16 +17,12 @@
 package com.twitter.flockdb.unit
 
 import com.twitter.gizzard.shards.{ReadWriteShard, ShardInfo}
+import com.twitter.gizzard.test.FakeReadWriteShard
 import com.twitter.xrayspecs.Time
 import org.specs.mock.{ClassMocker, JMocker}
 import shards.{ReadWriteShardAdapter, Shard, Metadata}
 import thrift.Edge
 
-
-class FakeReadWriteShard(shard: Shard, val shardInfo: ShardInfo, val weight: Int, val children: Seq[Shard]) extends ReadWriteShard[Shard] {
-  def readOperation[A](method: (Shard => A)): A = method(shard)
-  def writeOperation[A](method: (Shard => A)): A = method(shard)
-}
 
 object ReadWriteShardAdapterSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard1: Shard = null
@@ -51,7 +47,7 @@ object ReadWriteShardAdapterSpec extends ConfiguredSpecification with JMocker wi
       }
 
       val fake2 = new FakeLockingShard(shard2)
-      val fake1 = new FakeReadWriteShard(fake2, null, 1, Nil)
+      val fake1 = new FakeReadWriteShard[Shard](fake2, null, 1, Nil)
       val shard = new ReadWriteShardAdapter(fake1)
       shard.withLock(sourceId) { (innerShard, metadata) =>
         innerShard.add(sourceId, Time.now)
