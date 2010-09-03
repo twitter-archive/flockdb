@@ -62,7 +62,7 @@ object CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
-          one(shard1).selectAll((cursor1, cursor2), count) willThrow new ShardTimeoutException
+          one(shard1).selectAll((cursor1, cursor2), count) willThrow new ShardTimeoutException(100.milliseconds, null)
           one(scheduler).apply(new Copy(shard1Id, shard2Id, (cursor1, cursor2), count / 2))
         }
         job.apply((nameServer, scheduler))

@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS %s (
       queryEvaluator.execute(METADATA_TABLE_DDL.format(config("edges.db_name") + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
     } catch {
       case e: SQLException => throw new shards.ShardException(e.toString)
-      case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException
+      case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException(e.timeout, e)
     }
   }
 }
