@@ -15,7 +15,7 @@
  */
 
 namespace java com.twitter.flockdb.thrift
-namespace rb Flock
+namespace rb Flock.Edges
 
 exception FlockException {
   1: string description
