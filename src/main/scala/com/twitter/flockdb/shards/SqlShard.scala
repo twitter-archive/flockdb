@@ -235,7 +235,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   private def query(projections: String, cursorName: String, index: String, count: Int,
                     cursor: Cursor, order: String, inequality: String, conditions: String, args: Seq[Any]): (String, Seq[Any]) = {
-    val position = if (cursor == Cursor.Start) Math.MAX_LONG else cursor.position
+    val position = if (cursor == Cursor.Start) Math.MAX_LONG else cursor.magnitude.position
 
     val query = "(SELECT " + projections +
       " FROM "     + tablePrefix + "_edges USE INDEX (" + index + ")" +
