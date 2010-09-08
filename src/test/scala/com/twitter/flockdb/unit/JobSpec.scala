@@ -29,7 +29,7 @@ class FakeLockingShard(shard: Shard) extends BlackHoleShard(null, 1, Nil) {
   override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
 }
 
-object JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
+class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val FOLLOWS = 1
 
   val bob = 1L
