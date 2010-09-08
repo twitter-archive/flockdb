@@ -65,17 +65,4 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
       shard.readOperation(_.getMetadata(sourceId))
     }
   }
-
-  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
-    if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
-      val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]
-      val lockServer = children.first.asInstanceOf[Shard]
-      val rest = children.drop(1).asInstanceOf[Seq[Shard]]
-      lockServer.withLock(sourceId) { (lock, metadata) =>
-        f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.future)), metadata)
-      }
-    } else {
-      shard.writeOperation(_.withLock(sourceId)(f))
-    }
-  }
 }
