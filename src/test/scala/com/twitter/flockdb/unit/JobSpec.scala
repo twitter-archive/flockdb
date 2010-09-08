@@ -24,11 +24,6 @@ import jobs.single.{Add, Remove}
 import shards.{BlackHoleShard, Shard, Metadata}
 import thrift.Edge
 
-
-class FakeLockingShard(shard: Shard) extends BlackHoleShard(null, 1, Nil) {
-  override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
-}
-
 class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val FOLLOWS = 1
 
@@ -44,8 +39,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard2: Shard = null
   var shard3: Shard = null
   var shard4: Shard = null
-  var lockingShard1: Shard = null
-  var lockingShard2: Shard = null
 
   "Add" should {
     doBefore {
@@ -53,8 +46,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
     }
 
     "apply" in {
@@ -139,8 +130,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
     }
 
     "apply" in {
@@ -176,8 +165,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
     }
 
     "apply" in {
