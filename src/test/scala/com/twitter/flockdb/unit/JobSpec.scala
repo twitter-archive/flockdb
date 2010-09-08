@@ -49,6 +49,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
   "Add" should {
     doBefore {
+      Time.freeze
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
@@ -57,14 +58,14 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "apply" in {
-      "when the add takes effect" >> {
+      "when the add takes effect" in {
         val job = Add(bob, FOLLOWS, mary, 1, Time.now)
 
         expect {
-          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-          one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-          one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+          allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
+          allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
           one(shard1).add(bob, mary, 1, Time.now)
           one(shard2).add(mary, bob, 1, Time.now)
         }
@@ -77,10 +78,10 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           val job = Add(bob, FOLLOWS, mary, 1, Time.now)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Archived, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+            allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Archived, 1, Time.now))
+            allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
             one(shard1).archive(bob, mary, 1, Time.now)
             one(shard2).archive(mary, bob, 1, Time.now)
           }
@@ -92,16 +93,33 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           val job = Add(bob, FOLLOWS, mary, 1, Time.now)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Archived, 1, Time.now))
+            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+            allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
+            allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Archived, 1, Time.now))
             one(shard1).archive(bob, mary, 1, Time.now)
             one(shard2).archive(mary, bob, 1, Time.now)
           }
 
           job.apply((forwardingManager, uuidGenerator))
         }
+      }
+
+      "if node metadata changes during the operation" in {
+        val job = Add(bob, FOLLOWS, mary, 1, Time.now)
+
+        expect {
+          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+          one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now - 5.seconds))
+          one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Archived, 1, Time.now - 5.seconds))
+          one(shard1).archive(bob, mary, 1, Time.now)
+          one(shard2).archive(mary, bob, 1, Time.now)
+          one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now - 5.seconds))
+          one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+        }
+
+        job.apply((forwardingManager, uuidGenerator)) must throwA[Exception]
       }
     }
 
@@ -130,10 +148,10 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         val job = new Remove(bob, FOLLOWS, mary, 1, Time.now)
 
         expect {
-          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-          one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-          one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+          allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
+          allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
           one(shard1).remove(bob, mary, 1, Time.now)
           one(shard2).remove(mary, bob, 1, Time.now)
         }
@@ -168,10 +186,10 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
 
         expect {
-          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-          one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-          one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+          one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+          allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
+          allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
           one(shard1).archive(bob, mary, 1, Time.now)
           one(shard2).archive(mary, bob, 1, Time.now)
         }
@@ -184,10 +202,10 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Removed, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+            allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Removed, 1, Time.now))
+            allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
             one(shard1).remove(bob, mary, 1, Time.now)
             one(shard2).remove(mary, bob, 1, Time.now)
           }
@@ -199,10 +217,10 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Removed, 1, Time.now))
+            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard1
+            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn shard2
+            allowing(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
+            allowing(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Removed, 1, Time.now))
             one(shard1).remove(bob, mary, 1, Time.now)
             one(shard2).remove(mary, bob, 1, Time.now)
           }
