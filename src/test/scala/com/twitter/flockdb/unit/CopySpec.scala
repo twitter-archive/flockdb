@@ -28,7 +28,7 @@ import jobs.{Copy, MetadataCopy}
 import shards.{Metadata, Shard}
 
 
-object CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
+class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")
   val shard2Id = ShardId("test", "shard2")
   val count = 2300
@@ -63,7 +63,7 @@ object CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAll((cursor1, cursor2), count) willThrow new ShardTimeoutException(100.milliseconds, null)
-          one(scheduler).apply(new Copy(shard1Id, shard2Id, (cursor1, cursor2), count / 2))
+          one(scheduler).apply(new Copy(shard1Id, shard2Id, (cursor1, cursor2), (count.toFloat * 0.9).toInt))
         }
         job.apply((nameServer, scheduler))
      }
