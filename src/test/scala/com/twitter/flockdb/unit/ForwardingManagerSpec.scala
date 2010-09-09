@@ -16,11 +16,6 @@
 
 package com.twitter.flockdb.unit
 
-/*
-import com.twitter.gizzard.scheduler.JobScheduler
-import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
-*/
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
@@ -96,7 +91,7 @@ class ForwardingManagerSpec extends Specification with JMocker with ClassMocker 
 
           forwardingManager.withOptimisticLocks(0, List(nodePair1, nodePair2, nodePair3))(work) mustEqual Nil
         }
-        
+
         "more than one failure" in {
           expect {
             returnShards()

@@ -44,8 +44,14 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
     find(id, tableId(0), if (tableId(1) > 0) Direction.Forward else Direction.Backward)
   }
 
-  // returns a list of the NodePairs that failed their optimistic lock.
-  // FIXME: may want to optimize the (frequent) case of one NodePair.
+  /**
+   * Grab an "optimistic lock" on the list of NodePairs given, and then call a method on each
+   * NodePair with the forward shard, backward shard, pair, and current consensus state.
+   * Afterwards, re-check the metadata, and return a list of the NodePairs that failed to hold
+   * on to their lock. (They need to be replayed or punted to an error queue.)
+   *
+   * FIXME: May want to optimize the (frequent) case of one NodePair.
+   */
   def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit): Seq[NodePair] = {
     val shardMap = mutable.Map.empty[Long, Shard]
     nodePairs.foreach { nodePair =>
