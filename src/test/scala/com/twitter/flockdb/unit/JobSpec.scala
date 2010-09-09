@@ -20,7 +20,6 @@ import scala.collection.mutable
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
-import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}
 import shards.{BlackHoleShard, Shard, Metadata}
 import thrift.Edge

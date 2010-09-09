@@ -53,20 +53,14 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
    * FIXME: May want to optimize the (frequent) case of one NodePair.
    */
   def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit): Seq[NodePair] = {
-    val shardMap = mutable.Map.empty[Long, Shard]
-    nodePairs.foreach { nodePair =>
-      shardMap += (nodePair.sourceId -> find(nodePair.sourceId, graphId, Direction.Forward))
-      shardMap += (nodePair.destinationId -> find(nodePair.destinationId, graphId, Direction.Backward))
-    }
-
     def getState(stateMap: mutable.Map[Long, State], id: Long) = {
-      stateMap.getOrElseUpdate(id, shardMap(id).getMetadata(id).map(_.state).getOrElse(State.Normal))
+      stateMap.getOrElseUpdate(id, find(id, graphId, Direction.Forward).getMetadata(id).map(_.state).getOrElse(State.Normal))
     }
 
     val initialStateMap = mutable.Map.empty[Long, State]
     nodePairs.foreach { nodePair =>
       val nodeState = getState(initialStateMap, nodePair.sourceId) max getState(initialStateMap, nodePair.destinationId)
-      f(shardMap(nodePair.sourceId), shardMap(nodePair.destinationId), nodePair, nodeState)
+      f(find(nodePair.sourceId, graphId, Direction.Forward), find(nodePair.destinationId, graphId, Direction.Backward), nodePair, nodeState)
     }
 
     val rv = new mutable.ListBuffer[NodePair]
