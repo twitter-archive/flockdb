@@ -16,6 +16,7 @@
 
 package com.twitter.flockdb
 
+import scala.collection.{immutable, mutable}
 import com.twitter.gizzard.nameserver.{Forwarding, NameServer}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
@@ -39,5 +40,38 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
   @throws(classOf[ShardException])
   def findCurrentForwarding(tableId: List[Int], id: Long): Shard = {
     find(id, tableId(0), if (tableId(1) > 0) Direction.Forward else Direction.Backward)
+  }
+
+
+  case class NodePair(sourceId: Long, destinationId: Long)
+
+  // returns a list of the NodePairs that failed their optimistic lock.
+  // FIXME: may want to optimize the (frequent) case of one NodePair.
+  def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit): Seq[NodePair] = {
+    val shardMap = mutable.Map.empty[Long, Shard]
+    nodePairs.foreach { nodePair =>
+      shardMap += (nodePair.sourceId -> find(nodePair.sourceId, graphId, Direction.Forward))
+      shardMap += (nodePair.destinationId -> find(nodePair.destinationId, graphId, Direction.Backward))
+    }
+
+    def getState(stateMap: mutable.Map[Long, State], id: Long) = {
+      stateMap.getOrElseUpdate(id, shardMap(id).getMetadata(id).map(_.state).getOrElse(State.Normal))
+    }
+
+    val initialStateMap = mutable.Map.empty[Long, State]
+    nodePairs.foreach { nodePair =>
+      val nodeState = getState(initialStateMap, nodePair.sourceId) max getState(initialStateMap, nodePair.destinationId)
+      f(shardMap(nodePair.sourceId), shardMap(nodePair.destinationId), nodePair, nodeState)
+    }
+
+    val rv = new mutable.ListBuffer[NodePair]
+    val afterStateMap = mutable.Map.empty[Long, State]
+    nodePairs.foreach { nodePair =>
+      if (getState(afterStateMap, nodePair.sourceId) != initialStateMap(nodePair.sourceId) ||
+          getState(afterStateMap, nodePair.destinationId) != initialStateMap(nodePair.destinationId)) {
+        rv += nodePair
+      }
+    }
+    rv.toList
   }
 }
