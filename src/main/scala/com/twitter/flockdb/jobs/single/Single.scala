@@ -72,21 +72,11 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     (forwardShard, backwardShard)
   }
 
-  private def withOptimisticLock(forwardShard: Shard, backwardShard: Shard, sourceId: Long, destinationId: Long)(f: State => Unit) {
-    val initialState = forwardShard.getMetadata(sourceId).map(_.state).getOrElse(State.Normal) max backwardShard.getMetadata(destinationId).map(_.state).getOrElse(State.Normal)
-    f(initialState)
-    val endState = forwardShard.getMetadata(sourceId).map(_.state).getOrElse(State.Normal) max backwardShard.getMetadata(destinationId).map(_.state).getOrElse(State.Normal)
-    if (endState != initialState) {
-      throw new Exception("Lost optimistic lock on id " + sourceId + " / " + destinationId)
-    }
-  }
-
   def apply(environment: (ForwardingManager, UuidGenerator)) {
     val (forwardingManager, uuidGenerator) = environment
-    val (forwardShard, backwardShard) = shards(forwardingManager)
     val uuid = uuidGenerator(position)
-    withOptimisticLock(forwardShard, backwardShard, sourceId, destinationId) { initialState =>
-      (initialState max preferredState) match {
+    forwardingManager.withOptimisticLocks(graphId, List(NodePair(sourceId, destinationId))) { (forwardShard, backwardShard, nodePair, state) =>
+      (state max preferredState) match {
         case State.Normal =>
           forwardShard.add(sourceId, destinationId, uuid, updatedAt)
           backwardShard.add(destinationId, sourceId, uuid, updatedAt)
