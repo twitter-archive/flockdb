@@ -90,6 +90,8 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
           forwardShard.negate(sourceId, destinationId, uuid, updatedAt)
           backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
       }
+    }.foreach { nodePair =>
+      throw new Exception("Lost optimistic lock for " + sourceId + "/" + destinationId)
     }
   }
 
