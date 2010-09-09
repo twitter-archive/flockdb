@@ -23,6 +23,8 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import shards.Shard
 
 
+case class NodePair(sourceId: Long, destinationId: Long)
+
 class ForwardingManager(nameServer: NameServer[Shard]) {
   @throws(classOf[ShardException])
   def find(sourceId: Long, graphId: Int, direction: Direction) = {
@@ -41,9 +43,6 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
   def findCurrentForwarding(tableId: List[Int], id: Long): Shard = {
     find(id, tableId(0), if (tableId(1) > 0) Direction.Forward else Direction.Backward)
   }
-
-
-  case class NodePair(sourceId: Long, destinationId: Long)
 
   // returns a list of the NodePairs that failed their optimistic lock.
   // FIXME: may want to optimize the (frequent) case of one NodePair.
