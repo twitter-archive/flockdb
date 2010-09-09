@@ -17,6 +17,7 @@
 package com.twitter.flockdb.unit
 
 import scala.collection.mutable
+import com.twitter.gizzard.shards.ShardException
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
@@ -131,7 +132,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(shard2).archive(mary, bob, 1, Time.now)
         }
 
-        job.apply((wrappedForwardingManager, uuidGenerator)) must throwA[Exception]
+        job.apply((wrappedForwardingManager, uuidGenerator)) must throwA[ShardException]
       }
     }
 

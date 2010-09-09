@@ -16,12 +16,12 @@
 
 package com.twitter.flockdb.jobs.single
 
-import com.twitter.flockdb.shards.Shard
 import com.twitter.gizzard.jobs.{UnboundJobParser, UnboundJob}
+import com.twitter.gizzard.shards.ShardException
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.logging.Logger
-
+import shards.Shard
 
 abstract class SingleJobParser extends UnboundJobParser[(ForwardingManager, UuidGenerator)] {
   def apply(attributes: Map[String, Any]) = {
@@ -91,7 +91,7 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
           backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
       }
     }.foreach { nodePair =>
-      throw new Exception("Lost optimistic lock for " + sourceId + "/" + destinationId)
+      throw new ShardException("Lost optimistic lock for " + sourceId + "/" + destinationId)
     }
   }
 
