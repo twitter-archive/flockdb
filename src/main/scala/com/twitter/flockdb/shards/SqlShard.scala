@@ -462,21 +462,21 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     }
   }
 
-  def writeMetadata(metadata: Metadata) {
-    try {
-      queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
-                             "updated_at) VALUES (?, ?, ?, ?)",
-                             metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
-    } catch {
-      case e: SQLIntegrityConstraintViolationException =>
-        atomically(metadata.sourceId) { (transaction, oldMetadata) =>
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
-                              "WHERE source_id = ? AND updated_at <= ?",
-                              metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
-                              metadata.updatedAt.inSeconds)
-        }
-    }
+  def writeMetadata(metadata: List[Metadata])  = {
+    def update_value_if_newer(column:String) = column + "=IF(updated_at <= VALUES(updated_at), VALUES(" + column + "), " + column + ")"
+
+    val query = "INSERT INTO " + tablePrefix + "_metadata " +
+                "(source_id, count, state, updated_at) VALUES " +
+                (1 to metadata.length).map(_ =>"(?, ?, ?, ?)").mkString(", ") +
+                " ON DUPLICATE KEY UPDATE " +
+                update_value_if_newer("state") + " , " +
+                update_value_if_newer("updated_at")
+    val params = metadata.map(m => List(m.sourceId, 0, m.state.id, m.updatedAt.inSeconds)).flatten: List[Any]
+
+    queryEvaluator.execute(query, params: _*)
   }
+
+  def writeMetadata(metadata: Metadata) = this.writeMetadata(List(metadata))
 
   def updateMetadata(metadata: Metadata): Unit = updateMetadata(metadata.sourceId, metadata.state, metadata.updatedAt)
 
