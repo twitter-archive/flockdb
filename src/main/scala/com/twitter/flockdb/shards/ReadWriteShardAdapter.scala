@@ -28,6 +28,7 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def selectIncludingArchived(sourceId: Long, count: Int, cursor: Cursor)                            = shard.readOperation(_.selectIncludingArchived(sourceId, count, cursor))
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                       = shard.readOperation(_.intersect(sourceId, states, destinationIds))
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                  = shard.readOperation(_.intersectEdges(sourceId, states, destinationIds))
+  def getMetadata(sourceId: Long)                                                                    = shard.readOperation(_.getMetadata(sourceId))
   def selectByDestinationId(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor)          = shard.readOperation(_.selectByDestinationId(sourceId, states, count, cursor))
   def selectByPosition(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor)               = shard.readOperation(_.selectByPosition(sourceId, states, count, cursor))
   def selectEdges(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor)                    = shard.readOperation(_.selectEdges(sourceId, states, count, cursor))
@@ -48,21 +49,4 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def negate(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                   = shard.writeOperation(_.negate(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                  = shard.writeOperation(_.archive(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, updatedAt: Time)                                                       = shard.writeOperation(_.archive(sourceId, updatedAt))
-
-  def getMetadata(sourceId: Long): Option[Metadata] = {
-    if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
-      val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]
-      val metadatas = children.flatMap { _.asInstanceOf[Shard].getMetadata(sourceId) }
-      if (metadatas.size == 0) {
-        None
-      } else {
-        val maxTime = metadatas.map { _.updatedAt.inMillis }.reduceLeft { _ max _ }
-        val recentistMetadatas = metadatas.filter { m: Metadata => m.updatedAt.inMillis == maxTime }
-        val maxState = recentistMetadatas.map { _.state }.reduceLeft { _ max _ }
-        Some(recentistMetadatas.filter { _.state == maxState }.first)
-      }
-    } else {
-      shard.readOperation(_.getMetadata(sourceId))
-    }
-  }
 }
