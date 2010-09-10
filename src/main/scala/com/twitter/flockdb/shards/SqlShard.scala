@@ -308,15 +308,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
       "IF(" + column + " = " + newColor + ", 1, IF(" + column + " = edges.state, -1, 0)))"
   }
 
+  private def state_priority(state: String): String = "-IF(" + state + "=0, 4, " + state + ")"
+
   private def write(edges: Seq[Edge], tries: Int) {
     try {
       initializeMetadata(edges.map(_.sourceId))
       initializeEdges(edges)
-      queryEvaluator.select("select * from "+ tablePrefix + "_edges") { row =>
-        print("e: "+ row.getInt("source_id") + ", " + row.getInt("state") + "\n")
-      }
       edges.foreach { edge =>
-        print("new: " + edge.state.id + "\n")
         val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
           "SET " +
           "    metadata.count0 = metadata.count0 + " + incr(0, edge.state.id) + "," +
@@ -327,15 +325,12 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
           "    edges.position         = ?, " +
           "    edges.updated_at       = ?, " +
           "    metadata.updated_at    = ?  " +
-          "WHERE edges.updated_at    <= ? " +
+          "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
+          "(" + state_priority("edges.state") + " < " + state_priority(edge.state.id.toString) + ")))" +
           "  AND edges.source_id      = ? " +
           "  AND edges.destination_id = ? " +
           "  AND metadata.source_id   = ? "
-        val out = queryEvaluator.execute(query, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.sourceId, edge.destinationId, edge.sourceId)
-        queryEvaluator.select("select * from "+ tablePrefix + "_metadata") { row =>
-          print("m: "+ row.getInt("source_id") + ", " + row.getInt("count0") + "\n")
-        }
-        print("===\n")
+        queryEvaluator.execute(query, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.sourceId, edge.destinationId, edge.sourceId)
       }
     } catch {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
