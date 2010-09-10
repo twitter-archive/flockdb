@@ -22,9 +22,6 @@ import com.twitter.gizzard.shards
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 
-
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time)
-
 trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def get(sourceId: Long, destinationId: Long): Option[Edge]
   @throws(classOf[shards.ShardException]) def getMetadata(sourceId: Long): Option[Metadata]
@@ -41,7 +38,9 @@ trait Shard extends shards.Shard {
 
   @throws(classOf[shards.ShardException]) def writeCopies(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def updateMetadata(metadata: Metadata)
-  @throws(classOf[shards.ShardException]) def writeMetadata(metadata: Metadata)
+
+  @throws(classOf[shards.ShardException]) def writeMetadataState(metadata: Metadata)
+  @throws(classOf[shards.ShardException]) def writeMetadataState(metadata: Seq[Metadata])
 
   @throws(classOf[shards.ShardException]) def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)
   @throws(classOf[shards.ShardException]) def archive(sourceId: Long, updatedAt: Time)
