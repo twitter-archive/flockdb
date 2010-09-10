@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS %s (
   position              BIGINT                   NOT NULL,
   updated_at            INT UNSIGNED             NOT NULL,
   destination_id        %s                       NOT NULL,
-  count                 TINYINT UNSIGNED         NOT NULL,
   state                 TINYINT                  NOT NULL,
 
   PRIMARY KEY (source_id, state, position),
@@ -51,10 +50,12 @@ CREATE TABLE IF NOT EXISTS %s (
   val METADATA_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
   source_id             %s                       NOT NULL,
-  count                 INT                      NOT NULL,
-  state                 TINYINT                  NOT NULL,
-  updated_at            INT UNSIGNED             NOT NULL,
-
+  count0                INT                      NOT NULL DEFAULT 0,
+  count1                INT                      NOT NULL DEFAULT 0,
+  count2                INT                      NOT NULL DEFAULT 0,
+  count3                INT                      NOT NULL DEFAULT 0,
+  state                 TINYINT                  NOT NULL DEFAULT 0,
+  updated_at            INT UNSIGNED             NOT NULL DEFAULT 0,
   PRIMARY KEY (source_id)
 ) TYPE=INNODB
 """
@@ -96,7 +97,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
-      Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+      Metadata(sourceId, State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds))
     }
   }
 
@@ -109,7 +110,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds))
         nextCursor = Cursor(sourceId)
         i += 1
       } else {
@@ -121,39 +122,21 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
-    queryEvaluator.selectOne("SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       states.foldLeft(0) { (result, state) =>
-        result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
+        result + row.getInt("count"+state.id)
       }
     } getOrElse {
-      populateMetadata(sourceId, Normal)
-      count(sourceId, states)
+      initializeMetadata(sourceId)
+      0
     }
   }
 
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int]) {
-    queryEvaluator.select("SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
-      results(row.getLong("source_id")) = row.getInt("count")
+    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
+      val state = row.getInt("state")
+      results(row.getLong("source_id")) = row.getInt("count" + state)
     }
-  }
-
-  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time(0.seconds)) }
-
-  private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
-    try {
-      queryEvaluator.execute(
-        "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
-        sourceId,
-        computeCount(sourceId, state),
-        state.id,
-        updatedAt.inSeconds)
-    } catch {
-      case e: SQLIntegrityConstraintViolationException =>
-    }
-  }
-
-  private def computeCount(sourceId: Long, state: State) = {
-    queryEvaluator.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
   }
 
   def selectAll(cursor: (Cursor, Cursor), count: Int): (Seq[Edge], (Cursor, Cursor)) = {
@@ -272,7 +255,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def add(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Normal))
+    write(Seq(Edge(sourceId, destinationId, position, updatedAt, Normal)))
   }
 
   def add(sourceId: Long, updatedAt: Time) {
@@ -280,7 +263,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def negate(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Negative))
+    write(Seq(Edge(sourceId, destinationId, position, updatedAt, Negative)))
   }
 
   def negate(sourceId: Long, updatedAt: Time) {
@@ -288,7 +271,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def remove(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Removed))
+    write(Seq(Edge(sourceId, destinationId, position, updatedAt, Removed)))
   }
 
   def remove(sourceId: Long, updatedAt: Time) {
@@ -296,7 +279,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Archived))
+    write(Seq(Edge(sourceId, destinationId, position, updatedAt, Archived)))
   }
 
   def archive(sourceId: Long, updatedAt: Time) {
@@ -316,185 +299,114 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   private class MissingMetadataRow extends Exception("Missing Count Row")
 
-  private def insertEdge(transaction: Transaction, metadata: Metadata, edge: Edge): Int = {
-    val insertedRows =
-      transaction.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, " +
-                          "updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)",
-                          edge.sourceId, edge.position, edge.updatedAt.inSeconds,
-                          edge.destinationId, edge.count, edge.state.id)
-    if (edge.state == metadata.state) insertedRows else 0
+  private def write(edges: Seq[Edge]) {
+    write(edges, config("errors.deadlock_retries").toInt)
   }
 
-  private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
-                         oldEdge: Edge): Int = {
-    if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
-
-    val updatedRows = if (oldEdge.state != Archived && edge.state == Normal) {
-      transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
-                          "position = ?, count = 0, state = ? " +
-                          "WHERE source_id = ? AND destination_id = ? AND " +
-                          "updated_at <= ?",
-                          edge.updatedAt.inSeconds, edge.position, edge.state.id,
-                          edge.sourceId, edge.destinationId, edge.updatedAt.inSeconds)
-    } else {
-      try {
-        transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
-                            "count = 0, state = ? " +
-                            "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
-                            edge.updatedAt.inSeconds, edge.state.id, edge.sourceId,
-                            edge.destinationId, edge.updatedAt.inSeconds)
-      } catch {
-        case e: SQLIntegrityConstraintViolationException =>
-          // usually this is a (source_id, state, position) violation. scramble the position more.
-          // FIXME: hacky. remove with the new schema.
-          transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
-                              "count = 0, state = ?, position = position + ? " +
-                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
-                              edge.updatedAt.inSeconds, edge.state.id,
-                              (randomGenerator.nextInt() % 999) + 1, edge.sourceId,
-                              edge.destinationId, edge.updatedAt.inSeconds)
-      }
-    }
-    if (edge.state != oldEdge.state &&
-        (oldEdge.state == metadata.state || edge.state == metadata.state)) updatedRows else 0
+  private def incr(column: Int, newColor: Int) = {
+    "IF(" + newColor + " = edges.state, 0, " +
+      "IF(" + column + " = " + newColor + ", 1, IF(" + column + " = edges.state, -1, 0)))"
   }
 
-  // returns +1, 0, or -1, depending on how the metadata count should change after this operation.
-  // `predictExistence`=true for normal operations, false for copy/migrate.
-  private def writeEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
-                        predictExistence: Boolean): Int = {
-    val countDelta = if (predictExistence) {
-      transaction.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
-                            "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
-        makeEdge(row)
-      }.map { oldRow =>
-        updateEdge(transaction, metadata, edge, oldRow)
-      }.getOrElse {
-        insertEdge(transaction, metadata, edge)
-      }
-    } else {
-      try {
-        insertEdge(transaction, metadata, edge)
-      } catch {
-        case e: SQLIntegrityConstraintViolationException =>
-          transaction.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
-                                "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
-            makeEdge(row)
-          }.map { oldRow =>
-            updateEdge(transaction, metadata, edge, oldRow)
-          }.getOrElse(0)
-      }
-    }
-    if (edge.state == metadata.state) countDelta else -countDelta
-  }
-
-  private def write(edge: Edge) {
-    write(edge, config("errors.deadlock_retries").toInt, true)
-  }
-
-  private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
+  private def write(edges: Seq[Edge], tries: Int) {
     try {
-      atomically(edge.sourceId) { (transaction, metadata) =>
-        val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
-        if (countDelta != 0) {
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
-                              "WHERE source_id = ?", countDelta, edge.sourceId)
+      initializeMetadata(edges.map(_.sourceId))
+      initializeEdges(edges)
+      queryEvaluator.select("select * from "+ tablePrefix + "_edges") { row =>
+        print("e: "+ row.getInt("source_id") + ", " + row.getInt("state") + "\n")
+      }
+      edges.foreach { edge =>
+        print("new: " + edge.state.id + "\n")
+        val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
+          "SET " +
+          "    metadata.count0 = metadata.count0 + " + incr(0, edge.state.id) + "," +
+          "    metadata.count1 = metadata.count1 + " + incr(1, edge.state.id) + "," +
+          "    metadata.count2 = metadata.count2 + " + incr(2, edge.state.id) + "," +
+          "    metadata.count3 = metadata.count3 + " + incr(3, edge.state.id) + "," +
+          "    edges.state            = ?, " +
+          "    edges.position         = ?, " +
+          "    edges.updated_at       = ?, " +
+          "    metadata.updated_at    = ?  " +
+          "WHERE edges.updated_at    <= ? " +
+          "  AND edges.source_id      = ? " +
+          "  AND edges.destination_id = ? " +
+          "  AND metadata.source_id   = ? "
+        val out = queryEvaluator.execute(query, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.sourceId, edge.destinationId, edge.sourceId)
+        queryEvaluator.select("select * from "+ tablePrefix + "_metadata") { row =>
+          print("m: "+ row.getInt("source_id") + ", " + row.getInt("count0") + "\n")
         }
+        print("===\n")
       }
     } catch {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
-        write(edge, tries - 1, predictExistence)
-      case e: SQLIntegrityConstraintViolationException if (tries > 0) =>
-        // temporary. until the position differential between master/slave is fixed, it's 
-        // possible for a slave migration to have two different edges with the same position.
-        write(new Edge(edge.sourceId, edge.destinationId, edge.position + 1, edge.updatedAt,
-                       edge.count, edge.state), tries - 1, predictExistence)
+        write(edges, tries - 1)
     }
   }
 
-  def writeCopies(edges: Seq[Edge]) {
-    val retries = config("errors.deadlock_retries").toInt
-    var remaining = edges
-    while (remaining.size > 0) {
-      val burst = new mutable.ArrayBuffer[Edge]
-      val currentSourceId = remaining(0).sourceId
-      var index = 0
-      while (remaining.size > index && remaining(index).sourceId == currentSourceId) {
-        burst += remaining(index)
-        index += 1
-      }
+  def writeCopies(edges: Seq[Edge]) = write(edges)
 
-      var countDelta = 0
-      atomically(currentSourceId) { (transaction, metadata) =>
-        try {
-          burst.foreach { edge =>
-            countDelta += writeEdge(transaction, metadata, edge, false)
-          }
-        } finally {
-          if (countDelta != 0) {
-            transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
-                                "WHERE source_id = ?", countDelta, currentSourceId)
-          }
-        }
-      }
-
-      remaining = remaining.drop(index)
-    }
-  }
-
+  @deprecated
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     atomically(sourceId) { (transaction, metadata) =>
       f(new SqlShard(transaction, shardInfo, weight, children, config), metadata)
     }
   }
 
+  @deprecated
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
     try {
       queryEvaluator.transaction { transaction =>
         transaction.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ? FOR UPDATE", sourceId) { row =>
-          f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+          f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds)))
         } getOrElse(throw new MissingMetadataRow)
       }
     } catch {
       case e: MissingMetadataRow =>
-        populateMetadata(sourceId, Normal)
+        initializeMetadata(sourceId)
         atomically(sourceId)(f)
     }
   }
 
-  def writeMetadata(metadata: List[Metadata])  = {
+
+  def initializeMetadata(sourceId: Long): Unit = initializeMetadata(Seq(sourceId))
+
+  def initializeMetadata(sourceIds: Seq[Long]): Unit = {
+    val values = sourceIds.map("(" + _ + ")").mkString(",")
+    val query = "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id) VALUES " + values
+    queryEvaluator.execute(query)
+  }
+
+  def initializeEdges(edges: Seq[Edge]) = {
+    val values = edges.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, -1)"}.mkString(",")
+    val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, state) VALUES " + values
+    queryEvaluator.execute(query)
+  }
+
+  // writeMetadataState(Metadata(sourceId, Normal, 0, Time.now))
+
+  def writeMetadataState(metadatas: Seq[Metadata])  = {
     def update_value_if_newer(column:String) = column + "=IF(updated_at <= VALUES(updated_at), VALUES(" + column + "), " + column + ")"
 
     val query = "INSERT INTO " + tablePrefix + "_metadata " +
-                "(source_id, count, state, updated_at) VALUES " +
-                (1 to metadata.length).map(_ =>"(?, ?, ?, ?)").mkString(", ") +
+                "(source_id, state, updated_at) VALUES " +
+                List.make(metadatas.length, "(?, ?, ?)").mkString(", ") +
                 " ON DUPLICATE KEY UPDATE " +
                 update_value_if_newer("state") + " , " +
                 update_value_if_newer("updated_at")
-    val params = metadata.map(m => List(m.sourceId, 0, m.state.id, m.updatedAt.inSeconds)).flatten: List[Any]
+    val params = metadatas.foldLeft(List[Any]())((memo, m) => memo ++ List(m.sourceId, m.state.id, m.updatedAt.inSeconds))
 
     queryEvaluator.execute(query, params: _*)
   }
 
-  def writeMetadata(metadata: Metadata) = this.writeMetadata(List(metadata))
+  def writeMetadataState(metadata: Metadata) = this.writeMetadataState(List(metadata))
 
   def updateMetadata(metadata: Metadata): Unit = updateMetadata(metadata.sourceId, metadata.state, metadata.updatedAt)
 
-  // FIXME: computeCount could be really expensive. :(
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
-    atomically(sourceId) { (transaction, metadata) =>
-      if ((updatedAt != metadata.updatedAt) || ((metadata.state max state) == state)) {
-        transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
-          state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
-      }
-    }
-  }
-
-  private def makeEdge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, stateId: Int): Edge = {
-    new Edge(sourceId, destinationId, position, updatedAt, count, State(stateId))
+    writeMetadataState(Metadata(sourceId, state, 0, updatedAt))
   }
 
   private def makeEdge(row: ResultSet): Edge = {
-    makeEdge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), row.getInt("count"), row.getInt("state"))
+    Edge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), row.getInt("state"))
   }
 }

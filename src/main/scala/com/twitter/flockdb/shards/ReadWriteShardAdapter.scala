@@ -39,7 +39,8 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int])                                  = shard.readOperation(_.counts(sourceIds, results))
 
   def writeCopies(edges: Seq[Edge])                                                                  = shard.writeOperation(_.writeCopies(edges))
-  def writeMetadata(metadata: Metadata)                                                              = shard.writeOperation(_.writeMetadata(metadata))
+  def writeMetadataState(metadata: Metadata)                                                         = shard.writeOperation(_.writeMetadataState(metadata))
+  def writeMetadataState(metadatas: Seq[Metadata])                                                   = shard.writeOperation(_.writeMetadataState(metadatas))
   def updateMetadata(metadata: Metadata)                                                             = shard.writeOperation(_.updateMetadata(metadata))
   def remove(sourceId: Long, updatedAt: Time)                                                        = shard.writeOperation(_.remove(sourceId, updatedAt))
   def remove(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                   = shard.writeOperation(_.remove(sourceId, destinationId, position, updatedAt))
@@ -50,6 +51,7 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                  = shard.writeOperation(_.archive(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, updatedAt: Time)                                                       = shard.writeOperation(_.archive(sourceId, updatedAt))
 
+  @deprecated
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
       val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]

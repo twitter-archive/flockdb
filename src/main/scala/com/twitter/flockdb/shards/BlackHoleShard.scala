@@ -35,7 +35,7 @@ class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val child
 
   def getMetadata(sourceId: Long) = None
 
-  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(this, Metadata(sourceId, State.Normal, 1, Time.now))
+  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(this, Metadata(sourceId, State.Normal, 0, 0, 0, 0, Time.now))
 
   def remove(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = State.Removed
 
@@ -53,7 +53,9 @@ class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val child
 
   def writeCopies(edges: Seq[Edge]) = ()
 
-  def writeMetadata(metadata: Metadata) = ()
+  def writeMetadataState(metadata: Metadata) = ()
+
+  def writeMetadataState(metadata: Seq[Metadata]) = ()
 
   def updateMetadata(metadata: Metadata) = ()
 

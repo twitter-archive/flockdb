@@ -19,5 +19,15 @@ package com.twitter.flockdb
 import com.twitter.xrayspecs.Time
 
 
+object Edge {
+  def apply(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, state: State) = {
+    // Count is unused.
+    new Edge(sourceId, destinationId, position, updatedAt, 1, state)
+  }
+
+  def apply(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, state_id: Int) = {
+    new Edge(sourceId, destinationId, position, updatedAt, 1, State(state_id))
+  }
+}
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
                 state: State)
