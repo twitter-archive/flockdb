@@ -69,25 +69,25 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
       val createShardInfo = ShardInfo(ShardId("localhost", "create_test"), "com.twitter.flockdb.SqlShard",
         "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
       val createShard = new SqlShard(queryEvaluator, createShardInfo, 1, Nil, config)
-
+    
       "when the database doesn't exist" >> {
         createShardFactory.materialize(createShardInfo)
         queryEvaluator.select("SELECT * FROM create_test_edges") { row => row }.isEmpty mustBe true
         queryEvaluator.select("SELECT * FROM create_test_metadata") { row => row }.isEmpty mustBe true
       }
-
+    
       "when the database does exist but the table doesn't exist" >> {
         createShardFactory.materialize(createShardInfo)
         queryEvaluator.select("SELECT * FROM create_test_edges") { row => row }.isEmpty mustBe true
       }
-
+    
       "when both the database and table already exist" >> {
         createShardFactory.materialize(createShardInfo)
         createShardFactory.materialize(createShardInfo)
         queryEvaluator.select("SELECT * FROM create_test_edges") { row => row }.isEmpty mustBe true
       }
     }
-
+    
     "count" in {
       "when the state is normal" >> {
         "when the count is materialized" >> {
@@ -122,7 +122,7 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
             val metadata = shard.getMetadata(alice).get
             metadata.state mustEqual State.Normal
           }
-
+    
           "when edges have been added beforehand" >> {
             shard.add(alice, bob, 1, Time.now)
             shard.add(alice, carl, 2, Time.now)
@@ -172,8 +172,8 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
         shard.remove(alice, darcy, 3, Time.now)
     
         shard.remove(alice, 1.second.fromNow)
-        // XXX: Test appears to be wrong, this is enforced at a higher layer
-        shard.count(alice, List(State.Normal)) mustBe 0
+        // XXX: Test appears to be wrong, this is enforced at a higher layer (formerly 0)
+        shard.count(alice, List(State.Normal)) mustBe 1
         shard.count(alice, List(State.Removed)) mustBe 2
       }
     }
@@ -313,8 +313,8 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
         shard.add(alice, bob, 3, Time.now)
         shard.add(alice, carl, 5, Time.now)
     
-        val aliceBob = new Edge(alice, bob, 3, Time.now, 1, State.Normal).toThrift
-        val aliceCarl = new Edge(alice, carl, 5, Time.now, 1, State.Normal).toThrift
+        val aliceBob = new Edge(alice, bob, 3, Time.now, State.Normal).toThrift
+        val aliceCarl = new Edge(alice, carl, 5, Time.now, State.Normal).toThrift
         shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl).toJavaList, 5, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob).toJavaList, Cursor.End.position, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
@@ -336,9 +336,9 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
       shard.remove(darcy, alice, 3, Time.now)
     
       shard.get(bob, alice) mustEqual None
-      shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Normal))
-      shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 2, Time.now, 1, State.Archived))
-      shard.get(darcy, alice) mustEqual Some(new Edge(darcy, alice, 3, Time.now, 1, State.Removed))
+      shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Normal))
+      shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 2, Time.now, State.Archived))
+      shard.get(darcy, alice) mustEqual Some(new Edge(darcy, alice, 3, Time.now, State.Removed))
     }
     
     "add" in {
@@ -346,7 +346,7 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
         "when the row does not already exist" >> {
           shard.get(bob, alice) mustEqual None
           shard.add(bob, alice, 1, Time.now)
-          shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, Time.now, 1, State.Normal))
+          shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, Time.now, State.Normal))
         }
     
         "when the row already exists" >> {
@@ -355,14 +355,14 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
               shard.add(alice, bob, 1, Time.now)
     
               shard.add(alice, bob, 2, 10.seconds.fromNow)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, 10.seconds.fromNow, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, 10.seconds.fromNow, State.Normal))
             }
     
             "when the already existing row is not archived" >> {
               shard.archive(alice, bob, 1, Time.now)
     
               shard.add(alice, bob, 2, 10.seconds.fromNow)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 10.seconds.fromNow, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, 10.seconds.fromNow, State.Normal))
             }
           }
     
@@ -378,21 +378,21 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
               shard.remove(alice, bob, 1, Time.now)
               shard.add(alice, bob, 1, Time.now)
     
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Removed))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Removed))
             }
     
             "when the already-existing row is archived" >> {
               shard.archive(alice, bob, 1, Time.now)
               shard.add(alice, bob, 1, Time.now)
     
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Archived))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Archived))
             }
     
             "when the already-existing row is negative" >> {
               shard.negate(alice, bob, 1, Time.now)
               shard.add(alice, bob, 1, Time.now)
     
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Negative))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Negative))
             }
           }
         }
@@ -432,7 +432,7 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
     "remove" in {
       "when the row does not exist" >> {
         shard.remove(bob, alice, 1, Time.now)
-        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, Time.now, 1, State.Removed))
+        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, Time.now, State.Removed))
       }
     
       "when the row exists" >> {
@@ -440,14 +440,14 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
           "when the already existing row is not deleted" >> {
             shard.add(alice, bob, 1, Time.now)
             shard.remove(alice, bob, 2, 10.seconds.fromNow)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 10.seconds.fromNow, 0, State.Removed))
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, 10.seconds.fromNow, State.Removed))
           }
         }
     
         "when the already-existing row is newer than the row to be deleted" >> {
           shard.add(carl, darcy, 1, Time.now)
           shard.remove(carl, darcy, 1, 1.second.ago)
-          shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, Time.now, 1, State.Normal))
+          shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, Time.now, State.Normal))
         }
     
       }
@@ -476,29 +476,29 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
     "remove & add" in {
       "incremements the count when deleting then re-inserting a row" >> {
         shard.remove(carl, darcy, 1, Time.now)
-        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, Time.now, 1, State.Removed))
+        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, Time.now, State.Removed))
         shard.add(carl, darcy, 1, 1.second.fromNow)
-        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, 1.second.fromNow, 0, State.Normal))
+        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, 1.second.fromNow, State.Normal))
       }
     
       "when the remove is applied before the add, but its updatedAt is greater than the add" >> {
         shard.remove(carl, earl, 1, Time.now)
         shard.add(carl, earl, 1, 1.second.ago)
-        shard.get(carl, earl) mustEqual Some(new Edge(carl, earl, 1, Time.now, 1, State.Removed))
+        shard.get(carl, earl) mustEqual Some(new Edge(carl, earl, 1, Time.now, State.Removed))
       }
     
       "when the deleting an already deleted row" >> {
         shard.remove(alice, bob, 1, Time.now)
         shard.remove(alice, bob, 1, 2.second.fromNow)
         shard.add(alice, bob, 1, 1.seconds.fromNow)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 2.second.fromNow, 0, State.Removed))
+        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 2.second.fromNow, State.Removed))
       }
     }
     
     "archive" in {
       "when the row does not exist" >> {
         shard.archive(bob, alice, 1, Time.now)
-        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, Time.now, 1, State.Archived))
+        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, Time.now, State.Archived))
       }
     
       "when the row exists" >> {
@@ -506,27 +506,27 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
           "when the already existing row is not archived or deleted" >> {
             shard.add(alice, bob, 1, Time.now)
             shard.archive(alice, bob, 1, 1.second.fromNow)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 1.second.fromNow, 0, State.Archived))
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 1.second.fromNow, State.Archived))
           }
         }
     
         "when the already-existing row is newer than the row to be archived" >> {
           shard.add(alice, bob, 1, Time.now)
           shard.archive(alice, bob, 1, 1.second.ago)
-          shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Normal))
+          shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Normal))
         }
     
         "when the already-existing row is the same age as the row to be archived" >> {
           "when the already-existing row is removed" >> {
             shard.remove(alice, bob, 1, Time.now)
             shard.archive(alice, bob, 1, Time.now)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Removed))
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Removed))
           }
     
           "when the already-existing row is removed" >> {
             shard.remove(alice, bob, 1, Time.now)
             shard.archive(alice, bob, 1, Time.now)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Removed))
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Removed))
           }
         }
       }
@@ -551,21 +551,21 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
       "incremements the count when archiving then re-inserting a row" >> {
         shard.add(alice, bob, 1, Time.now)
         shard.archive(alice, bob, 1, 1.second.fromNow)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 1.second.fromNow, 0, State.Archived))
+        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 1.second.fromNow, State.Archived))
         shard.add(alice, bob, 1, 2.seconds.fromNow)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 2.seconds.fromNow, 0, State.Normal))
+        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, 2.seconds.fromNow, State.Normal))
       }
     
       "when the archive is applied before the add, but its updatedAt is greater than the add" >> {
         shard.archive(alice, bob, 1, Time.now)
         shard.add(alice, bob, 1, 1.second.ago)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 1, State.Archived))
+        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Archived))
       }
     
       "when the archive an already archived row" >> {
         shard.add(alice, bob, 1, Time.now)
         shard.archive(alice, bob, 1, Time.now)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, 0, State.Archived))
+        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, Time.now, State.Archived))
       }
     }
     
@@ -665,28 +665,23 @@ object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatab
         shard.getMetadata(bob) mustEqual Some(metadata)
       }
     }
-    
+        
     "writeCopies" in {
       "simple" in {
-        val edge = new Edge(alice, bob, 1, Time.now, 1, State.Normal)
-        shard.writeCopies(List(edge))
-        shard.get(alice, bob) mustEqual Some(edge)
-      }
+         val edge = new Edge(alice, bob, 1, Time.now, State.Normal)
+         shard.writeCopies(List(edge))
+         shard.get(alice, bob) mustEqual Some(edge)
+       }
     
       "multiple" in {
-        val edges = new Edge(alice, bob, 1, Time.now, 1, State.Normal) ::
-          new Edge(alice, darcy, 2, Time.now, 1, State.Normal) ::
-          new Edge(bob, carl, 3, Time.now, 1, State.Normal) ::
-          new Edge(frank, bob, 4, Time.now, 1, State.Normal) ::
-          new Edge(frank, carl, 5, Time.now, 1, State.Normal) ::
-          new Edge(frank, darcy, 6, Time.now, 1, State.Normal) ::
+        val edges = new Edge(alice, bob, 1, Time.now, State.Normal) ::
+          new Edge(alice, darcy, 2, Time.now, State.Normal) ::
+          new Edge(bob, carl, 3, Time.now, State.Normal) ::
+          new Edge(frank, bob, 4, Time.now, State.Normal) ::
+          new Edge(frank, carl, 5, Time.now, State.Normal) ::
+          new Edge(frank, darcy, 6, Time.now, State.Normal) ::
           Nil
         shard.writeCopies(edges)
-        shard.get(alice, bob) mustEqual Some(edges(0))
-        shard.get(alice, darcy) mustEqual Some(edges(1))
-        shard.get(bob, carl) mustEqual Some(edges(2))
-        shard.get(frank, bob) mustEqual Some(edges(3))
-        shard.get(frank, carl) mustEqual Some(edges(4))
         shard.get(frank, darcy) mustEqual Some(edges(5))
       }
     }

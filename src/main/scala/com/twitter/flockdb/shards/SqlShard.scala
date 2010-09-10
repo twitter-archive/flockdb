@@ -323,14 +323,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
           "    metadata.count3 = metadata.count3 + " + incr(3, edge.state.id) + "," +
           "    edges.state            = ?, " +
           "    edges.position         = ?, " +
-          "    edges.updated_at       = ?, " +
-          "    metadata.updated_at    = ?  " +
+          "    edges.updated_at       = ? " +
           "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
           "(" + state_priority("edges.state") + " < " + state_priority(edge.state.id.toString) + ")))" +
           "  AND edges.source_id      = ? " +
           "  AND edges.destination_id = ? " +
           "  AND metadata.source_id   = ? "
-        queryEvaluator.execute(query, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.sourceId, edge.destinationId, edge.sourceId)
+        queryEvaluator.execute(query, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.sourceId, edge.destinationId, edge.sourceId)
       }
     } catch {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
@@ -372,22 +371,22 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def initializeEdges(edges: Seq[Edge]) = {
-    val values = edges.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, -1)"}.mkString(",")
-    val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, state) VALUES " + values
+    val values = edges.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, "+edge.position+", -1)"}.mkString(",")
+    val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, position, state) VALUES " + values
     queryEvaluator.execute(query)
   }
 
   // writeMetadataState(Metadata(sourceId, Normal, 0, Time.now))
 
   def writeMetadataState(metadatas: Seq[Metadata])  = {
-    def update_value_if_newer(column:String) = column + "=IF(updated_at <= VALUES(updated_at), VALUES(" + column + "), " + column + ")"
+    def update_value_if_newer_or_better(column: String) = column + "=IF(updated_at < VALUES(updated_at) OR (updated_at = VALUES(updated_at) AND "+state_priority("state") + " < "+state_priority("VALUES(state)")+"), VALUES(" + column + "), " + column + ")"
 
     val query = "INSERT INTO " + tablePrefix + "_metadata " +
                 "(source_id, state, updated_at) VALUES " +
                 List.make(metadatas.length, "(?, ?, ?)").mkString(", ") +
                 " ON DUPLICATE KEY UPDATE " +
-                update_value_if_newer("state") + " , " +
-                update_value_if_newer("updated_at")
+                update_value_if_newer_or_better("state") + " , " +
+                update_value_if_newer_or_better("updated_at")
     val params = metadatas.foldLeft(List[Any]())((memo, m) => memo ++ List(m.sourceId, m.state.id, m.updatedAt.inSeconds))
 
     queryEvaluator.execute(query, params: _*)
@@ -402,6 +401,6 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   private def makeEdge(row: ResultSet): Edge = {
-    Edge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), row.getInt("state"))
+    Edge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), State(row.getInt("state")))
   }
 }

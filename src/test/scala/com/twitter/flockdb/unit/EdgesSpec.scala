@@ -90,7 +90,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     "contains" in {
       expect {
         one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
-        one(shard).get(bob, mary) willReturn Some(new Edge(bob, mary, 0, Time.now, 1, State.Normal))
+        one(shard).get(bob, mary) willReturn Some(new Edge(bob, mary, 0, Time.now, State.Normal))
       }
       flock.contains(bob, FOLLOWS, mary) must beTrue
     }
