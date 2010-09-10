@@ -31,6 +31,6 @@ object State {
 
   case object Normal extends State(0, "Normal", 0)
   case object Negative extends State(3, "Negative", 1)
-  case object Removed extends State(1, "Removed", 3)
   case object Archived extends State(2, "Archived", 2)
+  case object Removed extends State(1, "Removed", 3)
 }
