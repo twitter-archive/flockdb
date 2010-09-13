@@ -28,6 +28,7 @@ struct Results {
   3: i64 prev_cursor
 }
 
+# Set Cursor = -1 when requesting the first Page. Cursor = 0 indicates the end of the result set.
 struct Page {
   1: i32 count
   2: i64 cursor
