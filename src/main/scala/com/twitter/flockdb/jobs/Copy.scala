@@ -90,7 +90,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
       extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor) =
     this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
-
+    
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
     destinationShard.writeMetadataState(items)
