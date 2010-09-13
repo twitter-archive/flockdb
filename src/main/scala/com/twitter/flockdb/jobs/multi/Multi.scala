@@ -102,8 +102,8 @@ case class Unarchive(sourceId: Long, graphId: Int, direction: Direction, updated
 }
 
 case class RemoveAll(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends Multi(sourceId, graphId, direction, updatedAt, priority) {
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = new single.Remove(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt)
-  protected def updateMetadata(shard: Shard) = shard.remove(sourceId, updatedAt)
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = throw new UnsupportedOperationException
+  protected def updateMetadata(shard: Shard) = throw new UnsupportedOperationException
 }
 
 case class Negate(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends Multi(sourceId, graphId, direction, updatedAt, priority) {

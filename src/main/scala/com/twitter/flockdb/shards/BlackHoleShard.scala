@@ -51,7 +51,9 @@ class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val child
 
   def writeCopies(edges: Seq[Edge]) = ()
 
-  def writeMetadata(metadata: Metadata) = ()
+  def writeMetadataState(metadata: Metadata) = ()
+
+  def writeMetadataState(metadata: Seq[Metadata]) = ()
 
   def updateMetadata(metadata: Metadata) = ()
 

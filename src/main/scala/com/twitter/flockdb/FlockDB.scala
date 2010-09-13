@@ -123,7 +123,7 @@ class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
     edges.get(source_id, graph_id, destination_id).toThrift
   }
 
-  @deprecated
+  // @deprecated
   def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
     edges.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift)).toThrift
   }
@@ -145,7 +145,7 @@ class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
     }
   }
 
-  @deprecated
+  // @deprecated
   def count(query: JList[thrift.SelectOperation]) = {
     edges.count(List(query.toSeq.map { _.fromThrift })).first
   }

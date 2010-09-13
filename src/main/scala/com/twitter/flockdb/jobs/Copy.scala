@@ -24,6 +24,7 @@ import com.twitter.results
 import com.twitter.ostrich.Stats
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.logging.Logger
+import com.twitter.flockdb.shards.Metadata
 import shards.Shard
 
 
@@ -89,10 +90,10 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
       extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor) =
     this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
-
+    
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    items.foreach { destinationShard.writeMetadata(_) }
+    destinationShard.writeMetadataState(items)
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
       Some(new Copy(sourceShardId, destinationShardId, Copy.START))

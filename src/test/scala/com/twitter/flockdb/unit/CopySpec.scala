@@ -43,7 +43,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "apply" in {
       val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count)
-      val edge = new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)
+      val edge = new Edge(1L, 2L, 3L, Time.now, State.Normal)
 
       "continuing work" >> {
         expect {
@@ -101,26 +101,26 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
     "apply" in {
       "continuing work" >> {
         val job = new MetadataCopy(shard1Id, shard2Id, cursor, count)
-        val metadata = new Metadata(1, State.Normal, 2, Time.now)
+        val metadata = Metadata(1, State.Normal, 2, 0, 0, 0, Time.now)
         expect {
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor(cursor.position + 1))
-          one(shard2).writeMetadata(metadata)
-          one(scheduler).apply(new MetadataCopy(shard1Id, shard2Id, Cursor(cursor.position + 1), count))
+          one(shard2).writeMetadataState(List(metadata))
+          one(scheduler).apply(new MetadataCopy(shard1Id, shard2Id, Cursor(cursor.position + 1), count)) 
         }
         job.apply((nameServer, scheduler))
       }
 
       "finished" >> {
         val job = new MetadataCopy(shard1Id, shard2Id, cursor, count)
-        val metadata = new Metadata(1, State.Normal, 2, Time.now)
+        val metadata = Metadata(1, State.Normal, 2, 0, 0, 0, Time.now)
         expect {
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
-          one(shard2).writeMetadata(metadata)
+          one(shard2).writeMetadataState(List(metadata))
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(scheduler).apply(new Copy(shard1Id, shard2Id, (Cursor.Start, Cursor.Start), Copy.COUNT))
         }
