@@ -30,9 +30,14 @@ class DifferenceQuery(query1: Query, query2: Query) extends Query {
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
     val guessedPageSize = (count + count * config("edges.average_intersection_proportion").toDouble).toInt
     val internalPageSize = guessedPageSize min config("edges.intersection_page_size_max").toInt
+    val timeout = config("edges.intersection_timeout_ms").toInt
 
     var resultWindow = pageDifference(internalPageSize, count, cursor)
-    while (resultWindow.page.size < count && resultWindow.continueCursor != Cursor.End) {
+    val now = System.currentTimeMillis
+    while (resultWindow.page.size < count &&
+           resultWindow.continueCursor != Cursor.End &&
+           System.currentTimeMillis - now < timeout
+    ) {
       resultWindow = resultWindow ++ pageDifference(internalPageSize, count, resultWindow.continueCursor)
     }
     resultWindow
