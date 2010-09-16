@@ -88,6 +88,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new util.Random
+  private var oldSchema = false
 
   def get(sourceId: Long, destinationId: Long) = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
@@ -105,13 +106,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     val metadatas = new mutable.ArrayBuffer[Metadata]
     var nextCursor = Cursor.Start
     var returnedCursor = Cursor.End
+    oldSchema = false
 
     var i = 0
     queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
       if (i < count) {
-        val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds))
-        nextCursor = Cursor(sourceId)
+        metadatas += makeMetadata(row)
+        nextCursor = Cursor(metadatas.last.sourceId)
         i += 1
       } else {
         returnedCursor = nextCursor
@@ -119,6 +120,22 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     }
 
     (metadatas, returnedCursor)
+  }
+
+  private def makeMetadata(row: ResultSet): Metadata = {
+    try {
+      if(oldSchema) {
+        Metadata(row.getInt("source_id"), State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds))
+      } else {
+        Metadata(row.getInt("source_id"), State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+      }
+    } catch {
+      case e: SQLException => {
+        if(oldSchema) throw(e)
+        oldSchema = true
+        makeMetadata(row)
+      }
+    }
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
