@@ -20,12 +20,16 @@ import scala.collection.{immutable, mutable}
 import com.twitter.gizzard.nameserver.{Forwarding, NameServer}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.ostrich.Stats
+import net.lag.logging.Logger
 import shards.Shard
 
 
 case class NodePair(sourceId: Long, destinationId: Long)
 
 class ForwardingManager(nameServer: NameServer[Shard]) {
+  private val log = Logger(getClass.getName)
+
   @throws(classOf[ShardException])
   def find(sourceId: Long, graphId: Int, direction: Direction) = {
     nameServer.findCurrentForwarding(translate(graphId, direction), sourceId)
@@ -68,6 +72,8 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
     nodePairs.foreach { nodePair =>
       if (getState(afterStateMap, nodePair.sourceId) != initialStateMap(nodePair.sourceId) ||
           getState(afterStateMap, nodePair.destinationId) != initialStateMap(nodePair.destinationId)) {
+        log.debug("Lost optimistic lock on (%d, %d)", nodePair.sourceId, nodePair.destinationId)
+        Stats.incr("lock-lost")
         rv += nodePair
       }
     }
