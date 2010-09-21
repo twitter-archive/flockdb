@@ -5,10 +5,10 @@ import com.twitter.sbt._
 class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher with NoisyDependencies{
   val configgy  = "net.lag" % "configgy" % "1.6.1"
   val dbcp      = "commons-dbcp" % "commons-dbcp" % "1.2.2"
-  val gizzard   = "com.twitter" % "gizzard" % "1.4.2-SNAPSHOT"
+  val gizzard   = "com.twitter" % "gizzard" % "1.3.17"
   val kestrel   = "net.lag" % "kestrel" % "1.2"
   val mysqljdbc = "mysql" % "mysql-connector-java" % "5.1.6"
-  val ostrich   = "com.twitter" % "ostrich" % "1.2.1"
+  // val ostrich   = "com.twitter" % "ostrich" % "1.2.1"
   val pool      = "commons-pool" % "commons-pool" % "1.3"
   val querulous = "com.twitter" % "querulous" % "1.1.11"
   val results   = "com.twitter" % "results" % "1.0"
