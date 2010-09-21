@@ -54,6 +54,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       shard2 = mock[Shard]
       lockingShard1 = new FakeLockingShard(shard1)
       lockingShard2 = new FakeLockingShard(shard2)
+      Time.freeze
     }
 
     "apply" in {
