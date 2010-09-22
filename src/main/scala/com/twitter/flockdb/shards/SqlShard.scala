@@ -88,6 +88,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new util.Random
+  private var oldSchema = false
 
   def get(sourceId: Long, destinationId: Long) = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
@@ -105,13 +106,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     val metadatas = new mutable.ArrayBuffer[Metadata]
     var nextCursor = Cursor.Start
     var returnedCursor = Cursor.End
+    oldSchema = false
 
     var i = 0
     queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
       if (i < count) {
-        val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds))
-        nextCursor = Cursor(sourceId)
+        metadatas += makeMetadata(row)
+        nextCursor = Cursor(metadatas.last.sourceId)
         i += 1
       } else {
         returnedCursor = nextCursor
@@ -119,6 +120,22 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     }
 
     (metadatas, returnedCursor)
+  }
+
+  private def makeMetadata(row: ResultSet): Metadata = {
+    try {
+      if(oldSchema) {
+        Metadata(row.getInt("source_id"), State(row.getInt("state")), row.getInt("count0"), row.getInt("count1"), row.getInt("count2"), row.getInt("count3"), Time(row.getInt("updated_at").seconds))
+      } else {
+        Metadata(row.getInt("source_id"), State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+      }
+    } catch {
+      case e: SQLException => {
+        if(oldSchema) throw(e)
+        oldSchema = true
+        makeMetadata(row)
+      }
+    }
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
@@ -303,7 +320,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     write(edges, config("errors.deadlock_retries").toInt)
   }
 
-  private def incr(column: Int, newColor: Int) = {
+  private def incr(column: Int, newColor: String) = {
     "IF(" + newColor + " = edges.state, 0, " +
       "IF(" + column + " = " + newColor + ", 1, IF(" + column + " = edges.state, -1, 0)))"
   }
@@ -314,22 +331,24 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     try {
       initializeMetadata(edges.map(_.sourceId))
       initializeEdges(edges)
-      edges.foreach { edge =>
-        val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
-          "SET " +
-          "    metadata.count0 = metadata.count0 + " + incr(0, edge.state.id) + "," +
-          "    metadata.count1 = metadata.count1 + " + incr(1, edge.state.id) + "," +
-          "    metadata.count2 = metadata.count2 + " + incr(2, edge.state.id) + "," +
-          "    metadata.count3 = metadata.count3 + " + incr(3, edge.state.id) + "," +
-          "    edges.state            = ?, " +
-          "    edges.position         = ?, " +
-          "    edges.updated_at       = ? " +
-          "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
-          "(" + state_priority("edges.state") + " < " + state_priority(edge.state.id.toString) + ")))" +
-          "  AND edges.source_id      = ? " +
-          "  AND edges.destination_id = ? " +
-          "  AND metadata.source_id   = ? "
-        queryEvaluator.execute(query, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.sourceId, edge.destinationId, edge.sourceId)
+      val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
+        "SET " +
+        "    metadata.count0 = metadata.count0 + " + incr(0, "?") + "," +
+        "    metadata.count1 = metadata.count1 + " + incr(1, "?") + "," +
+        "    metadata.count2 = metadata.count2 + " + incr(2, "?") + "," +
+        "    metadata.count3 = metadata.count3 + " + incr(3, "?") + "," +
+        "    edges.state            = ?, " +
+        "    edges.position         = ?, " +
+        "    edges.updated_at       = ? " +
+        "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
+        "(" + state_priority("edges.state") + " < " + state_priority("?") + ")))" +
+        "  AND edges.source_id      = ? " +
+        "  AND edges.destination_id = ? " +
+        "  AND metadata.source_id   = ? "
+      queryEvaluator.executeBatch(query){ p =>
+        edges.foreach { edge =>
+          p(edge.state.id, edge.state.id, edge.state.id, edge.state.id, edge.state.id, edge.state.id, edge.state.id, edge.state.id, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.state.id, edge.state.id, edge.sourceId, edge.destinationId, edge.sourceId)
+        }
       }
     } catch {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
