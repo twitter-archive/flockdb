@@ -53,21 +53,23 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
    * FIXME: May want to optimize the (frequent) case of one NodePair.
    */
   def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit): Seq[NodePair] = {
-    def getState(stateMap: mutable.Map[Long, State], id: Long) = {
-      stateMap.getOrElseUpdate(id, find(id, graphId, Direction.Forward).getMetadata(id).map(_.state).getOrElse(State.Normal))
+    def directionalId(id: Long, direction: Direction) = if (direction == Direction.Forward) id else -id
+    def getState(stateMap: mutable.Map[Long, State], id: Long, direction: Direction) = {
+      val did = directionalId(id, direction)
+      stateMap.getOrElseUpdate(did, find(id, graphId, direction).getMetadata(id).map(_.state).getOrElse(State.Normal))
     }
 
     val initialStateMap = mutable.Map.empty[Long, State]
     nodePairs.foreach { nodePair =>
-      val nodeState = getState(initialStateMap, nodePair.sourceId) max getState(initialStateMap, nodePair.destinationId)
+      val nodeState = getState(initialStateMap, nodePair.sourceId, Direction.Forward) max getState(initialStateMap, nodePair.destinationId, Direction.Backward)
       f(find(nodePair.sourceId, graphId, Direction.Forward), find(nodePair.destinationId, graphId, Direction.Backward), nodePair, nodeState)
     }
 
     val rv = new mutable.ListBuffer[NodePair]
     val afterStateMap = mutable.Map.empty[Long, State]
     nodePairs.foreach { nodePair =>
-      if (getState(afterStateMap, nodePair.sourceId) != initialStateMap(nodePair.sourceId) ||
-          getState(afterStateMap, nodePair.destinationId) != initialStateMap(nodePair.destinationId)) {
+      if (getState(afterStateMap, nodePair.sourceId, Direction.Forward) != initialStateMap(directionalId(nodePair.sourceId, Direction.Forward)) ||
+          getState(afterStateMap, nodePair.destinationId, Direction.Backward) != initialStateMap(directionalId(nodePair.destinationId, Direction.Backward))) {
         rv += nodePair
       }
     }
