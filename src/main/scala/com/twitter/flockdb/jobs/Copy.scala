@@ -56,13 +56,13 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
 
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.writeCopies(items)
-    Stats.incr("edges-copy", items.size)
     if (newCursor == Copy.END) {
       None
     } else {
       Some(new Copy(sourceShardId, destinationShardId, newCursor, count))
     }
+    destinationShard.writeCopies(items)
+    Stats.incr("edges-copy", items.size)
   }
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
@@ -93,12 +93,12 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
     
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    destinationShard.writeMetadataState(items)
-    Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
       Some(new Copy(sourceShardId, destinationShardId, Copy.START))
     else
       Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count))
+    destinationShard.writeMetadataState(items)
+    Stats.incr("edges-copy", items.size)
   }
 
   def serialize = Map("cursor" -> cursor.position)
