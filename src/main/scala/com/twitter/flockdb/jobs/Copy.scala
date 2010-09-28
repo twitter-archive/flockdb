@@ -26,7 +26,7 @@ import com.twitter.xrayspecs.TimeConversions._
 import net.lag.logging.Logger
 import com.twitter.flockdb.shards.Metadata
 import shards.Shard
-
+import net.lag.logging.Logger
 
 object Copy {
   type Cursor = (results.Cursor, results.Cursor)
@@ -88,12 +88,18 @@ object MetadataCopyParser extends gizzard.jobs.CopyParser[Shard] {
 class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor,
                    count: Int)
       extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
+
+  val log = Logger.get(getClass.getName)
+
   def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor) =
     this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
-    
+
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+    log.info("selecting")
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
+    log.info("updating")
     destinationShard.writeMetadataState(items)
+    log.info("updated")
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
       Some(new Copy(sourceShardId, destinationShardId, Copy.START))
