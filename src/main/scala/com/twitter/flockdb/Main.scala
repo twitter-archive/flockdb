@@ -69,6 +69,10 @@ object Main extends Service {
 
     statsLogger = new JsonStatsLogger(Logger.get("stats"), 1.minute)
     statsLogger.start()
+
+            println("awesome")
+
+            shutdown()
   }
 
   def shutdown() {
@@ -115,7 +119,7 @@ object Main extends Service {
                                             flock.edges.schedule,
                                             Priority.Medium.id)
       gizzardServices.start()
-      thriftServer.serve()
+      // thriftServer.serve()
     } catch {
       case e: Exception =>
         log.error(e, "Unexpected exception: %s", e.getMessage)

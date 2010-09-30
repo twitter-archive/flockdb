@@ -38,6 +38,9 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def count(sourceId: Long, states: Seq[State])                                                      = shard.readOperation(_.count(sourceId, states))
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int])                                  = shard.readOperation(_.counts(sourceIds, results))
 
+  def bulkUnsafeInsertEdges(edges: Seq[Edge])                                                        = shard.writeOperation(_.bulkUnsafeInsertEdges(edges))
+  def bulkUnsafeInsertMetadata(metadata: Seq[Metadata])                                              = shard.writeOperation(_.bulkUnsafeInsertMetadata(metadata))
+
   def writeCopies(edges: Seq[Edge])                                                                  = shard.writeOperation(_.writeCopies(edges))
   def writeMetadata(metadata: Metadata)                                                              = shard.writeOperation(_.writeMetadata(metadata))
   def updateMetadata(metadata: Metadata)                                                             = shard.writeOperation(_.updateMetadata(metadata))

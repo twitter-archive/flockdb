@@ -55,6 +55,9 @@ class BlackHoleShard(val shardInfo: shards.ShardInfo, val weight: Int, val child
 
   def writeMetadata(metadata: Metadata) = ()
 
+  def bulkUnsafeInsertEdges(edge: Seq[Edge]) = ()
+  def bulkUnsafeInsertMetadata(edge: Seq[Metadata]) = ()
+
   def updateMetadata(metadata: Metadata) = ()
 
   def add(sourceId: Long, updatedAt: Time) = ()

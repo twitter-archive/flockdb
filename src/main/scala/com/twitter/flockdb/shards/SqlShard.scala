@@ -325,6 +325,24 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     if (edge.state == metadata.state) insertedRows else 0
   }
 
+  def bulkUnsafeInsertEdges(edges: Seq[Edge]) = {
+    val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
+    queryEvaluator.executeBatch(query) { batch =>
+      edges.foreach { edge =>
+        batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
+      }
+    }
+  }
+
+  def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
+    val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)"
+    queryEvaluator.executeBatch(query) { batch =>
+      metadatas.foreach { metadata =>
+        batch(metadata.sourceId, metadata.count, metadata.state.id, metadata.updatedAt.inSeconds)
+      }
+    }
+  }
+
   private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                          oldEdge: Edge): Int = {
     if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
@@ -405,7 +423,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
       case e: MySQLTransactionRollbackException if (tries > 0) =>
         write(edge, tries - 1, predictExistence)
       case e: SQLIntegrityConstraintViolationException if (tries > 0) =>
-        // temporary. until the position differential between master/slave is fixed, it's 
+        // temporary. until the position differential between master/slave is fixed, it's
         // possible for a slave migration to have two different edges with the same position.
         write(new Edge(edge.sourceId, edge.destinationId, edge.position + 1, edge.updatedAt,
                        edge.count, edge.state), tries - 1, predictExistence)
