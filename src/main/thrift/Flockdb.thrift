@@ -149,6 +149,6 @@ service FlockDB {
   void execute(1: ExecuteOperations operations) throws(1: FlockException ex)
 
   # deprecated:
-  i32 count(1: list<SelectOperation> operations)
-  Results select(1: list<SelectOperation> operations, 2: Page page)
+  i32 count(1: list<SelectOperation> operations) throws(1: FlockException ex)
+  Results select(1: list<SelectOperation> operations, 2: Page page) throws(1: FlockException ex)
 }
