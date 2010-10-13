@@ -46,8 +46,13 @@ object Main extends Service {
   var statsLogger: JsonStatsLogger = null
 
   object FlockExceptionWrappingProxy extends ExceptionHandlingProxy({ e =>
-    log.error(e, "Error in FlockDB: " + e)
-    throw new thrift.FlockException(e.toString)
+    e match {
+      case _: thrift.FlockException =>
+        throw e
+      case _ =>
+        log.error(e, "Error in FlockDB: " + e)
+        throw new thrift.FlockException(e.toString)
+    }
   })
 
   def main(args: Array[String]) {
