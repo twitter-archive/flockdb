@@ -65,7 +65,7 @@ object FlockDB {
 
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), replicationFuture)
+      new shards.ReadWriteShardAdapter(_), Some(replicationFuture), 6.seconds)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
@@ -73,7 +73,7 @@ object FlockDB {
     shardRepository += ("com.twitter.service.flock.edges.BlackHoleShard" -> new shards.BlackHoleShardFactory)
 
     val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository, replicationFuture)
+                                           shardRepository, Some(replicationFuture))
 
     val polymorphicJobParser = new PolymorphicJobParser
     val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
