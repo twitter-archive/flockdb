@@ -21,7 +21,6 @@ import com.twitter.results.Cursor
 import com.twitter.ostrich.Stats
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import net.lag.smile.kestrel.{KestrelClient, MemoryStore}
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
