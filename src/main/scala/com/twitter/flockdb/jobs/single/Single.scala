@@ -17,9 +17,11 @@
 package com.twitter.flockdb.jobs.single
 
 import com.twitter.gizzard.jobs.{UnboundJobParser, UnboundJob}
+import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.logging.Logger
+import shards.Shard
 
 
 abstract class SingleJobParser extends UnboundJobParser[(ForwardingManager, UuidGenerator)] {
@@ -71,26 +73,36 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     (forwardShard, backwardShard)
   }
 
+  private def withLock(state: State, shard: Shard, id: Long)(f: (State, Option[Shard]) => Unit) {
+    try {
+      shard.withLock(id) { (newShard, metadata) =>
+        f(metadata.state max state, Some(newShard))
+      }
+    } catch {
+      case e: ShardBlackHoleException =>
+        f(state, None)
+    }
+  }
+
   def apply(environment: (ForwardingManager, UuidGenerator)) {
     val (forwardingManager, uuidGenerator) = environment
     val (forwardShard, backwardShard) = shards(forwardingManager)
     val uuid = uuidGenerator(position)
-    forwardShard.withLock(sourceId) { (forwardShard, forwardMetadata) =>
-      backwardShard.withLock(destinationId) { (backwardShard, backwardMetadata) =>
-        val finalState = forwardMetadata.state max backwardMetadata.state max preferredState
-        finalState match {
+    withLock(preferredState, forwardShard, sourceId) { (state, forwardShard) =>
+      withLock(state, backwardShard, destinationId) { (state, backwardShard) =>
+        state match {
           case State.Normal =>
-            forwardShard.add(sourceId, destinationId, uuid, updatedAt)
-            backwardShard.add(destinationId, sourceId, uuid, updatedAt)
+            forwardShard.foreach { _.add(sourceId, destinationId, uuid, updatedAt) }
+            backwardShard.foreach { _.add(destinationId, sourceId, uuid, updatedAt) }
           case State.Removed =>
-            forwardShard.remove(sourceId, destinationId, uuid, updatedAt)
-            backwardShard.remove(destinationId, sourceId, uuid, updatedAt)
+            forwardShard.foreach { _.remove(sourceId, destinationId, uuid, updatedAt) }
+            backwardShard.foreach { _.remove(destinationId, sourceId, uuid, updatedAt) }
           case State.Archived =>
-            forwardShard.archive(sourceId, destinationId, uuid, updatedAt)
-            backwardShard.archive(destinationId, sourceId, uuid, updatedAt)
+            forwardShard.foreach { _.archive(sourceId, destinationId, uuid, updatedAt) }
+            backwardShard.foreach { _.archive(destinationId, sourceId, uuid, updatedAt) }
           case State.Negative =>
-            forwardShard.negate(sourceId, destinationId, uuid, updatedAt)
-            backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
+            forwardShard.foreach { _.negate(sourceId, destinationId, uuid, updatedAt) }
+            backwardShard.foreach { _.negate(destinationId, sourceId, uuid, updatedAt) }
         }
       }
     }

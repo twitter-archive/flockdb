@@ -20,6 +20,7 @@ import com.twitter.gizzard.Future
 import com.twitter.gizzard.jobs.CopyFactory
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
 import operations.{ExecuteOperations, SelectOperation}
@@ -57,7 +58,12 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
     queries.parallel(future).map { query =>
-      selectCompiler(query.operations).select(query.page)
+      try {
+        selectCompiler(query.operations).select(query.page)
+      } catch {
+        case e: ShardBlackHoleException =>
+          throw new FlockException("Shard is blackholed: " + e)
+      }
     }
   }
 

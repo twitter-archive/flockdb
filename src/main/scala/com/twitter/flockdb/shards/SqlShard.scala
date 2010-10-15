@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS %s (
 
   def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
     val queryEvaluator = instantiatingQueryEvaluatorFactory(List(shardInfo.hostname), config("edges.db_name"), config("db.username"), config("db.password"))
-    SqlExceptionWrappingProxy[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, config))
+    new SqlExceptionWrappingProxy(shardInfo.id).apply[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, config))
   }
 
   def materialize(shardInfo: shards.ShardInfo) = {
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS %s (
       queryEvaluator.execute(METADATA_TABLE_DDL.format(config("edges.db_name") + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
     } catch {
       case e: SQLException => throw new shards.ShardException(e.toString)
-      case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException(e.timeout, e)
+      case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException(e.timeout, shardInfo.id, e)
     }
   }
 }
