@@ -116,10 +116,14 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     try {
       block
     } catch {
-      case e: FlockException => throw(e)
+      case e: FlockException => {
+        Stats.incr(e.getClass.getName)
+        throw(e)
+      }
       case e: com.twitter.gizzard.shards.ShardTimeoutException => countAndRethrow(e)
       case e: com.twitter.gizzard.shards.ShardDatabaseTimeoutException => countAndRethrow(e)
       case e: Throwable => {
+        Stats.incr("unknown-exceptions")
         log.error(e, "Unhandled error in EdgesService")
         throw(new FlockException(e.getMessage))
       }
