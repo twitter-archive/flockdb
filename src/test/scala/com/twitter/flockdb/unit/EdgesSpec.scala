@@ -51,7 +51,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "add" in {
       Time.freeze()
-      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
+      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
@@ -60,7 +60,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "add_at" in {
-      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
+      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
@@ -70,7 +70,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "remove" in {
       Time.freeze()
-      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
+      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
@@ -79,7 +79,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "remove_at" in {
-      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
+      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
         one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
