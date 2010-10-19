@@ -17,8 +17,7 @@
 package com.twitter.flockdb.queries
 
 import scala.collection.mutable
-import com.twitter.gizzard.jobs.{Schedulable, SchedulableWithTasks}
-import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.scheduler.{JsonJob, JsonNestedJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
@@ -28,12 +27,12 @@ import jobs.multi
 import flockdb.operations.{ExecuteOperations, ExecuteOperationType}
 
 
-class ExecuteCompiler(schedule: PrioritizingJobScheduler, forwardingManager: ForwardingManager) {
+class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingManager: ForwardingManager) {
   @throws(classOf[ShardException])
   def apply(program: ExecuteOperations) {
     val now = Time.now
     val operations = program.operations
-    val results = new mutable.ArrayBuffer[Schedulable]
+    val results = new mutable.ArrayBuffer[JsonJob]
     if (operations.size == 0) throw new InvalidQueryException("You must have at least one operation")
 
     for (op <- operations) {
@@ -73,10 +72,10 @@ class ExecuteCompiler(schedule: PrioritizingJobScheduler, forwardingManager: For
           throw new InvalidQueryException("Unknown operation " + n)
       })
     }
-    schedule(program.priority.id, new SchedulableWithTasks(results))
+    scheduler.put(program.priority.id, new JsonNestedJob(results))
   }
 
-  private def processDestinations(term: QueryTerm)(handleItemInCollection: (Long, Long) => Schedulable)(noDestinations: Schedulable) = {
+  private def processDestinations(term: QueryTerm)(handleItemInCollection: (Long, Long) => JsonJob)(noDestinations: JsonJob) = {
     if (term.destinationIds.isDefined) {
       for (d <- term.destinationIds.get) yield {
         val (sourceId, destinationId) = if (term.isForward) {
