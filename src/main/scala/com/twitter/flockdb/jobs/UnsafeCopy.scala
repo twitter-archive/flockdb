@@ -16,8 +16,7 @@
 
 package com.twitter.flockdb.jobs
 
-import com.twitter.gizzard.jobs.BoundJobParser
-import com.twitter.gizzard.scheduler.JobScheduler
+import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.results
@@ -35,24 +34,25 @@ object UnsafeCopy {
   val COUNT = 10000
 }
 
-object UnsafeCopyFactory extends gizzard.jobs.CopyFactory[Shard] {
-  def apply(sourceShardId: ShardId, destinationShardId: ShardId) = new MetadataUnsafeCopy(sourceShardId, destinationShardId, MetadataUnsafeCopy.START)
+class UnsafeCopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJobFactory[Shard] {
+  def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
+    new MetadataUnsafeCopy(sourceShardId, destinationShardId, MetadataUnsafeCopy.START,
+                           UnsafeCopy.COUNT, nameServer, scheduler)
 }
 
-object UnsafeCopyParser extends gizzard.jobs.CopyParser[Shard] {
-  def apply(attributes: Map[String, Any]) = {
-    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
-    new UnsafeCopy(
-      ShardId(casted("source_shard_hostname").toString, casted("source_shard_table_prefix").toString),
-      ShardId(casted("destination_shard_hostname").toString, casted("destination_shard_table_prefix").toString),
-      (results.Cursor(casted("cursor1").toInt), results.Cursor(casted("cursor2").toInt)),
-      casted("count").toInt)
+class UnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJobParser[Shard] {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+    val cursor = (results.Cursor(attributes("cursor1").asInstanceOf[AnyVal].toInt),
+                  results.Cursor(attributes("cursor2").asInstanceOf[AnyVal].toInt))
+    new UnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
-class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: UnsafeCopy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: UnsafeCopy.Cursor) = this(sourceShardId, destinationShardId, cursor, UnsafeCopy.COUNT)
-
+class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: UnsafeCopy.Cursor,
+                 count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.bulkUnsafeInsertEdges(items)
@@ -60,7 +60,7 @@ class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Un
     if (newCursor == UnsafeCopy.END) {
       None
     } else {
-      Some(new UnsafeCopy(sourceShardId, destinationShardId, newCursor, count))
+      Some(new UnsafeCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
     }
   }
 
@@ -73,31 +73,27 @@ object MetadataUnsafeCopy {
   val END = results.Cursor.End
 }
 
-object MetadataUnsafeCopyParser extends gizzard.jobs.CopyParser[Shard] {
-  def apply(attributes: Map[String, Any]) = {
-    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
-    new MetadataUnsafeCopy(
-      ShardId(casted("source_shard_hostname").toString, casted("source_shard_table_prefix").toString),
-      ShardId(casted("destination_shard_hostname").toString, casted("destination_shard_table_prefix").toString),
-      results.Cursor(casted("cursor").toInt),
-      casted("count").toInt)
+class MetadataUnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJobParser[Shard] {
+  def deserialize(attributes: Map[String, AnyVal], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+    val cursor = results.Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
+    new MetadataUnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
-class MetadataUnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataUnsafeCopy.Cursor,
-                   count: Int)
-      extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataUnsafeCopy.Cursor) =
-    this(sourceShardId, destinationShardId, cursor, UnsafeCopy.COUNT)
-
+class MetadataUnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId,
+                         cursor: MetadataUnsafeCopy.Cursor, count: Int,
+                         nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
     destinationShard.bulkUnsafeInsertMetadata(items)
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataUnsafeCopy.END)
-      Some(new UnsafeCopy(sourceShardId, destinationShardId, UnsafeCopy.START))
+      Some(new UnsafeCopy(sourceShardId, destinationShardId, UnsafeCopy.START, UnsafeCopy.COUNT,
+                          nameServer, scheduler))
     else
-      Some(new MetadataUnsafeCopy(sourceShardId, destinationShardId, newCursor, count))
+      Some(new MetadataUnsafeCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
   }
 
   def serialize = Map("cursor" -> cursor.position)

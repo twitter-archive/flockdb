@@ -16,8 +16,7 @@
 
 package com.twitter.flockdb.jobs
 
-import com.twitter.gizzard.jobs.BoundJobParser
-import com.twitter.gizzard.scheduler.JobScheduler
+import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.results
@@ -35,24 +34,25 @@ object Copy {
   val COUNT = 10000
 }
 
-object CopyFactory extends gizzard.jobs.CopyFactory[Shard] {
-  def apply(sourceShardId: ShardId, destinationShardId: ShardId) = new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START)
+class CopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJobFactory[Shard] {
+  def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
+    new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
+                     nameServer, scheduler)
 }
 
-object CopyParser extends gizzard.jobs.CopyParser[Shard] {
-  def apply(attributes: Map[String, Any]) = {
-    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
-    new Copy(
-      ShardId(casted("source_shard_hostname").toString, casted("source_shard_table_prefix").toString),
-      ShardId(casted("destination_shard_hostname").toString, casted("destination_shard_table_prefix").toString),
-      (results.Cursor(casted("cursor1").toInt), results.Cursor(casted("cursor2").toInt)),
-      casted("count").toInt)
+class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJobParser[Shard] {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+    val cursor = (results.Cursor(attributes("cursor1").asInstanceOf[AnyVal].toInt),
+                  results.Cursor(attributes("cursor2").asInstanceOf[AnyVal].toInt))
+    new Copy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
-class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor, count: Int) extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor) = this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
-
+class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cursor,
+           count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.writeCopies(items)
@@ -60,7 +60,7 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cur
     if (newCursor == Copy.END) {
       None
     } else {
-      Some(new Copy(sourceShardId, destinationShardId, newCursor, count))
+      Some(new Copy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
     }
   }
 
@@ -73,31 +73,25 @@ object MetadataCopy {
   val END = results.Cursor.End
 }
 
-object MetadataCopyParser extends gizzard.jobs.CopyParser[Shard] {
-  def apply(attributes: Map[String, Any]) = {
-    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
-    new MetadataCopy(
-      ShardId(casted("source_shard_hostname").toString, casted("source_shard_table_prefix").toString),
-      ShardId(casted("destination_shard_hostname").toString, casted("destination_shard_table_prefix").toString),
-      results.Cursor(casted("cursor").toInt),
-      casted("count").toInt)
+class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJobParser[Shard] {
+  def deserialize(attributes: Map[String, AnyVal], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+    val cursor = results.Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
+    new MetadataCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
 class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor,
-                   count: Int)
-      extends gizzard.jobs.Copy[Shard](sourceShardId, destinationShardId, count) {
-  def this(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.Cursor) =
-    this(sourceShardId, destinationShardId, cursor, Copy.COUNT)
-
+                   count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
     items.foreach { destinationShard.writeMetadata(_) }
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
-      Some(new Copy(sourceShardId, destinationShardId, Copy.START))
+      Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))
     else
-      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count))
+      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
   }
 
   def serialize = Map("cursor" -> cursor.position)
