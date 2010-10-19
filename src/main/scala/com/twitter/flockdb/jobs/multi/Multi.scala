@@ -16,9 +16,7 @@
 
 package com.twitter.flockdb.jobs.multi
 
-import com.twitter.gizzard.jobs.{UnboundJobParser, Schedulable,
-  SchedulableWithTasks, UnboundJob}
-import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.scheduler._
 import com.twitter.ostrich.Stats
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
@@ -27,8 +25,8 @@ import net.lag.configgy.Configgy
 import flockdb.shards.Shard
 
 
-abstract class MultiJobParser extends UnboundJobParser[(ForwardingManager, PrioritizingJobScheduler)] {
-  def apply(attributes: Map[String, Any]) = {
+abstract class MultiJobParser extends JsonJobParser[JsonJob] {
+  def apply(codec: JsonCodec[JsonJob], attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
     createJob(
       casted("source_id").toLong,
@@ -41,38 +39,40 @@ abstract class MultiJobParser extends UnboundJobParser[(ForwardingManager, Prior
   protected def createJob(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value): Multi
 }
 
-object ArchiveParser extends MultiJobParser {
+class ArchiveParser(forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) extends MultiJobParser {
   protected def createJob(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) = {
-    new Archive(sourceId, graphId, direction, updatedAt, priority)
+    new Archive(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler)
   }
 }
 
-object UnarchiveParser extends MultiJobParser {
+class UnarchiveParser(forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) extends MultiJobParser {
   protected def createJob(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) = {
-    new Unarchive(sourceId, graphId, direction, updatedAt, priority)
+    new Unarchive(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler)
   }
 }
 
-object RemoveAllParser extends MultiJobParser {
+class RemoveAllParser(forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) extends MultiJobParser {
   protected def createJob(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) = {
-    new RemoveAll(sourceId, graphId, direction, updatedAt, priority)
+    new RemoveAll(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler)
   }
 }
 
-object NegateParser extends MultiJobParser {
+class NegateParser(forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) extends MultiJobParser {
   protected def createJob(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) = {
-    new Negate(sourceId, graphId, direction, updatedAt, priority)
+    new Negate(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler)
   }
 }
 
-abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends UnboundJob[(ForwardingManager, PrioritizingJobScheduler)] {
+abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time,
+               priority: Priority.Value, forwardingManager: ForwardingManager,
+               scheduler: PrioritizingJobScheduler[JsonJob])
+         extends JsonJob {
   private val config = Configgy.config
 
   def toMap = Map("source_id" -> sourceId, "updated_at" -> updatedAt.inSeconds, "graph_id" -> graphId, "direction" -> direction.id, "priority" -> priority.id)
 
-  def apply(environment: (ForwardingManager, PrioritizingJobScheduler)) {
+  def apply() {
     Stats.incr("multijobs-" + getClass.getName.split("\\.").last)
-    val (forwardingManager, scheduler) = environment
     var cursor = Cursor.Start
     val forwardShard = forwardingManager.find(sourceId, graphId, direction)
     updateMetadata(forwardShard)
@@ -83,32 +83,48 @@ abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updated
         val (a, b) = if (direction == Direction.Backward) (destinationId, sourceId) else (sourceId, destinationId)
         update(a, graphId, b)
       }
-      scheduler(priority.id, new SchedulableWithTasks(chunkOfTasks))
+      scheduler.put(priority.id, new JsonNestedJob(chunkOfTasks))
 
       cursor = resultWindow.nextCursor
     }
   }
 
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long): Schedulable
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long): JsonJob
   protected def updateMetadata(shard: Shard)
 }
 
-case class Archive(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends Multi(sourceId, graphId, direction, updatedAt, priority) {
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = single.Archive(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt)
+case class Archive(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time,
+                   priority: Priority.Value, forwardingManager: ForwardingManager,
+                   scheduler: PrioritizingJobScheduler[JsonJob])
+           extends Multi(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler) {
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
+    new single.Archive(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.archive(sourceId, updatedAt)
 }
 
-case class Unarchive(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends Multi(sourceId, graphId, direction, updatedAt, priority) {
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = new single.Add(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt)
+case class Unarchive(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time,
+                     priority: Priority.Value, forwardingManager: ForwardingManager,
+                      scheduler: PrioritizingJobScheduler[JsonJob])
+           extends Multi(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler) {
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
+    new single.Add(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.add(sourceId, updatedAt)
 }
 
-case class RemoveAll(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends Multi(sourceId, graphId, direction, updatedAt, priority) {
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = new single.Remove(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt)
+case class RemoveAll(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time,
+                     priority: Priority.Value, forwardingManager: ForwardingManager,
+                      scheduler: PrioritizingJobScheduler[JsonJob])
+           extends Multi(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler) {
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
+    new single.Remove(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.remove(sourceId, updatedAt)
 }
 
-case class Negate(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time, priority: Priority.Value) extends Multi(sourceId, graphId, direction, updatedAt, priority) {
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = new single.Negate(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt)
+case class Negate(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time,
+                  priority: Priority.Value, forwardingManager: ForwardingManager,
+                   scheduler: PrioritizingJobScheduler[JsonJob])
+           extends Multi(sourceId, graphId, direction, updatedAt, priority, forwardingManager, scheduler) {
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
+    new single.Negate(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.negate(sourceId, updatedAt)
 }

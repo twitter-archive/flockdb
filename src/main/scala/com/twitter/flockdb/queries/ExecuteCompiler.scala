@@ -47,27 +47,27 @@ class ExecuteCompiler(schedule: PrioritizingJobScheduler, forwardingManager: For
       results ++= (op.operationType match {
         case ExecuteOperationType.Add =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Add(sourceId, term.graphId, destinationId, position, time)
+            single.Add(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case ExecuteOperationType.Remove =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Remove(sourceId, term.graphId, destinationId, position, time)
+            single.Remove(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case ExecuteOperationType.Archive =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Archive(sourceId, term.graphId, destinationId, position, time)
+            single.Archive(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case ExecuteOperationType.Negate =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Negate(sourceId, term.graphId, destinationId, position, time)
+            single.Negate(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case n =>
           throw new InvalidQueryException("Unknown operation " + n)
