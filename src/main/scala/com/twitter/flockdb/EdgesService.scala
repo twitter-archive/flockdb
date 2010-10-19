@@ -17,9 +17,8 @@
 package com.twitter.flockdb
 
 import com.twitter.gizzard.Future
-import com.twitter.gizzard.jobs.CopyFactory
 import com.twitter.gizzard.nameserver.NameServer
-import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
@@ -30,8 +29,8 @@ import thrift.FlockException
 
 class EdgesService(val nameServer: NameServer[shards.Shard],
                    val forwardingManager: ForwardingManager,
-                   val copyFactory: CopyFactory[shards.Shard],
-                   val schedule: PrioritizingJobScheduler,
+                   val copyFactory: CopyJobFactory[shards.Shard],
+                   val schedule: PrioritizingJobScheduler[JsonJob],
                    future: Future, replicationFuture: Future) {
   private val selectCompiler = new SelectCompiler(forwardingManager)
   private val executeCompiler = new ExecuteCompiler(schedule, forwardingManager)

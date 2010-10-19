@@ -23,8 +23,8 @@ import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.server.{TServer, TThreadPoolServer}
 import org.apache.thrift.transport.{TServerSocket, TTransportFactory}
 import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
-import com.twitter.gizzard.thrift.{GizzardServices, JobManager, JobManagerService, ShardManager,
-  ShardManagerService, TSelectorServer}
+import com.twitter.gizzard.scheduler.JsonJob
+import com.twitter.gizzard.thrift._
 import com.twitter.ostrich.{JsonStatsLogger, Service, ServiceTracker, Stats, StatsMBean, W3CStats}
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.{Config, RuntimeEnvironment, ConfigMap, Configgy}
@@ -36,7 +36,7 @@ object Main extends Service {
   val runtime = new RuntimeEnvironment(getClass)
 
   var thriftServer: TSelectorServer = null
-  var gizzardServices: GizzardServices[shards.Shard] = null
+  var gizzardServices: GizzardServices[shards.Shard, JsonJob] = null
   var flock: FlockDB = null
 
   var config: ConfigMap = null
@@ -118,7 +118,7 @@ object Main extends Service {
                                             flock.edges.nameServer,
                                             flock.edges.copyFactory,
                                             flock.edges.schedule,
-                                            Priority.Medium.id)
+                                            flock.edges.schedule(Priority.Medium.id))
       gizzardServices.start()
       thriftServer.serve()
     } catch {
