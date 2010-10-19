@@ -18,8 +18,7 @@ package com.twitter.flockdb.unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.Future
-import com.twitter.gizzard.jobs.SchedulableWithTasks
-import com.twitter.gizzard.scheduler.{JobScheduler, PrioritizingJobScheduler}
+import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
@@ -42,47 +41,48 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val mary = 2L
 
     val nameServer = mock[NameServer[Shard]]
+    val uuidGenerator = mock[UuidGenerator]
     val forwardingManager = mock[ForwardingManager]
     val shard = mock[Shard]
-    val scheduler = mock[PrioritizingJobScheduler]
+    val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
     val future = mock[Future]
-    val copyFactory = mock[gizzard.jobs.CopyFactory[Shard]]
+    val copyFactory = mock[CopyJobFactory[Shard]]
     val flock = new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future, future))
 
     "add" in {
       Time.freeze()
-      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
+      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
+        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).add.toThrift)
     }
 
     "add_at" in {
-      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
+      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
+        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
     }
 
     "remove" in {
       Time.freeze()
-      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
+      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
+        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
     }
 
     "remove_at" in {
-      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now)
+      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, forwardingManager, uuidGenerator)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).apply(Priority.High.id, new SchedulableWithTasks(List(job)))
+        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
       }
       flock.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)
     }
