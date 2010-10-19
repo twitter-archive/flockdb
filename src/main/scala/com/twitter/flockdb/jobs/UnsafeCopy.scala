@@ -75,7 +75,7 @@ object MetadataUnsafeCopy {
 
 class MetadataUnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
-  def deserialize(attributes: Map[String, AnyVal], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
     val cursor = results.Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
     new MetadataUnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
