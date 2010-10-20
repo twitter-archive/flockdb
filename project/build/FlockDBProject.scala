@@ -3,7 +3,7 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher {
-  val gizzard   = "com.twitter" % "gizzard" % "1.4.4"
+  val gizzard   = "com.twitter" % "gizzard" % "1.4.5-SNAPSHOT"
   val results   = "com.twitter" % "results" % "1.0"
 
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
@@ -14,6 +14,4 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with Subve
   val specs     = "org.scala-tools.testing" % "specs" % "1.6.2.1" % "test"
 
   override def subversionRepository = Some("http://svn.local.twitter.com/maven-public/")
-
-  override def disableCrossPaths = false
 }
