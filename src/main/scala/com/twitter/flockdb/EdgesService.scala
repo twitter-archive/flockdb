@@ -18,13 +18,8 @@ package com.twitter.flockdb
 
 import com.twitter.gizzard.Future
 import com.twitter.gizzard.nameserver.NameServer
-<<<<<<< HEAD
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.ShardBlackHoleException
-=======
-import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException, ShardTimeoutException}
->>>>>>> master
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.results.{Cursor, ResultWindow}
 import operations.{ExecuteOperations, SelectOperation}
