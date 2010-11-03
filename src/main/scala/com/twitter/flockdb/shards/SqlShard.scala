@@ -326,19 +326,23 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def bulkUnsafeInsertEdges(edges: Seq[Edge]) = {
-    val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
-    queryEvaluator.executeBatch(query) { batch =>
-      edges.foreach { edge =>
-        batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
+    if (edges.length > 0) {
+      val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
+      queryEvaluator.executeBatch(query) { batch =>
+        edges.foreach { edge =>
+          batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
+        }
       }
     }
   }
 
   def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
-    val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)"
-    queryEvaluator.executeBatch(query) { batch =>
-      metadatas.foreach { metadata =>
-        batch(metadata.sourceId, metadata.count, metadata.state.id, metadata.updatedAt.inSeconds)
+    if (metadatas.length > 0) {
+      val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)"
+      queryEvaluator.executeBatch(query) { batch =>
+        metadatas.foreach { metadata =>
+          batch(metadata.sourceId, metadata.count, metadata.state.id, metadata.updatedAt.inSeconds)
+        }
       }
     }
   }

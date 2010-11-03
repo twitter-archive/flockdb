@@ -78,7 +78,7 @@ object FlockDB {
 
     val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), Some(replicationFuture), 6.seconds)
+      new shards.ReadWriteShardAdapter(_), Some(replicationFuture))
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")

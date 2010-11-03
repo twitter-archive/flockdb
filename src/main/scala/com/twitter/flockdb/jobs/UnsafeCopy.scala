@@ -22,7 +22,6 @@ import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.results
 import com.twitter.ostrich.Stats
 import com.twitter.xrayspecs.TimeConversions._
-import net.lag.logging.Logger
 import shards.Shard
 
 
