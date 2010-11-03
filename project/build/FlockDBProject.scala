@@ -14,6 +14,4 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with Subve
   val specs     = "org.scala-tools.testing" % "specs" % "1.6.2.1" % "test"
 
   override def subversionRepository = Some("http://svn.local.twitter.com/maven-public/")
-
-  override def disableCrossPaths = false
 }

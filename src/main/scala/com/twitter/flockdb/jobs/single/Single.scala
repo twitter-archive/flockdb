@@ -20,7 +20,6 @@ import com.twitter.gizzard.scheduler.{JsonCodec, JsonJob, JsonJobParser}
 import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
-import net.lag.logging.Logger
 import shards.Shard
 
 
