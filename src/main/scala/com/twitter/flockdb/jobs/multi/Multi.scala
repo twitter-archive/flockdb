@@ -19,12 +19,13 @@ package com.twitter.flockdb.jobs.multi
 import com.twitter.gizzard.jobs.{UnboundJobParser, Schedulable,
   SchedulableWithTasks, UnboundJob}
 import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.ostrich.Stats
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
-import flockdb.shards.Shard
+import shards.Shard
 
 
 abstract class MultiJobParser extends UnboundJobParser[(ForwardingManager, PrioritizingJobScheduler)] {
@@ -75,7 +76,12 @@ abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updated
     val (forwardingManager, scheduler) = environment
     var cursor = Cursor.Start
     val forwardShard = forwardingManager.find(sourceId, graphId, direction)
-    updateMetadata(forwardShard)
+    try {
+      updateMetadata(forwardShard)
+    } catch {
+      case e: ShardBlackHoleException =>
+        return
+    }
     while (cursor != Cursor.End) {
       val resultWindow = forwardShard.selectIncludingArchived(sourceId, config("edges.aggregate_jobs_page_size").toInt, cursor)
 
