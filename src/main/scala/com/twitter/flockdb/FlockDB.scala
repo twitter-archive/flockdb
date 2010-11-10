@@ -29,7 +29,7 @@ import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import com.twitter.querulous.query.QueryFactory
+import com.twitter.querulous.query.{QueryClass, QueryFactory}
 import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
@@ -60,6 +60,9 @@ object FlockDB {
   }
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
+    // make a new query class for select-during-modify.
+    QueryClass.register(shards.SelectModify)
+
     val stats = statsCollector(w3c)
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
     val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))

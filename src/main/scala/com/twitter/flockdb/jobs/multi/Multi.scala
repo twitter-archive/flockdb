@@ -22,7 +22,7 @@ import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.Configgy
-import flockdb.shards.Shard
+import shards.Shard
 
 
 abstract class MultiJobParser extends JsonJobParser[JsonJob] {
@@ -75,7 +75,12 @@ abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updated
     Stats.incr("multijobs-" + getClass.getName.split("\\.").last)
     var cursor = Cursor.Start
     val forwardShard = forwardingManager.find(sourceId, graphId, direction)
-    updateMetadata(forwardShard)
+    try {
+      updateMetadata(forwardShard)
+    } catch {
+      case e: ShardBlackHoleException =>
+        return
+    }
     while (cursor != Cursor.End) {
       val resultWindow = forwardShard.selectIncludingArchived(sourceId, config("edges.aggregate_jobs_page_size").toInt, cursor)
 
