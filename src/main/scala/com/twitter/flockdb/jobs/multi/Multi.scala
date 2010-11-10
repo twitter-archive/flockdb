@@ -17,6 +17,7 @@
 package com.twitter.flockdb.jobs.multi
 
 import com.twitter.gizzard.scheduler._
+import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.ostrich.Stats
 import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
