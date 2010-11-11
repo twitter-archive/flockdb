@@ -18,14 +18,12 @@ package com.twitter.flockdb.unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import org.specs.mock.JMocker
 import conversions.Results._
 import shards.Shard
 import thrift.Results
 
-
-object WhereInQuerySpec extends ConfiguredSpecification with JMocker {
+class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
   "WhereInQuery" should {
     var shard: Shard = null
     var whereInQuery: queries.WhereInQuery = null

@@ -18,9 +18,7 @@ package com.twitter.flockdb.queries
 
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.{Cursor, ResultWindow}
 import flockdb.shards.Shard
-
 
 class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) extends Query {
   def sizeEstimate() = destinationIds.size

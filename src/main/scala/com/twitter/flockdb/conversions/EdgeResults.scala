@@ -17,9 +17,7 @@
 package com.twitter.flockdb.conversions
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.ResultWindow
 import conversions.Edge._
-
 
 object EdgeResults {
   class RichResultWindowOfEdges(resultWindow: ResultWindow[Edge]) {

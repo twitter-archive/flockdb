@@ -24,7 +24,6 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.{Cursor, ResultWindow}
 import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
