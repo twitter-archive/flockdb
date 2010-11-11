@@ -17,10 +17,8 @@
 package com.twitter.flockdb.queries
 
 import scala.util.Sorting
-import com.twitter.results.Cursor
 import net.lag.configgy.Configgy
 import flockdb.shards.Shard
-
 
 class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
   val config = Configgy.config

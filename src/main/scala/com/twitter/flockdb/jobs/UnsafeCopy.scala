@@ -19,17 +19,16 @@ package com.twitter.flockdb.jobs
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
-import com.twitter.results
 import com.twitter.ostrich.Stats
 import com.twitter.xrayspecs.TimeConversions._
 import shards.Shard
 
 
 object UnsafeCopy {
-  type Cursor = (results.Cursor, results.Cursor)
+  type CopyCursor = (Cursor, Cursor)
 
-  val START = (results.Cursor.Start, results.Cursor.Start)
-  val END = (results.Cursor.End, results.Cursor.End)
+  val START = (Cursor.Start, Cursor.Start)
+  val END = (Cursor.End, Cursor.End)
   val COUNT = 10000
 }
 
@@ -43,13 +42,13 @@ class UnsafeCopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[J
 class UnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
-    val cursor = (results.Cursor(attributes("cursor1").asInstanceOf[AnyVal].toInt),
-                  results.Cursor(attributes("cursor2").asInstanceOf[AnyVal].toInt))
+    val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toInt),
+                  Cursor(attributes("cursor2").asInstanceOf[AnyVal].toInt))
     new UnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
-class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: UnsafeCopy.Cursor,
+class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: UnsafeCopy.CopyCursor,
                  count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
@@ -67,21 +66,21 @@ class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Un
 }
 
 object MetadataUnsafeCopy {
-  type Cursor = results.Cursor
-  val START = results.Cursor.Start
-  val END = results.Cursor.End
+  type CopyCursor = Cursor
+  val START = Cursor.Start
+  val END = Cursor.End
 }
 
 class MetadataUnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
-    val cursor = results.Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
+    val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
     new MetadataUnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
 class MetadataUnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId,
-                         cursor: MetadataUnsafeCopy.Cursor, count: Int,
+                         cursor: MetadataUnsafeCopy.CopyCursor, count: Int,
                          nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {

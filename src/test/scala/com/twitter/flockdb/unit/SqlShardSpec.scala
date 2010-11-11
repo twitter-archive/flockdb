@@ -22,7 +22,6 @@ import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.{StandardQueryEvaluatorFactory, QueryEvaluator, QueryEvaluatorFactory}
 import com.twitter.querulous.query.SqlQueryFactory
-import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.JMocker
@@ -33,8 +32,7 @@ import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
 import thrift.{Results, EdgeResults}
 import test.EdgesDatabase
 
-
-object SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatabase {
+class SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatabase {
   val poolConfig = config.configMap("db.connection_pool")
 
   "Edge SqlShard" should {

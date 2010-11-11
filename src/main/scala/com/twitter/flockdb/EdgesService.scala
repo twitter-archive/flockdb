@@ -21,7 +21,6 @@ import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.{Cursor, ResultWindow}
 import operations.{ExecuteOperations, SelectOperation}
 import com.twitter.ostrich.Stats
 import queries._

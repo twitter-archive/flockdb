@@ -20,13 +20,11 @@ import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.{Copy, MetadataCopy}
 import shards.{Metadata, Shard}
-
 
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")
