@@ -1,0 +1,23 @@
+
+1. sooty addCounts
+   - running flock ok
+   - alter table, changes all metadata tables
+   - countN default -1 (not filled in)
+   - uses flock config
+2. deploy counts branch
+   - reads old & new counts
+   - only writes new counts if present
+   - new metadata rows added with count=-1  (* change code)
+3. sooty changeCountsDefault
+   - change schema: countN default 0
+4. sooty populateCounts
+   - fills in new counts in bg
+   - copies over current color
+5. validate
+   - verify that no tables have -1 counts
+6. deploy flock 2.0
+   - old count column no longer updated
+
+to-do:
+- sooty should print out db hostname in addCounts
+- sooty should retry on errors

@@ -30,7 +30,6 @@ import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.{Config, RuntimeEnvironment, ConfigMap, Configgy}
 import net.lag.logging.Logger
 
-
 object Main extends Service {
   private val log = Logger.get(getClass.getName)
   val runtime = new RuntimeEnvironment(getClass)
@@ -56,6 +55,12 @@ object Main extends Service {
   })
 
   def main(args: Array[String]) {
+    if (args.size > 0 && args(0) == "migrate") {
+      runtime.load(Array())
+      migrate.SchemaMigrate(args.drop(1))
+      System.exit(0)
+    }
+
     runtime.load(args)
     config = Configgy.config
 
