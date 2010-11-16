@@ -18,8 +18,6 @@ package com.twitter.flockdb.queries
 
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.{Cursor, ResultWindow}
-
 
 class SeqQuery(s: Seq[Long]) extends Query {
   val seq = sort(s)

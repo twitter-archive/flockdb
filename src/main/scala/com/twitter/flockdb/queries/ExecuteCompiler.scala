@@ -17,8 +17,7 @@
 package com.twitter.flockdb.queries
 
 import scala.collection.mutable
-import com.twitter.gizzard.jobs.{Schedulable, SchedulableWithTasks}
-import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.scheduler.{JsonJob, JsonNestedJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
@@ -28,12 +27,12 @@ import jobs.multi
 import flockdb.operations.{ExecuteOperations, ExecuteOperationType}
 
 
-class ExecuteCompiler(schedule: PrioritizingJobScheduler, forwardingManager: ForwardingManager) {
+class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingManager: ForwardingManager) {
   @throws(classOf[ShardException])
   def apply(program: ExecuteOperations) {
     val now = Time.now
     val operations = program.operations
-    val results = new mutable.ArrayBuffer[Schedulable]
+    val results = new mutable.ArrayBuffer[JsonJob]
     if (operations.size == 0) throw new InvalidQueryException("You must have at least one operation")
 
     for (op <- operations) {
@@ -47,36 +46,36 @@ class ExecuteCompiler(schedule: PrioritizingJobScheduler, forwardingManager: For
       results ++= (op.operationType match {
         case ExecuteOperationType.Add =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Add(sourceId, term.graphId, destinationId, position, time)
+            single.Add(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case ExecuteOperationType.Remove =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Remove(sourceId, term.graphId, destinationId, position, time)
+            single.Remove(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case ExecuteOperationType.Archive =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Archive(sourceId, term.graphId, destinationId, position, time)
+            single.Archive(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case ExecuteOperationType.Negate =>
           processDestinations(term) { (sourceId, destinationId) =>
-            single.Negate(sourceId, term.graphId, destinationId, position, time)
+            single.Negate(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority)
+            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
           }
         case n =>
           throw new InvalidQueryException("Unknown operation " + n)
       })
     }
-    schedule(program.priority.id, new SchedulableWithTasks(results))
+    scheduler.put(program.priority.id, new JsonNestedJob(results))
   }
 
-  private def processDestinations(term: QueryTerm)(handleItemInCollection: (Long, Long) => Schedulable)(noDestinations: Schedulable) = {
+  private def processDestinations(term: QueryTerm)(handleItemInCollection: (Long, Long) => JsonJob)(noDestinations: JsonJob) = {
     if (term.destinationIds.isDefined) {
       for (d <- term.destinationIds.get) yield {
         val (sourceId, destinationId) = if (term.isForward) {

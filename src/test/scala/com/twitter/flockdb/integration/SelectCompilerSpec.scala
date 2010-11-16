@@ -18,13 +18,11 @@ package com.twitter.flockdb.integration
 
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import test.{EdgesDatabase, StaticEdges}
 import thrift._
-
 
 object SelectCompilerSpec extends ConfiguredSpecification with EdgesDatabase with JMocker with ClassMocker {
   val poolConfig = config.configMap("db.connection_pool")
