@@ -16,9 +16,7 @@
 
 package com.twitter.flockdb.queries
 
-import com.twitter.results.Cursor
 import net.lag.configgy.Configgy
-
 
 class DifferenceQuery(query1: Query, query2: Query) extends Query {
   val config = Configgy.config

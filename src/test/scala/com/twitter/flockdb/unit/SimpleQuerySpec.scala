@@ -18,12 +18,10 @@ package com.twitter.flockdb.unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.{Cursor, ResultWindow}
 import org.specs.mock.JMocker
 import conversions.Results._
 import shards.Shard
 import thrift.Results
-
 
 object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
   "SimpleQuery" should {

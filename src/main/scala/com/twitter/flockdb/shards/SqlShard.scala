@@ -20,7 +20,6 @@ import java.sql.{ResultSet, SQLException, SQLIntegrityConstraintViolationExcepti
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
-import com.twitter.results.{Cursor, ResultWindow}
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query.{QueryClass, SqlQueryTimeoutException}
 import com.twitter.xrayspecs.Time
@@ -29,7 +28,6 @@ import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
 import net.lag.configgy.ConfigMap
 import net.lag.logging.Logger
 import State._
-
 
 object SelectModify extends QueryClass("select_modify")
 

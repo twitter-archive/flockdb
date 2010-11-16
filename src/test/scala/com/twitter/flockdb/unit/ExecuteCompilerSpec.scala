@@ -17,9 +17,8 @@
 package com.twitter.flockdb.unit
 
 import scala.collection.mutable
-import com.twitter.gizzard.jobs.SchedulableWithTasks
 import com.twitter.gizzard.nameserver.InvalidShard
-import com.twitter.gizzard.scheduler.PrioritizingJobScheduler
+import com.twitter.gizzard.scheduler.{JsonJob, JsonNestedJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
@@ -46,13 +45,13 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
     val alice = 1L
     val bob = 2L
     val carl = 3L
-    var scheduler: PrioritizingJobScheduler = null
+    var scheduler: PrioritizingJobScheduler[JsonJob] = null
     var executeCompiler: ExecuteCompiler = null
     var forwardingManager: ForwardingManager = null
 
     doBefore {
       Time.freeze()
-      scheduler = mock[PrioritizingJobScheduler]
+      scheduler = mock[PrioritizingJobScheduler[JsonJob]]
       forwardingManager = mock[ForwardingManager]
       executeCompiler = new ExecuteCompiler(scheduler, forwardingManager)
     }
@@ -61,7 +60,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+        one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
       }
       executeCompiler(program)
     }
@@ -70,7 +69,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None, None)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+        one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
       }
       executeCompiler(program)
     }
@@ -90,7 +89,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -99,7 +98,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -110,7 +109,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -119,7 +118,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -130,9 +129,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
-              single.Add(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null),
+              single.Add(alice, FOLLOWS, carl, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -141,9 +140,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
-              single.Add(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              single.Add(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null),
+              single.Add(carl, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -156,7 +155,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -165,7 +164,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -176,7 +175,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -185,7 +184,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -196,9 +195,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
-              new single.Remove(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              new single.Remove(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null),
+              new single.Remove(alice, FOLLOWS, carl, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -207,9 +206,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
-              new single.Remove(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              new single.Remove(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null),
+              new single.Remove(carl, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))
             ))
           }
           executeCompiler(program)
@@ -223,7 +222,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -232,7 +231,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -243,7 +242,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Archive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Archive(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -252,7 +251,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Archive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Archive(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -263,9 +262,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
-              single.Archive(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              single.Archive(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null),
+              single.Archive(alice, FOLLOWS, carl, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -274,9 +273,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
-              single.Archive(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              single.Archive(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null),
+              single.Archive(carl, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -289,7 +288,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -298,7 +297,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -309,7 +308,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Negate(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Negate(alice, FOLLOWS, Direction.Forward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -318,7 +317,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(multi.Negate(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Negate(alice, FOLLOWS, Direction.Backward, Time.now, Priority.Low, null, null))))
           }
           executeCompiler(program)
         }
@@ -329,9 +328,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now),
-              single.Negate(alice, FOLLOWS, carl, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              single.Negate(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null),
+              single.Negate(alice, FOLLOWS, carl, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }
@@ -340,9 +339,9 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(
-              single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now),
-              single.Negate(carl, FOLLOWS, alice, Time.now.inMillis, Time.now))))
+            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
+              single.Negate(bob, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null),
+              single.Negate(carl, FOLLOWS, alice, Time.now.inMillis, Time.now, null, null))))
           }
           executeCompiler(program)
         }

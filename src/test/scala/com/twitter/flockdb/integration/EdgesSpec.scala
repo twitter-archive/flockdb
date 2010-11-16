@@ -17,7 +17,6 @@
 package com.twitter.flockdb.integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import com.twitter.ostrich.Stats
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
@@ -25,7 +24,6 @@ import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
 import test.{EdgesDatabase, StaticEdges}
-
 
 class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
   lazy val poolConfig = config.configMap("db.connection_pool")

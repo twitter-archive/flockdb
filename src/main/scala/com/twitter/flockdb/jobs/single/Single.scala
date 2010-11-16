@@ -16,15 +16,15 @@
 
 package com.twitter.flockdb.jobs.single
 
-import com.twitter.gizzard.jobs.{UnboundJobParser, UnboundJob}
+import com.twitter.gizzard.scheduler.{JsonCodec, JsonJob, JsonJobParser}
 import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import shards.Shard
 
 
-abstract class SingleJobParser extends UnboundJobParser[(ForwardingManager, UuidGenerator)] {
-  def apply(attributes: Map[String, Any]) = {
+abstract class SingleJobParser extends JsonJobParser[JsonJob] {
+  def apply(codec: JsonCodec[JsonJob], attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
     createJob(
       casted("source_id").toLong,
@@ -37,36 +37,38 @@ abstract class SingleJobParser extends UnboundJobParser[(ForwardingManager, Uuid
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time): Single
 }
 
-object AddParser extends SingleJobParser {
+class AddParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Add(sourceId, graphId, destinationId, position, updatedAt)
+    new Add(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
 }
 
-object RemoveParser extends SingleJobParser {
+class RemoveParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Remove(sourceId, graphId, destinationId, position, updatedAt)
+    new Remove(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
 }
 
-object ArchiveParser extends SingleJobParser {
+class ArchiveParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Archive(sourceId, graphId, destinationId, position, updatedAt)
+    new Archive(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
 }
 
-object NegateParser extends SingleJobParser {
+class NegateParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Negate(sourceId, graphId, destinationId, position, updatedAt)
+    new Negate(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
 }
 
-abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends UnboundJob[(ForwardingManager, UuidGenerator)] {
+abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, position: Long,
+                      updatedAt: Time, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
+         extends JsonJob {
   def toMap = {
     Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
   }
 
-  def shards(forwardingManager: ForwardingManager) = {
+  def shards() = {
     val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
     val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
     (forwardShard, backwardShard)
@@ -83,9 +85,8 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     }
   }
 
-  def apply(environment: (ForwardingManager, UuidGenerator)) {
-    val (forwardingManager, uuidGenerator) = environment
-    val (forwardShard, backwardShard) = shards(forwardingManager)
+  def apply() {
+    val (forwardShard, backwardShard) = shards()
     val uuid = uuidGenerator(position)
     withLock(preferredState, forwardShard, sourceId) { (state, forwardShard) =>
       withLock(state, backwardShard, destinationId) { (state, backwardShard) =>
@@ -110,18 +111,26 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
   protected def preferredState: State
 }
 
-case class Add(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
+case class Add(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
+               forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
+           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
   def preferredState = State.Normal
 }
 
-case class Remove(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
+case class Remove(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
+                  forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
+           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
   def preferredState = State.Removed
 }
 
-case class Archive(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
+case class Archive(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
+                   forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
+           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
   def preferredState = State.Archived
 }
 
-case class Negate(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) extends Single(sourceId, graphId, destinationId, position, updatedAt) {
+case class Negate(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
+                  forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
+           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
   def preferredState = State.Negative
 }

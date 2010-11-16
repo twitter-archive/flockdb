@@ -16,6 +16,7 @@
 
 package com.twitter.flockdb.unit
 
+import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
@@ -47,6 +48,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard4: Shard = null
   var lockingShard1: Shard = null
   var lockingShard2: Shard = null
+  val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
 
   "Add" should {
     doBefore {
@@ -60,7 +62,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "apply" in {
       "when the add takes effect" >> {
-        val job = Add(bob, FOLLOWS, mary, 1, Time.now)
+        val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
         expect {
           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -71,12 +73,12 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(shard2).add(mary, bob, 1, Time.now)
         }
 
-        job.apply((forwardingManager, uuidGenerator))
+        job.apply()
       }
 
       "when the add does not take effect" >> {
         "when the forward direction causes it to not take effect" >> {
-          val job = Add(bob, FOLLOWS, mary, 1, Time.now)
+          val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
           expect {
             one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -87,11 +89,11 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
             one(shard2).archive(mary, bob, 1, Time.now)
           }
 
-          job.apply((forwardingManager, uuidGenerator))
+          job.apply()
         }
 
         "when the backward direction causes it to not take effect" >> {
-          val job = Add(bob, FOLLOWS, mary, 1, Time.now)
+          val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
           expect {
             one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -102,13 +104,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
             one(shard2).archive(mary, bob, 1, Time.now)
           }
 
-          job.apply((forwardingManager, uuidGenerator))
+          job.apply()
         }
       }
     }
 
     "toJson" in {
-      val job = Add(bob, FOLLOWS, mary, 1, Time.now)
+      val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
       val json = job.toJson
       json mustMatch "Add"
       json mustMatch "\"source_id\":" + bob
@@ -129,7 +131,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "apply" in {
       "when the remove takes effect" >> {
-        val job = new Remove(bob, FOLLOWS, mary, 1, Time.now)
+        val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
         expect {
           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -140,12 +142,12 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(shard2).remove(mary, bob, 1, Time.now)
         }
 
-        job.apply((forwardingManager, uuidGenerator))
+        job.apply()
       }
     }
 
     "toJson" in {
-      val job = new Remove(bob, FOLLOWS, mary, 1, Time.now)
+      val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
       val json = job.toJson
       json mustMatch "Remove"
       json mustMatch "\"source_id\":" + bob
@@ -167,7 +169,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     "apply" in {
       "when the archive takes effect" >> {
         val time = System.currentTimeMillis
-        val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
+        val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
         expect {
           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -178,12 +180,12 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(shard2).archive(mary, bob, 1, Time.now)
         }
 
-        job.apply((forwardingManager, uuidGenerator))
+        job.apply()
       }
 
       "when the archive does not take effect" >> {
         "when the forward direction causes it to not take effect" >> {
-          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
+          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
           expect {
             one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -194,11 +196,11 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
             one(shard2).remove(mary, bob, 1, Time.now)
           }
 
-          job.apply((forwardingManager, uuidGenerator))
+          job.apply()
         }
 
         "when the backward direction causes it to not take effect" >> {
-          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
+          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
 
           expect {
             one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
@@ -209,13 +211,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
             one(shard2).remove(mary, bob, 1, Time.now)
           }
 
-          job.apply((forwardingManager, uuidGenerator))
+          job.apply()
         }
       }
     }
 
     "toJson" in {
-      val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now)
+      val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
       val json = job.toJson
       json mustMatch "Archive"
       json mustMatch "\"source_id\":" + bob
@@ -235,7 +237,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = new Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low)
+      val job = new Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, forwardingManager, scheduler)
       val json = job.toJson
       json mustMatch "Archive"
       json mustMatch "\"source_id\":" + bob
@@ -255,7 +257,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low)
+      val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, forwardingManager, scheduler)
       val json = job.toJson
       json mustMatch "Unarchive"
       json mustMatch "\"source_id\":" + bob
@@ -275,7 +277,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low)
+      val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, forwardingManager, scheduler)
       val json = job.toJson
       json mustMatch "RemoveAll"
       json mustMatch "\"source_id\":" + bob
