@@ -23,6 +23,8 @@ import net.lag.logging.Logger
 
 
 object StaticEdges extends Database {
+  shards.QueryClass.SelectModify
+
   val log = Logger.get
   val config = Configgy.config
   val w3c = new W3CStats(log, config.getList("edges.w3c").toArray)

@@ -22,7 +22,7 @@ import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
 import com.twitter.results.{Cursor, ResultWindow}
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
-import com.twitter.querulous.query.{QueryClass, SqlQueryTimeoutException}
+import com.twitter.querulous.query.{QueryClass => QQueryClass, SqlQueryTimeoutException}
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
@@ -31,7 +31,9 @@ import net.lag.logging.Logger
 import State._
 
 
-object SelectModify extends QueryClass("select_modify")
+object QueryClass {
+  val SelectModify = QQueryClass("select_modify")
+}
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)
   extends shards.ShardFactory[Shard] {
@@ -86,6 +88,8 @@ CREATE TABLE IF NOT EXISTS %s (
 
 class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
                val weight: Int, val children: Seq[Shard], config: ConfigMap) extends Shard {
+  import QueryClass._
+
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new util.Random
@@ -197,10 +201,10 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   private def select(cursorName: String, index: String, count: Int,
                      cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
-    select(QueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
+    select(QQueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
   }
 
-  private def select(queryClass: QueryClass, cursorName: String, index: String, count: Int,
+  private def select(queryClass: QQueryClass, cursorName: String, index: String, count: Int,
                      cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
     var edges = new mutable.ArrayBuffer[(Long, Cursor)]
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"

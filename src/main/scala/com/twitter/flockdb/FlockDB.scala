@@ -59,9 +59,6 @@ object FlockDB {
   }
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
-    // make a new query class for select-during-modify.
-    QueryClass.register(shards.SelectModify)
-
     val stats = statsCollector(w3c)
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
     val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))
