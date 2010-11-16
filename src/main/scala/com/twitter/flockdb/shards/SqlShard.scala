@@ -29,7 +29,9 @@ import net.lag.configgy.ConfigMap
 import net.lag.logging.Logger
 import State._
 
-object SelectModify extends QueryClass("select_modify")
+object FlockQueryClass {
+  val SelectModify = QueryClass("select_modify")
+}
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)
   extends shards.ShardFactory[Shard] {
@@ -87,6 +89,8 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new util.Random
+
+  import FlockQueryClass._
 
   def get(sourceId: Long, destinationId: Long) = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
