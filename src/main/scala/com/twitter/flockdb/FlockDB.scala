@@ -65,7 +65,6 @@ object FlockDB {
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
     val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))
 
-
     val codec = new JsonCodec[JsonJob]({ unparsable: Array[Byte] =>
       log.error("Unparsable job: %s", unparsable.map { n => "%02x".format(n.toInt & 0xff) }.mkString(", "))
     })
