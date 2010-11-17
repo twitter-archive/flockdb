@@ -97,8 +97,8 @@ object FlockDB {
     codec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, scheduler))
     codec += ("multi.Negate".r, new jobs.multi.NegateParser(forwardingManager, scheduler))
 
-    codec += ("(Copy|Migrate)".r, new jobs.CopyParser(nameServer, scheduler(Priority.Medium.id)))
-    codec += ("(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, scheduler(Priority.Medium.id)))
+    codec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, scheduler(Priority.Medium.id)))
+    codec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, scheduler(Priority.Medium.id)))
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
