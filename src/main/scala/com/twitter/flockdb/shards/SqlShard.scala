@@ -31,6 +31,7 @@ import State._
 
 object FlockQueryClass {
   val SelectModify = QueryClass("select_modify")
+  val SelectCopy = QueryClass("select_copy")
 }
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)
@@ -112,7 +113,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var i = 0
     val query = "SELECT * FROM " + tablePrefix +
       "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?"
-    queryEvaluator.select(query, cursor.position, count + 1) { row =>
+    queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
         metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
@@ -173,7 +174,8 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
       "USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) " +
       "OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?"
     val (cursor1, cursor2) = cursor
-    queryEvaluator.select(query, cursor1.position, cursor2.position, cursor1.position, count + 1) { row =>
+    queryEvaluator.select(SelectCopy, query, cursor1.position, cursor2.position, cursor1.position,
+                          count + 1) { row =>
       if (i < count) {
         edges += makeEdge(row)
         nextCursor = (Cursor(row.getLong("source_id")), Cursor(row.getLong("destination_id")))
