@@ -75,17 +75,15 @@ object FlockDB {
       Map(Priority.High.id -> "primary", Priority.Medium.id -> "copy", Priority.Low.id -> "slow"),
       Some(badJobQueue))
 
-
-    val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), Some(replicationFuture))
+      new shards.ReadWriteShardAdapter(_), None)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
 
     val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository, Some(replicationFuture))
+                                           shardRepository, None)
 
     val forwardingManager = new ForwardingManager(nameServer)
     nameServer.reload()
@@ -107,8 +105,7 @@ object FlockDB {
     scheduler.start()
 
     val copyFactory = new jobs.CopyFactory(nameServer, scheduler(Priority.Medium.id))
-    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler,
-                                 future, replicationFuture))
+    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
   }
 }
 
