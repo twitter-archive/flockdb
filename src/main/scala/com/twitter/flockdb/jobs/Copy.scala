@@ -42,8 +42,8 @@ class CopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob
 class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
-    val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toInt),
-                  Cursor(attributes("cursor2").asInstanceOf[AnyVal].toInt))
+    val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
+                  Cursor(attributes("cursor2").asInstanceOf[AnyVal].toLong))
     new Copy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
@@ -74,7 +74,7 @@ object MetadataCopy {
 class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
-    val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
+    val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
     new MetadataCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
