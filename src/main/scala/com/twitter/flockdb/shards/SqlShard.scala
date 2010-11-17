@@ -110,10 +110,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = Cursor.End
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
+    val query = "SELECT * FROM " + tablePrefix +
+      "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?"
+    queryEvaluator.select(query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
+                              Time(row.getInt("updated_at").seconds))
         nextCursor = Cursor(sourceId)
         i += 1
       } else {
@@ -166,7 +169,11 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = (Cursor.End, Cursor.End)
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?", cursor._1.position, cursor._2.position, cursor._1.position, count + 1) { row =>
+    val query = "SELECT * FROM " + tablePrefix + "_edges " +
+      "USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) " +
+      "OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?"
+    val (cursor1, cursor2) = cursor
+    queryEvaluator.select(query, cursor1.position, cursor2.position, cursor1.position, count + 1) { row =>
       if (i < count) {
         edges += makeEdge(row)
         nextCursor = (Cursor(row.getLong("source_id")), Cursor(row.getLong("destination_id")))
