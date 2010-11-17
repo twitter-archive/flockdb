@@ -59,7 +59,9 @@ object FlockDB {
   }
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
-    @volatile val __trickJava = shards.FlockQueryClass.SelectModify
+    @volatile val __trickJava = List(
+      shards.FlockQueryClass.SelectModify,
+      shards.FlockQueryClass.SelectCopy)
 
     val stats = statsCollector(w3c)
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
