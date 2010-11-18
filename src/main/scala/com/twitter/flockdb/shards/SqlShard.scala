@@ -457,7 +457,6 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def writeCopies(edges: Seq[Edge]) {
-    val retries = config("errors.deadlock_retries").toInt
     var remaining = edges
     while (remaining.size > 0) {
       val burst = new mutable.ArrayBuffer[Edge]
