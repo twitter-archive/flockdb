@@ -16,10 +16,11 @@
 
 package com.twitter.flockdb.shards
 
-import java.sql.{ResultSet, SQLException, SQLIntegrityConstraintViolationException}
+import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
+import com.twitter.ostrich.Stats
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query.{QueryClass, SqlQueryTimeoutException}
 import com.twitter.xrayspecs.Time
@@ -31,6 +32,7 @@ import State._
 
 object FlockQueryClass {
   val SelectModify = QueryClass("select_modify")
+  val SelectCopy = QueryClass("select_copy")
 }
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)
@@ -110,10 +112,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = Cursor.End
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
+    val query = "SELECT * FROM " + tablePrefix +
+      "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?"
+    queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
+                              Time(row.getInt("updated_at").seconds))
         nextCursor = Cursor(sourceId)
         i += 1
       } else {
@@ -166,7 +171,12 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = (Cursor.End, Cursor.End)
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?", cursor._1.position, cursor._2.position, cursor._1.position, count + 1) { row =>
+    val query = "SELECT * FROM " + tablePrefix + "_edges " +
+      "USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) " +
+      "OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?"
+    val (cursor1, cursor2) = cursor
+    queryEvaluator.select(SelectCopy, query, cursor1.position, cursor2.position, cursor1.position,
+                          count + 1) { row =>
       if (i < count) {
         edges += makeEdge(row)
         nextCursor = (Cursor(row.getLong("source_id")), Cursor(row.getLong("destination_id")))
@@ -336,15 +346,22 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     if (edge.state == metadata.state) insertedRows else 0
   }
 
-  def bulkUnsafeInsertEdges(edges: Seq[Edge]) = {
-    if (edges.length > 0) {
+  def bulkUnsafeInsertEdges(edges: Seq[Edge]) {
+    bulkUnsafeInsertEdges(queryEvaluator, State.Normal, edges)
+  }
+
+  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, currentState: State, edges: Seq[Edge]) = {
+    var count = 0
+    if (edges.size > 0) {
       val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
-      queryEvaluator.executeBatch(query) { batch =>
+      transaction.executeBatch(query) { batch =>
         edges.foreach { edge =>
           batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
+          if (edge.state == currentState) count += 1
         }
       }
     }
+    count
   }
 
   def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
@@ -448,7 +465,6 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   def writeCopies(edges: Seq[Edge]) {
-    val retries = config("errors.deadlock_retries").toInt
     var remaining = edges
     while (remaining.size > 0) {
       val burst = new mutable.ArrayBuffer[Edge]
@@ -462,8 +478,14 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
       var countDelta = 0
       atomically(currentSourceId) { (transaction, metadata) =>
         try {
-          burst.foreach { edge =>
-            countDelta += writeEdge(transaction, metadata, edge, false)
+          try {
+            countDelta += bulkUnsafeInsertEdges(transaction, metadata.state, burst)
+          } catch {
+            case e: BatchUpdateException =>
+              Stats.incr("x-copy-fallback")
+              burst.foreach { edge =>
+                countDelta += writeEdge(transaction, metadata, edge, false)
+              }
           }
         } finally {
           if (countDelta != 0) {
