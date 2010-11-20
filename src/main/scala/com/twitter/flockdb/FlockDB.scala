@@ -59,7 +59,9 @@ object FlockDB {
   }
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
-    @volatile val __trickJava = shards.FlockQueryClass.SelectModify
+    @volatile val __trickJava = List(
+      shards.FlockQueryClass.SelectModify,
+      shards.FlockQueryClass.SelectCopy)
 
     val stats = statsCollector(w3c)
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
@@ -75,17 +77,15 @@ object FlockDB {
       Map(Priority.High.id -> "primary", Priority.Medium.id -> "copy", Priority.Low.id -> "slow"),
       Some(badJobQueue))
 
-
-    val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), Some(replicationFuture))
+      new shards.ReadWriteShardAdapter(_), None)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
 
     val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository, Some(replicationFuture))
+                                           shardRepository, None)
 
     val forwardingManager = new ForwardingManager(nameServer)
     nameServer.reload()
@@ -99,16 +99,15 @@ object FlockDB {
     codec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, scheduler))
     codec += ("multi.Negate".r, new jobs.multi.NegateParser(forwardingManager, scheduler))
 
-    codec += ("(Copy|Migrate)".r, new jobs.CopyParser(nameServer, scheduler(Priority.Medium.id)))
-    codec += ("(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, scheduler(Priority.Medium.id)))
+    codec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, scheduler(Priority.Medium.id)))
+    codec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, scheduler(Priority.Medium.id)))
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
     scheduler.start()
 
     val copyFactory = new jobs.CopyFactory(nameServer, scheduler(Priority.Medium.id))
-    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler,
-                                 future, replicationFuture))
+    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
   }
 }
 

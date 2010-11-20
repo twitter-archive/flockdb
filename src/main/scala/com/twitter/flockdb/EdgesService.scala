@@ -31,7 +31,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
                    val forwardingManager: ForwardingManager,
                    val copyFactory: CopyJobFactory[shards.Shard],
                    val schedule: PrioritizingJobScheduler[JsonJob],
-                   future: Future, replicationFuture: Future) {
+                   future: Future) {
 
   private val log = Logger.get(getClass.getName)
   private val selectCompiler = new SelectCompiler(forwardingManager)
@@ -40,7 +40,6 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   def shutdown() {
     schedule.shutdown()
     future.shutdown()
-    replicationFuture.shutdown()
   }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
@@ -123,7 +122,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
         countAndRethrow(e)
       case e: Throwable =>
         Stats.incr("unknown-exceptions")
-        log.error(e, "Unhandled error in EdgesService")
+        log.error(e, "Unhandled error in EdgesService: %s", e)
         throw(new FlockException(e.getMessage))
     }
   }
