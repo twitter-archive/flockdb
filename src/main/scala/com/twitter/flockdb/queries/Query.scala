@@ -16,9 +16,6 @@
 
 package com.twitter.flockdb.queries
 
-import com.twitter.results.{Cursor, Page, ResultWindow}
-
-
 trait Query {
   def sizeEstimate(): Int
   def selectWhereIn(page: Seq[Long]): Seq[Long]

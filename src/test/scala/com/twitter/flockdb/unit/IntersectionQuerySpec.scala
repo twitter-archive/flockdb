@@ -19,11 +19,9 @@ package com.twitter.flockdb.unit
 import scala.util.Sorting
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import org.specs.mock.JMocker
 import conversions.Results._
 import thrift.{Results, Page}
-
 
 object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
   "IntersectionQuery" should {

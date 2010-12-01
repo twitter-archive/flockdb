@@ -18,8 +18,6 @@ package com.twitter.flockdb.queries
 
 import scala.util.Sorting
 import net.lag.configgy.Configgy
-import com.twitter.results.Cursor
-
 
 class UnionQuery(query1: Query, query2: Query) extends Query {
   val config = Configgy.config

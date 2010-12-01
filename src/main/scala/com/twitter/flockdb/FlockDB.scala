@@ -20,17 +20,15 @@ import java.lang.{Long => JLong, String}
 import java.util.{ArrayList => JArrayList, List => JList}
 import scala.collection.mutable
 import com.twitter.gizzard.Future
-import com.twitter.gizzard.jobs._
-import com.twitter.gizzard.scheduler.{KestrelMessageQueue, JobScheduler, PrioritizingJobScheduler}
+import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.{Cursor, ResultWindow}
 import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import com.twitter.querulous.query.QueryFactory
+import com.twitter.querulous.query.{QueryClass, QueryFactory}
 import com.twitter.flockdb.conversions.Edge._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
@@ -51,6 +49,8 @@ import thrift.FlockException
 
 
 object FlockDB {
+  private val log = Logger.get(getClass.getName)
+
   def statsCollector(w3c: W3CStats) = {
     new StatsCollector {
       def incr(name: String, count: Int) = w3c.incr(name, count)
@@ -59,57 +59,55 @@ object FlockDB {
   }
 
   def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
+    @volatile val __trickJava = List(
+      shards.FlockQueryClass.SelectModify,
+      shards.FlockQueryClass.SelectCopy)
+
     val stats = statsCollector(w3c)
     val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
     val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))
 
-    val replicationFuture = new Future("ReplicationFuture", config.configMap("edges.replication.future"))
+    val codec = new JsonCodec[JsonJob]({ unparsable: Array[Byte] =>
+      log.error("Unparsable job: %s", unparsable.map { n => "%02x".format(n.toInt & 0xff) }.mkString(", "))
+    })
+
+    val badJobQueue = new JsonJobLogger[JsonJob](Logger.get("bad_jobs"))
+//  :(    val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
+    val scheduler = PrioritizingJobScheduler(config.configMap("edges.queue"), codec,
+      Map(Priority.High.id -> "primary", Priority.Medium.id -> "copy", Priority.Low.id -> "slow"),
+      Some(badJobQueue))
+
     val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), Some(replicationFuture))
+      new shards.ReadWriteShardAdapter(_), None)
     shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
     // for backward compat:
     shardRepository.setupPackage("com.twitter.service.flock.edges")
     shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
 
     val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository, Some(replicationFuture))
-
-    val polymorphicJobParser = new PolymorphicJobParser
-    val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
-    val scheduler = PrioritizingJobScheduler(config.configMap("edges.queue"), jobParser,
-      Map(Priority.High.id -> "primary", Priority.Medium.id -> "copy", Priority.Low.id -> "slow"))
+                                           shardRepository, None)
 
     val forwardingManager = new ForwardingManager(nameServer)
     nameServer.reload()
 
-    val singleJobEnvironment = (forwardingManager, OrderedUuidGenerator)
-    List((jobs.single.AddParser, "single.Add".r), (jobs.single.RemoveParser, "single.Remove".r),
-         (jobs.single.ArchiveParser, "single.Archive".r), (jobs.single.NegateParser, "single.Negate".r)).foreach {
-      case (unboundJobParser, regex) =>
-        val boundJobParser = new BoundJobParser(unboundJobParser, singleJobEnvironment)
-        polymorphicJobParser += (regex, boundJobParser)
-    }
+    codec += ("single.Add".r, new jobs.single.AddParser(forwardingManager, OrderedUuidGenerator))
+    codec += ("single.Remove".r, new jobs.single.RemoveParser(forwardingManager, OrderedUuidGenerator))
+    codec += ("single.Archive".r, new jobs.single.ArchiveParser(forwardingManager, OrderedUuidGenerator))
+    codec += ("single.Negate".r, new jobs.single.NegateParser(forwardingManager, OrderedUuidGenerator))
+    codec += ("multi.Archive".r, new jobs.multi.ArchiveParser(forwardingManager, scheduler))
+    codec += ("multi.Unarchive".r, new jobs.multi.UnarchiveParser(forwardingManager, scheduler))
+    codec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, scheduler))
+    codec += ("multi.Negate".r, new jobs.multi.NegateParser(forwardingManager, scheduler))
 
-    val multiJobEnvironment = (forwardingManager, scheduler)
-    List((jobs.multi.ArchiveParser, "multi.Archive".r), (jobs.multi.UnarchiveParser, "multi.Unarchive".r),
-         (jobs.multi.RemoveAllParser, "multi.RemoveAll".r), (jobs.multi.NegateParser, "multi.Negate".r)).foreach {
-      case (unboundJobParser, regex) =>
-        val boundJobParser = new BoundJobParser(unboundJobParser, multiJobEnvironment)
-        polymorphicJobParser += (regex, boundJobParser)
-    }
-
-    val copyJobParser         = new BoundJobParser(jobs.CopyParser, (nameServer, scheduler(Priority.Medium.id)))
-    val metadataCopyJobParser = new BoundJobParser(jobs.MetadataCopyParser, (nameServer, scheduler(Priority.Medium.id)))
+    codec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, scheduler(Priority.Medium.id)))
+    codec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, scheduler(Priority.Medium.id)))
 
     val future = new Future("EdgesFuture", config.configMap("edges.future"))
 
-    polymorphicJobParser += ("(Copy|Migrate)".r, copyJobParser)
-    polymorphicJobParser += ("(MetadataCopy|MetadataMigrate)".r, metadataCopyJobParser)
-
     scheduler.start()
 
-    new FlockDB(new EdgesService(nameServer, forwardingManager, jobs.CopyFactory, scheduler,
-                                 future, replicationFuture))
+    val copyFactory = new jobs.CopyFactory(nameServer, scheduler(Priority.Medium.id))
+    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
   }
 }
 
