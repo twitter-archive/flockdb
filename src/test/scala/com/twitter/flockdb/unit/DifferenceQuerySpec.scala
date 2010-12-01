@@ -19,11 +19,9 @@ package com.twitter.flockdb.unit
 import scala.collection.mutable
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.results.Cursor
 import org.specs.mock.JMocker
 import conversions.Results._
 import thrift.{Results, Page}
-
 
 class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
   "DifferenceQuery" should {

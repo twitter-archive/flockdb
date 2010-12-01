@@ -16,4 +16,4 @@
 
 package com.twitter.flockdb
 
-case class EdgeQuery(term: QueryTerm, page: Page)
+case class Page(count: Int, cursor: Cursor)
