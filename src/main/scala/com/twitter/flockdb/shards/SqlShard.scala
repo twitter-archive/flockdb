@@ -16,11 +16,13 @@
 
 package com.twitter.flockdb.shards
 
+import java.util.Random
 import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
 import com.twitter.ostrich.Stats
+import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query.{QueryClass, SqlQueryTimeoutException}
 import com.twitter.xrayspecs.Time
@@ -35,8 +37,10 @@ object FlockQueryClass {
   val SelectCopy = QueryClass("select_copy")
 }
 
-class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)
+class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
   extends shards.ShardFactory[Shard] {
+    
+  val deadlockRetries = 3
 
   val EDGE_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
@@ -64,20 +68,16 @@ CREATE TABLE IF NOT EXISTS %s (
 """
 
   def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
-    val queryEvaluator = instantiatingQueryEvaluatorFactory(List(shardInfo.hostname), config("edges.db_name"), config("db.username"), config("db.password"))
-    new SqlExceptionWrappingProxy(shardInfo.id).apply[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, config))
+    val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
+    new SqlExceptionWrappingProxy(shardInfo.id).apply[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, deadlockRetries))
   }
 
   def materialize(shardInfo: shards.ShardInfo) = {
     try {
-      val queryEvaluator = materializingQueryEvaluatorFactory(
-        List(shardInfo.hostname),
-        null,
-        config("db.username"),
-        config("db.password"))
-      queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + config("edges.db_name"))
-      queryEvaluator.execute(EDGE_TABLE_DDL.format(config("edges.db_name") + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
-      queryEvaluator.execute(METADATA_TABLE_DDL.format(config("edges.db_name") + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
+      val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
+      queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database)
+      queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
+      queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
     } catch {
       case e: SQLException => throw new shards.ShardException(e.toString)
       case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException(e.timeout, shardInfo.id, e)
@@ -87,10 +87,10 @@ CREATE TABLE IF NOT EXISTS %s (
 
 
 class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
-               val weight: Int, val children: Seq[Shard], config: ConfigMap) extends Shard {
+               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard {
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
-  private val randomGenerator = new util.Random
+  private val randomGenerator = new Random
 
   import FlockQueryClass._
 
@@ -441,7 +441,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   }
 
   private def write(edge: Edge) {
-    write(edge, config("errors.deadlock_retries").toInt, true)
+    write(edge, deadlockRetries, true)
   }
 
   private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
@@ -501,7 +501,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     atomically(sourceId) { (transaction, metadata) =>
-      f(new SqlShard(transaction, shardInfo, weight, children, config), metadata)
+      f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
     }
   }
 
