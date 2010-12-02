@@ -28,7 +28,7 @@ object StaticEdges extends Database {
   val w3c = new W3CStats(log, config.getList("edges.w3c").toArray)
 
   lazy val flock = try {
-    FlockDB(config, w3c)
+    new FlockDB(config, w3c)
   } catch {
     case e =>
       e.printStackTrace()
