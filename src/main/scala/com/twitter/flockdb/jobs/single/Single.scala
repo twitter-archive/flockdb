@@ -16,7 +16,7 @@
 
 package com.twitter.flockdb.jobs.single
 
-import com.twitter.gizzard.scheduler.{JsonCodec, JsonJob, JsonJobParser}
+import com.twitter.gizzard.scheduler.{JsonJob, JsonJobParser}
 import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
@@ -24,7 +24,7 @@ import shards.Shard
 
 
 abstract class SingleJobParser extends JsonJobParser[JsonJob] {
-  def apply(codec: JsonCodec[JsonJob], attributes: Map[String, Any]): JsonJob = {
+  def apply(attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
     createJob(
       casted("source_id").toLong,

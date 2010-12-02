@@ -25,7 +25,7 @@ import net.lag.configgy.Configgy
 import shards.Shard
 
 abstract class MultiJobParser extends JsonJobParser[JsonJob] {
-  def apply(codec: JsonCodec[JsonJob], attributes: Map[String, Any]): JsonJob = {
+  def apply(attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
     createJob(
       casted("source_id").toLong,
