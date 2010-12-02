@@ -1,150 +1,81 @@
-/*
- * Copyright 2010 Twitter, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.twitter.flockdb
 
-import java.util.concurrent.CountDownLatch
-import scala.actors.Actor.actor
-import org.apache.thrift.TProcessor
-import org.apache.thrift.protocol.TBinaryProtocol
-import org.apache.thrift.server.{TServer, TThreadPoolServer}
-import org.apache.thrift.transport.{TServerSocket, TTransportFactory}
-import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
-import com.twitter.gizzard.scheduler.JsonJob
-import com.twitter.gizzard.thrift._
-import com.twitter.ostrich.{JsonStatsLogger, Service, ServiceTracker, Stats, StatsMBean, W3CStats}
-import com.twitter.xrayspecs.TimeConversions._
-import net.lag.configgy.{Config, RuntimeEnvironment, ConfigMap, Configgy}
-import net.lag.logging.Logger
-
+import com.twitter.ostrich.{W3CStats, Stats, Service, ServiceTracker, W3CReporter}
+import com.twitter.util.Eval
+import net.lag.configgy.{Config => CConfig, Configgy, RuntimeEnvironment}
+import net.lag.logging.{FileHandler, Logger}
+import org.apache.thrift.server.TServer
+import java.io.File
 
 object Main extends Service {
-  private val log = Logger.get(getClass.getName)
-  val runtime = new RuntimeEnvironment(getClass)
+  var service: FlockDB = null
+  var config: flockdb.config.FlockDB = null
 
-  var thriftServer: TSelectorServer = null
-  var gizzardServices: GizzardServices[shards.Shard, JsonJob] = null
-  var flock: FlockDB = null
+  val w3cItems = Array(
+    "second",
+    "minute",
+    "hour",
+    "timestamp",
+    "action-timing",
+    "result-count",
+    "db-timing",
+    "database-open-timing",
+    "database-close-timing",
+    "connection-pool-release-timing",
+    "connection-pool-reserve-timing",
+    "kestrel-put-timing",
+    "db-select-count",
+    "db-select-timing",
+    "db-execute-count",
+    "db-execute-timing",
+    "db-query-count-default",
+    "x-db-query-count-default",
+    "x-db-query-timing-default",
+    "job-success-count",
+    "operation",
+    "arguments"
+  )
 
-  var config: ConfigMap = null
-
-  private val deathSwitch = new CountDownLatch(1)
-  private val serverLatch = new CountDownLatch(1)
-  var statsLogger: JsonStatsLogger = null
-
-  object FlockExceptionWrappingProxy extends ExceptionHandlingProxy({ e =>
-    e match {
-      case _: thrift.FlockException =>
-        throw e
-      case _ =>
-        log.error(e, "Error in FlockDB: " + e)
-        throw new thrift.FlockException(e.toString)
-    }
-  })
+  lazy val w3c = new W3CStats(Logger.get("w3c"), w3cItems)
 
   def main(args: Array[String]) {
-    runtime.load(args)
-    config = Configgy.config
+    try {
+      config  = Eval[flockdb.config.FlockDB](args.map(new File(_)): _*)
+      service = new FlockDB(config, w3c)
+      Configgy.configLogging(CConfig.fromString(config.loggingConfig))
 
-    val maxThreads = config.getInt("max_threads", Runtime.getRuntime().availableProcessors * 2)
-    System.setProperty("actors.maxPoolSize", maxThreads.toString)
-    System.setProperty("actors.corePoolSize", "1")
-    log.debug("max_threads=%d", maxThreads)
+      start()
 
-    StatsMBean("com.twitter.flockdb")
+      println("Running.")
+    } catch {
+      case e => {
+        println("Exception in initialization: ")
+        Logger.get("").fatal(e, "Exception in initialization.")
+        e.printStackTrace
+        shutdown()
+      }
+    }
+  }
 
-    // workaround for actor lifetime issue:
-    actor { deathSwitch.await }
+  def start() {
+    ServiceTracker.register(this)
+    val adminConfig = new CConfig
+    adminConfig.setInt("admin_http_port", config.adminConfig.httpPort)
+    adminConfig.setInt("admin_text_port", config.adminConfig.textPort)
+    ServiceTracker.startAdmin(adminConfig, new RuntimeEnvironment(this.getClass))
 
-    startAdmin()
-    startThrift()
-
-    statsLogger = new JsonStatsLogger(Logger.get("stats"), 1.minute)
-    statsLogger.start()
+    service.start()
   }
 
   def shutdown() {
-    log.info("Shutting down.")
-    stopThrift()
-    finishShutdown()
+    if (service ne null) service.shutdown()
+    service = null
+    ServiceTracker.stopAdmin()
   }
 
   def quiesce() {
-    log.info("Going quiescent.")
-    stopThrift()
-
-    while (flock.edges.schedule.size > 0) {
-      log.info("Waiting for job queue to drain: jobs=%d", flock.edges.schedule.size)
-      Thread.sleep(100)
-    }
-
-    log.info("Shutting down.")
-    finishShutdown()
-  }
-
-  def startAdmin() = {
-    ServiceTracker.register(this)
-    ServiceTracker.startAdmin(config, runtime)
-  }
-
-  def startThrift() {
-    try {
-      val w3c = new W3CStats(Logger.get("w3c"), config.getList("edges.w3c").toArray)
-
-      // there are a bunch of things we report that aren't in the w3c list above.
-      w3c.complainAboutUnregisteredFields = false
-
-      flock = FlockDB(config, w3c)
-
-      val processor = new thrift.FlockDB.Processor(
-        FlockExceptionWrappingProxy[thrift.FlockDB.Iface](
-          LoggingProxy[thrift.FlockDB.Iface](Stats, w3c, "Edges", flock)))
-      thriftServer = TSelectorServer("edges", config("edges.server_port").toInt,
-                                     config.configMap("gizzard_services"), processor)
-      gizzardServices = new GizzardServices(config.configMap("gizzard_services"),
-                                            flock.edges.nameServer,
-                                            flock.edges.copyFactory,
-                                            flock.edges.schedule,
-                                            flock.edges.schedule(Priority.Medium.id))
-      gizzardServices.start()
-      thriftServer.serve()
-    } catch {
-      case e: Exception =>
-        log.error(e, "Unexpected exception: %s", e.getMessage)
-        System.exit(0)
-    }
-  }
-
-  def stopThrift() {
-    // thrift bug doesn't let worker threads know to close their connection, so we wait for any
-    // pending requests to finish.
-    log.info("Thrift servers shutting down...")
-    thriftServer.shutdown()
-    thriftServer = null
-    gizzardServices.shutdown()
-    gizzardServices = null
-  }
-
-  def finishShutdown() {
-    flock.edges.shutdown()
-    if (statsLogger ne null) {
-      statsLogger.shutdown()
-      statsLogger = null
-    }
-    deathSwitch.countDown()
-    log.info("Goodbye!")
+    if (service ne null) service.shutdown(true)
+    service = null
+    ServiceTracker.stopAdmin()
   }
 }

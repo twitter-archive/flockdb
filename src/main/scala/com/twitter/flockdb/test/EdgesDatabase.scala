@@ -27,21 +27,21 @@ import com.twitter.gizzard.test.NameServerDatabase
 trait EdgesDatabase extends NameServerDatabase {
   def reset(flock: FlockDB) {
     try {
-      materialize(Configgy.config.configMap("edges.nameservers"))
-      reset(Configgy.config.configMap("edges.nameservers"))
+      materialize(Configgy.config.configMap("nameservers"))
+      reset(Configgy.config.configMap("nameservers"))
       val config = Configgy.config.configMap("db")
       config.update("database", Configgy.config("edges.db_name"))
       config.update("hostname", "localhost")
       val queryEvaluator = evaluator(config)
-      flock.edges.nameServer.reload()
+      flock.nameServer.reload()
 
       for (graph <- (1 until 10)) {
         val forwardShardId = ShardId("localhost", "forward_" + graph)
         val backwardShardId = ShardId("localhost", "backward_" + graph)
 
-        flock.edges.nameServer.createShard(ShardInfo(forwardShardId,
+        flock.nameServer.createShard(ShardInfo(forwardShardId,
           "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-        flock.edges.nameServer.createShard(ShardInfo(backwardShardId,
+        flock.nameServer.createShard(ShardInfo(backwardShardId,
           "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
         queryEvaluator.execute("DELETE FROM forward_" + graph + "_edges")
         queryEvaluator.execute("DELETE FROM forward_" + graph + "_metadata")
@@ -50,16 +50,16 @@ trait EdgesDatabase extends NameServerDatabase {
 
         val replicatingForwardShardId = ShardId("localhost", "replicating_forward_" + graph)
         val replicatingBackwardShardId = ShardId("localhost", "replicating_backward_" + graph)
-        flock.edges.nameServer.createShard(ShardInfo(replicatingForwardShardId,
+        flock.nameServer.createShard(ShardInfo(replicatingForwardShardId,
           "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        flock.edges.nameServer.createShard(ShardInfo(replicatingBackwardShardId,
+        flock.nameServer.createShard(ShardInfo(replicatingBackwardShardId,
           "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        flock.edges.nameServer.addLink(replicatingForwardShardId, forwardShardId, 1)
-        flock.edges.nameServer.addLink(replicatingBackwardShardId, backwardShardId, 1)
-        flock.edges.nameServer.setForwarding(Forwarding(graph, 0, replicatingForwardShardId))
-        flock.edges.nameServer.setForwarding(Forwarding(-1 * graph, 0, replicatingBackwardShardId))
+        flock.nameServer.addLink(replicatingForwardShardId, forwardShardId, 1)
+        flock.nameServer.addLink(replicatingBackwardShardId, backwardShardId, 1)
+        flock.nameServer.setForwarding(Forwarding(graph, 0, replicatingForwardShardId))
+        flock.nameServer.setForwarding(Forwarding(-1 * graph, 0, replicatingBackwardShardId))
       }
-      flock.edges.nameServer.reload()
+      flock.nameServer.reload()
     } catch {
       case e =>
         e.printStackTrace()
