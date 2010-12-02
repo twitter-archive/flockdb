@@ -3,7 +3,7 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher with InlineDependencies {
-  inline("com.twitter" % "gizzard" % "1.5.6")
+  inline("com.twitter" % "gizzard" % "1.5.8-thrift050-SNAPSHOT")
 
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
   val cglib     = "cglib" % "cglib" % "2.1_3" % "test"
