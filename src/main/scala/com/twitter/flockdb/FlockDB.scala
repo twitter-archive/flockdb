@@ -49,7 +49,7 @@ import Direction._
 import thrift.FlockException
 
 class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
-  
+
   object FlockExceptionWrappingProxy extends ExceptionHandlingProxy({ e =>
     e match {
       case _: thrift.FlockException =>
@@ -68,7 +68,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   @volatile val __trickJava = List(
     shards.FlockQueryClass.SelectModify,
     shards.FlockQueryClass.SelectCopy)
-    
+
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)
   val jobPriorities = List(Priority.Low, Priority.Medium, Priority.High).map(_.id)
   val copyPriority = Priority.Medium.id
@@ -95,13 +95,13 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
 
   jobCodec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
   jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
-  
+
   val flockService = {
     val future = config.readFuture("readFuture")
     val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future)
     new FlockDBThriftAdapter(edges)
   }
-  
+
   lazy val flockThriftServer = {
     val processor = new flockdb.thrift.FlockDB.Processor(
       FlockExceptionWrappingProxy(
@@ -110,6 +110,17 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
           flockService)))
 
     config.server(processor)
+  }
+
+  def start() {
+    startGizzard()
+    val runnable = new Runnable { def run() { flockThriftServer.serve() } }
+    new Thread(runnable, "FlockDBServerThread").start()
+  }
+
+  def shutdown(quiesce: Boolean) {
+    flockThriftServer.stop()
+    shutdownGizzard(quiesce)
   }
 }
 
