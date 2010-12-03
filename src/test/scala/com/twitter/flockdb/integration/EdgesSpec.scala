@@ -56,10 +56,10 @@ class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
         val op = new SelectOperation(SelectOperationType.SimpleQuery)
         op.setTerm(term)
         val page = new Page(1, Cursor.Start.position)
-        flock.select(List(op).toJavaList, page).ids.size must eventually(be_>(0))
+        flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_>(0))
         Time.advance(1.second)
         flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
-        flock.select(List(op).toJavaList, page).ids.size must eventually(be_==(0))
+        flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(0))
         flock.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
       }
 
