@@ -24,7 +24,8 @@ import com.twitter.gizzard.shards
 import com.twitter.ostrich.Stats
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
-import com.twitter.querulous.query.{QueryClass, SqlQueryTimeoutException}
+import com.twitter.querulous.query
+import com.twitter.querulous.query.{SqlQueryTimeoutException}
 import com.twitter.xrayspecs.Time
 import com.twitter.xrayspecs.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
@@ -32,14 +33,16 @@ import net.lag.configgy.ConfigMap
 import net.lag.logging.Logger
 import State._
 
-object FlockQueryClass {
-  val SelectModify = QueryClass("select_modify")
-  val SelectCopy = QueryClass("select_copy")
+object QueryClass {
+  val Select       = query.QueryClass.Select
+  val Execute      = query.QueryClass.Execute
+  val SelectModify = query.QueryClass("select_modify")
+  val SelectCopy   = query.QueryClass("select_copy")
 }
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
   extends shards.ShardFactory[Shard] {
-    
+
   val deadlockRetries = 3
 
   val EDGE_TABLE_DDL = """
@@ -92,7 +95,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
 
-  import FlockQueryClass._
+  import QueryClass._
 
   def get(sourceId: Long, destinationId: Long) = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
@@ -212,7 +215,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     select(QueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
   }
 
-  private def select(queryClass: QueryClass, cursorName: String, index: String, count: Int,
+  private def select(queryClass: querulous.query.QueryClass, cursorName: String, index: String, count: Int,
                      cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
     var edges = new mutable.ArrayBuffer[(Long, Cursor)]
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"

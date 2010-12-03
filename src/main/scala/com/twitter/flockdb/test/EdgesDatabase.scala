@@ -16,6 +16,8 @@
 
 package com.twitter.flockdb.test
 
+import com.twitter.ostrich.W3CStats
+import net.lag.logging.Logger
 import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.querulous.evaluator.StandardQueryEvaluatorFactory
 import net.lag.configgy.{ConfigMap, Configgy}
@@ -25,41 +27,36 @@ import com.twitter.gizzard.test.NameServerDatabase
 
 
 trait EdgesDatabase extends NameServerDatabase {
-  def reset(flock: FlockDB) {
+  def reset(config: flockdb.config.FlockDB) {
     try {
-      materialize(Configgy.config.configMap("nameservers"))
-      reset(Configgy.config.configMap("nameservers"))
-      val config = Configgy.config.configMap("db")
-      config.update("database", Configgy.config("edges.db_name"))
-      config.update("hostname", "localhost")
-      val queryEvaluator = evaluator(config)
-      flock.nameServer.reload()
+      val nameServer     = new FlockDB(config, new W3CStats(Logger.get, Array())).nameServer
+      val queryEvaluator = evaluator(config.nameServer)
+
+      materialize(config.nameServer)
+      nameServer.rebuildSchema()
+      queryEvaluator.execute("DROP DATABASE IF EXISTS " + config.databaseConnection.database)
+
+      nameServer.reload()
 
       for (graph <- (1 until 10)) {
-        val forwardShardId = ShardId("localhost", "forward_" + graph)
-        val backwardShardId = ShardId("localhost", "backward_" + graph)
+        Seq("forward", "backward").foreach { direction =>
+          val tableId = if (direction == "forward") graph else graph * -1
+          val shardId = ShardId("localhost", direction + "_" + graph)
+          val replicatingShardId = ShardId("localhost", "replicating_" + direction + "_" + graph)
 
-        flock.nameServer.createShard(ShardInfo(forwardShardId,
-          "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-        flock.nameServer.createShard(ShardInfo(backwardShardId,
-          "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-        queryEvaluator.execute("DELETE FROM forward_" + graph + "_edges")
-        queryEvaluator.execute("DELETE FROM forward_" + graph + "_metadata")
-        queryEvaluator.execute("DELETE FROM backward_" + graph + "_edges")
-        queryEvaluator.execute("DELETE FROM backward_" + graph + "_metadata")
+          nameServer.createShard(ShardInfo(shardId,
+            "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
+          nameServer.createShard(ShardInfo(replicatingShardId,
+            "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
+          nameServer.addLink(replicatingShardId, shardId, 1)
+          nameServer.setForwarding(Forwarding(tableId, 0, replicatingShardId))
 
-        val replicatingForwardShardId = ShardId("localhost", "replicating_forward_" + graph)
-        val replicatingBackwardShardId = ShardId("localhost", "replicating_backward_" + graph)
-        flock.nameServer.createShard(ShardInfo(replicatingForwardShardId,
-          "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        flock.nameServer.createShard(ShardInfo(replicatingBackwardShardId,
-          "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        flock.nameServer.addLink(replicatingForwardShardId, forwardShardId, 1)
-        flock.nameServer.addLink(replicatingBackwardShardId, backwardShardId, 1)
-        flock.nameServer.setForwarding(Forwarding(graph, 0, replicatingForwardShardId))
-        flock.nameServer.setForwarding(Forwarding(-1 * graph, 0, replicatingBackwardShardId))
+          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_edges")
+          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_metadata")
+        }
       }
-      flock.nameServer.reload()
+
+      nameServer.reload()
     } catch {
       case e =>
         e.printStackTrace()
@@ -67,9 +64,9 @@ trait EdgesDatabase extends NameServerDatabase {
     }
   }
 
-  def reset(config: ConfigMap, db: String) {
+  def reset(config: flockdb.config.FlockDB, db: String) {
     try {
-      rootEvaluator(config).execute("DROP DATABASE IF EXISTS " + db)
+      evaluator(config.nameServer).execute("DROP DATABASE IF EXISTS " + db)
     } catch {
       case e =>
         e.printStackTrace()
