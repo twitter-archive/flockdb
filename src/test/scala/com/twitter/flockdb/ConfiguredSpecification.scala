@@ -16,10 +16,36 @@
 
 package com.twitter.flockdb
 
-import net.lag.configgy.Configgy
+import java.io.File
 import org.specs.Specification
+import com.twitter.util.Eval
+import com.twitter.ostrich.W3CStats
+import net.lag.logging.Logger
+import net.lag.configgy.Configgy
+import test.EdgesDatabase
 
-abstract class ConfiguredSpecification extends Specification {
+abstract class ConfiguredSpecification extends Specification with EdgesDatabase {
   Configgy.configure("config/test.conf")
-  lazy val config = Configgy.config
+
+  lazy val config = {
+    val c = Eval[flockdb.config.FlockDB](new File("config/test.scala"))
+    try {
+      c.logging()
+      c
+    } catch {
+      case e: Exception => {
+        e.printStackTrace()
+        throw e
+      }
+    }
+  }
+}
+
+abstract class IntegrationSpecification extends ConfiguredSpecification with EdgesDatabase {
+  val (manager, nameServer, flock, jobScheduler) = {
+    val f = new FlockDB(config, new W3CStats(Logger.get, Array()))
+    (f.managerServer, f.nameServer, f.flockService, f.jobScheduler)
+  }
+
+  val queryEvaluator = evaluator(config.nameServer)
 }

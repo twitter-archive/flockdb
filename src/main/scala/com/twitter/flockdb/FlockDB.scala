@@ -65,10 +65,6 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
     def time[A](name: String)(f: => A): A = w3c.time(name)(f)
   }
 
-  @volatile val __trickJava = List(
-    shards.FlockQueryClass.SelectModify,
-    shards.FlockQueryClass.SelectCopy)
-
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)
   val jobPriorities = List(Priority.Low, Priority.Medium, Priority.High).map(_.id)
   val copyPriority = Priority.Medium.id

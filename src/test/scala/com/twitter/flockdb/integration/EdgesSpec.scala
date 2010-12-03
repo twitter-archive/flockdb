@@ -23,12 +23,8 @@ import com.twitter.xrayspecs.TimeConversions._
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
-import test.{EdgesDatabase, StaticEdges}
 
-class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
-  lazy val poolConfig = config.configMap("db.connection_pool")
-
-  import StaticEdges._
+class EdgesSpec extends IntegrationSpecification {
 
   val FOLLOWS = 1
   val BORKEN = 900
@@ -38,12 +34,9 @@ class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
   val carl = 3L
   val darcy = 4L
 
-  materialize(config.configMap("edges.nameservers"))
-
   "Edge Integration" should {
     doBefore {
-      flock
-      reset(flock)
+      reset(config)
       Time.freeze()
     }
 
@@ -56,10 +49,10 @@ class EdgesSpec extends ConfiguredSpecification with EdgesDatabase {
         val op = new SelectOperation(SelectOperationType.SimpleQuery)
         op.setTerm(term)
         val page = new Page(1, Cursor.Start.position)
-        flock.select(List(op).toJavaList, page).ids.size must eventually(be_>(0))
+        flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_>(0))
         Time.advance(1.second)
         flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
-        flock.select(List(op).toJavaList, page).ids.size must eventually(be_==(0))
+        flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(0))
         flock.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
       }
 
