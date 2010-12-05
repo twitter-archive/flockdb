@@ -8,8 +8,18 @@ trait AdminConfig {
   def textPort: Int
 }
 
+trait FlockDBServer extends TServer {
+  var name = "flockdb_edges"
+  var port = 7915
+}
+
 trait FlockDB extends gizzard.config.GizzardServer {
-  def server: TServer
+  def server: EdgesServer
+
+  var intersectionTimeout           = 100.millis
+  var averageIntersectionProportion = 0.1
+  var intersectionPageSizeMax       = 4000
+  var aggregateJobsPageSize         = 500
 
   def databaseConnection: Connection
   def edgesQueryEvaluator: QueryEvaluator
@@ -18,6 +28,5 @@ trait FlockDB extends gizzard.config.GizzardServer {
   def replicationFuture: Future
   def readFuture: Future
 
-  def loggingConfig: String
   def adminConfig: AdminConfig
 }
