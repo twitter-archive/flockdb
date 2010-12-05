@@ -38,13 +38,16 @@ trait DevelopmentQueryEvaluator extends QueryEvaluator {
 }
 
 new FlockDB {
-  val server = new THsHaServer {
+  intersectionTimeout           = 100.millis
+  averageIntersectionProportion = 0.1
+  intersectionPageSizeMax       = 4000
+  aggregateJobsPageSize         = 500
+
+  val server = new FlockDBServer with THsHaServer {
     val timeout = 100.millis
     val idleTimeout = 60.seconds
-    val port = 7919
-    val threadPool = new ThreadPool {
-      val name = "flockdb_edges"
-      val minThreads = 200
+      val threadPool = new ThreadPool {
+        val minThreads = 200
       override val maxThreads = 200
     }
   }
