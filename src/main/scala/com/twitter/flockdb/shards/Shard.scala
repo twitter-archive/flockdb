@@ -18,8 +18,8 @@ package com.twitter.flockdb.shards
 
 import scala.collection.mutable
 import com.twitter.gizzard.shards
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time)
 

@@ -20,8 +20,8 @@ import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, JsonNestedJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import jobs.single
 import jobs.multi
 import flockdb.operations.{ExecuteOperations, ExecuteOperationType}

@@ -79,13 +79,13 @@ object IntersectionSpec extends IntegrationSpecification {
     }
 
     "with a large intersection" >>  {
-      doBefore { config("edges.intersection_page_size_max") = 1 }
+      config.intersectionPageSizeMax = 1
 
       intersectAlot
     }
 
     "with a small intersection" >> {
-      doBefore { config("edges.intersection_page_size_max") = Integer.MAX_VALUE - 1 }
+      config.intersectionPageSizeMax = Integer.MAX_VALUE - 1
 
       intersectAlot
     }

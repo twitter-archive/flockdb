@@ -18,8 +18,8 @@ package com.twitter.flockdb.integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.ostrich.Stats
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._

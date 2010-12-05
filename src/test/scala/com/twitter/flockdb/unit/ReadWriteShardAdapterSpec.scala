@@ -18,7 +18,7 @@ package com.twitter.flockdb.unit
 
 import com.twitter.gizzard.shards.{ReadWriteShard, ShardInfo}
 import com.twitter.gizzard.test.FakeReadWriteShard
-import com.twitter.xrayspecs.Time
+import com.twitter.util.Time
 import org.specs.mock.{ClassMocker, JMocker}
 import shards.{ReadWriteShardAdapter, Shard, Metadata}
 import thrift.Edge

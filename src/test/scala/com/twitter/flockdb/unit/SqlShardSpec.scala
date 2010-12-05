@@ -22,8 +22,8 @@ import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.{StandardQueryEvaluatorFactory, QueryEvaluator, QueryEvaluatorFactory}
 import com.twitter.querulous.query.SqlQueryFactory
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import org.specs.mock.JMocker
 import conversions.Edge._
 import conversions.EdgeResults._
@@ -33,8 +33,6 @@ import thrift.{Results, EdgeResults}
 import test.EdgesDatabase
 
 class SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatabase {
-  val poolConfig = config.configMap("db.connection_pool")
-
   "Edge SqlShard" should {
     val alice = 1L
     val bob = 2L
@@ -43,11 +41,9 @@ class SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDataba
     val earl = 5L
     val frank = 6L
 
-    val evalConf = config.configMap("db")
-    evalConf.update("hostname", "localhost")
-    evalConf.update("database", config("edges.db_name"))
-    val queryEvaluator = evaluator(evalConf)
-    val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config)
+    val queryEvaluatorFactory = config.edgesQueryEvaluator()
+    val queryEvaluator = evaluator(config.nameServer)
+    val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
     val shardInfo = ShardInfo(ShardId("localhost", "table_001"), "com.twitter.flockdb.SqlShard",
       "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
     var shard: Shard = null
@@ -56,17 +52,17 @@ class SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDataba
       try {
         Time.reset()
         Time.freeze()
-        reset(config.configMap("db"), config("edges.db_name"))
+        reset(config, config.databaseConnection.database)
         shardFactory.materialize(shardInfo)
         shard = shardFactory.instantiate(shardInfo, 1, List[Shard]())
       } catch { case e => e.printStackTrace() }
     }
 
     "create" in {
-      val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config)
+      val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
       val createShardInfo = ShardInfo(ShardId("localhost", "create_test"), "com.twitter.flockdb.SqlShard",
         "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
-      val createShard = new SqlShard(queryEvaluator, createShardInfo, 1, Nil, config)
+      val createShard = new SqlShard(queryEvaluator, createShardInfo, 1, Nil, 0)
 
       "when the database doesn't exist" >> {
         createShardFactory.materialize(createShardInfo)

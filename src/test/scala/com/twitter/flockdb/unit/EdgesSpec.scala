@@ -22,8 +22,8 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
@@ -47,7 +47,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
     val future = mock[Future]
     val copyFactory = mock[CopyJobFactory[Shard]]
-    val flock = new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
+    val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
 
     "add" in {
       Time.freeze()

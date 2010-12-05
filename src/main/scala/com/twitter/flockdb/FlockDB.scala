@@ -38,8 +38,6 @@ import com.twitter.flockdb.conversions.Page._
 import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
 import com.twitter.flockdb.conversions.SelectOperation._
-import com.twitter.xrayspecs.{Duration, Time}
-import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.{Config, ConfigMap}
 import net.lag.logging.Logger
 import queries._
