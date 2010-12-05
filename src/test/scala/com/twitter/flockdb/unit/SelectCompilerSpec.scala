@@ -18,8 +18,8 @@ package com.twitter.flockdb.unit
 
 import scala.collection.jcl.Conversions._
 import scala.collection.mutable
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import queries.SelectCompiler
 import operations.{SelectOperation, SelectOperationType}

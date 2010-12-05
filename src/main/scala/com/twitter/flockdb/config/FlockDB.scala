@@ -2,6 +2,7 @@ package com.twitter.flockdb.config
 
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config.{Connection, QueryEvaluator}
+import com.twitter.util.TimeConversions._
 
 trait AdminConfig {
   def httpPort: Int
@@ -14,7 +15,7 @@ trait FlockDBServer extends TServer {
 }
 
 trait FlockDB extends gizzard.config.GizzardServer {
-  def server: EdgesServer
+  def server: FlockDBServer
 
   var intersectionTimeout           = 100.millis
   var averageIntersectionProportion = 0.1

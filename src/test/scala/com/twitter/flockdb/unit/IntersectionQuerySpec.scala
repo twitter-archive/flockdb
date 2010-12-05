@@ -29,7 +29,7 @@ object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
     val query2 = new queries.SeqQuery(List(1,2,3,4,11))
 
     doBefore {
-      config("edges.average_intersection_proportion") = "1.0"
+      config.averageIntersectionProportion = 1.0
     }
 
     "sizeEstimate" in {

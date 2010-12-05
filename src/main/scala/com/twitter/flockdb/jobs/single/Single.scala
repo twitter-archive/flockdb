@@ -18,8 +18,9 @@ package com.twitter.flockdb.jobs.single
 
 import com.twitter.gizzard.scheduler.{JsonJob, JsonJobParser}
 import com.twitter.gizzard.shards.ShardBlackHoleException
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
+import conversions.Numeric._
 import shards.Shard
 
 

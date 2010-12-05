@@ -42,7 +42,7 @@ object Main extends Service {
     try {
       config  = Eval[flockdb.config.FlockDB](args.map(new File(_)): _*)
       service = new FlockDB(config, w3c)
-      Configgy.configLogging(CConfig.fromString(config.loggingConfig))
+//      Configgy.configLogging(CConfig.fromString(config.loggingConfig))
 
       start()
 

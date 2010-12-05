@@ -16,7 +16,7 @@
 
 package com.twitter.flockdb
 
-import com.twitter.xrayspecs.Time
+import com.twitter.util.Time
 
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,

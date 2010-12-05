@@ -16,8 +16,8 @@
 
 package com.twitter.flockdb.conversions
 
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 
 
 object Edge {
