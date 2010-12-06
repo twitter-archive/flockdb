@@ -41,7 +41,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     val frank = 6L
 
     val queryEvaluatorFactory = config.edgesQueryEvaluator()
-    val queryEvaluator = evaluator(config.nameServer)
+    val queryEvaluator = queryEvaluatorFactory(config.databaseConnection)
     val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
     val shardInfo = ShardInfo(ShardId("localhost", "table_001"), "com.twitter.flockdb.SqlShard",
       "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)

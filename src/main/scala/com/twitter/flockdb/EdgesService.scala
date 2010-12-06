@@ -32,11 +32,12 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
                    val copyFactory: CopyJobFactory[shards.Shard],
                    val schedule: PrioritizingJobScheduler[JsonJob],
                    future: Future,
-                   intersectionQueryConfig: config.IntersectionQuery) {
+                   intersectionQueryConfig: config.IntersectionQuery,
+                   aggregateJobsPageSize: Int) {
 
   private val log = Logger.get(getClass.getName)
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
-  private val executeCompiler = new ExecuteCompiler(schedule, forwardingManager)
+  private val executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
 
   def shutdown() {
     schedule.shutdown()
@@ -107,7 +108,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   private def countAndRethrow(e: Throwable) = {
     Stats.incr(e.getClass.getName)
-    throw(new FlockException(e.getMessage))
+    throw(new FlockException(e.toString))
   }
 
   private def rethrowExceptionsAsThrift[A](block: => A): A = {
@@ -124,7 +125,6 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
       case e: Throwable =>
         Stats.incr("unknown-exceptions")
         log.error(e, "Unhandled error in EdgesService: %s", e)
-        e.printStackTrace()
         throw(new FlockException(e.toString))
     }
   }

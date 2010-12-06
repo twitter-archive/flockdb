@@ -47,7 +47,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       forwardingManager = mock[ForwardingManager]
       shard = mock[Shard]
       shard2 = mock[Shard]
-      selectCompiler = new SelectCompiler(forwardingManager, new flockdb.config.IntersectionQuery { })
+      selectCompiler = new SelectCompiler(forwardingManager, new flockdb.config.IntersectionQuery { averageIntersectionProportion = 1.0 })
     }
 
     "execute a simple wildcard query" in {
