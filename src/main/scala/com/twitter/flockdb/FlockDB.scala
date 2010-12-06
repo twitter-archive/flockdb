@@ -59,8 +59,10 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   })
 
   val stats = new StatsCollector {
-    def incr(name: String, count: Int) = w3c.incr(name, count)
-    def time[A](name: String)(f: => A): A = w3c.time(name)(f)
+//    def incr(name: String, count: Int) = w3c.incr(name, count)
+//    def time[A](name: String)(f: => A): A = w3c.time(name)(f)
+    def incr(name: String, count: Int) =  { }
+    def time[A](name: String)(f: => A): A = f
   }
 
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)
@@ -92,7 +94,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
 
   val flockService = {
     val future = config.readFuture("readFuture")
-    val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future)
+    val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future, config.intersectionQuery)
     new FlockDBThriftAdapter(edges)
   }
 

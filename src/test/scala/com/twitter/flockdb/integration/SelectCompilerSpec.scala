@@ -21,7 +21,6 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
-import test.EdgesDatabase
 import thrift._
 
 object SelectCompilerSpec extends IntegrationSpecification with JMocker with ClassMocker {
@@ -32,8 +31,6 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     val bob = 2L
     val carl = 3L
     val darcy = 4L
-
-    materialize(config.nameServer)
 
     doBefore {
       reset(config)

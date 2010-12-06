@@ -16,11 +16,11 @@
 
 package com.twitter.flockdb.queries
 
+import com.twitter.util.Duration
+import com.twitter.util.TimeConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import net.lag.configgy.Configgy
 
-class IntersectionQuery(query1: Query, query2: Query) extends Query {
-  val config = Configgy.config
+class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends Query {
   val count1 = query1.sizeEstimate
   val count2 = query2.sizeEstimate
 
@@ -30,7 +30,7 @@ class IntersectionQuery(query1: Query, query2: Query) extends Query {
     (query2, query1)
   }
 
-  def sizeEstimate() = ((count1 min count2) * config("edges.average_intersection_proportion").toDouble).toInt
+  def sizeEstimate() = ((count1 min count2) * averageIntersectionProportion).toInt
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
@@ -38,9 +38,9 @@ class IntersectionQuery(query1: Query, query2: Query) extends Query {
     if (count1 == 0 || count2 == 0) {
       new ResultWindow(List[(Long,Cursor)](), count, cursor)
     } else {
-      val guessedPageSize = (count / config("edges.average_intersection_proportion").toDouble).toInt
-      val internalPageSize = guessedPageSize min config("edges.intersection_page_size_max").toInt
-      val timeout = config("edges.intersection_timeout_ms").toInt
+      val guessedPageSize = (count / averageIntersectionProportion).toInt
+      val internalPageSize = guessedPageSize min intersectionPageSizeMax.toInt
+      val timeout = intersectionTimeout.inMillis
 
       val now = System.currentTimeMillis
       var resultWindow = pageIntersection(smallerQuery, largerQuery, internalPageSize, count, cursor)

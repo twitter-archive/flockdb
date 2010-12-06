@@ -1,9 +1,10 @@
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
+import com.twitter.querulous.StatsCollector
 import com.twitter.util.TimeConversions._
 import com.twitter.flockdb.shards.QueryClass
-import com.twitter.flockdb.Priority
+import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
 
 
 trait Credentials extends Connection {
@@ -22,28 +23,25 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
   database.pool = new ApachePoolingDatabase {
     sizeMin = 2
     sizeMax = 2
-    maxWait = 100.millis
+    maxWait = 1.second
     minEvictableIdle = 60.seconds
     testIdle = 1.second
     testOnBorrow = false
   }
 
-  database.timeout = new TimingOutDatabase {
+/*  database.timeout = new TimingOutDatabase {
     poolSize = 10
     queueSize = 10000
-    open = 100.millis
-    initialize = 1000.millis
-  }
+    open = 1.second
+    initialize = 1.second
+  } */
 
-//  override def apply(stats: StatsCollector) = {
-//    MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(status) } )
-//  }
+  override def apply(stats: StatsCollector) = {
+    MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats) } )
+  }
 }
 
 new FlockDB {
-  intersectionTimeout           = 100.millis
-  averageIntersectionProportion = 0.1
-  intersectionPageSizeMax       = 4000
   aggregateJobsPageSize         = 500
 
   val server = new FlockDBServer with THsHaServer {

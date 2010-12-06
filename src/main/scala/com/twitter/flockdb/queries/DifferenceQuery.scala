@@ -16,19 +16,19 @@
 
 package com.twitter.flockdb.queries
 
-import net.lag.configgy.Configgy
+import com.twitter.util.Duration
+import com.twitter.util.TimeConversions._
 
-class DifferenceQuery(query1: Query, query2: Query) extends Query {
-  val config = Configgy.config
 
+class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends Query {
   def sizeEstimate = query1.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
-    val guessedPageSize = (count + count * config("edges.average_intersection_proportion").toDouble).toInt
-    val internalPageSize = guessedPageSize min config("edges.intersection_page_size_max").toInt
-    val timeout = config("edges.intersection_timeout_ms").toInt
+    val guessedPageSize = (count + count * averageIntersectionProportion).toInt
+    val internalPageSize = guessedPageSize min intersectionPageSizeMax
+    val timeout = intersectionTimeout.inMillis
 
     var resultWindow = pageDifference(internalPageSize, count, cursor)
     val now = System.currentTimeMillis
