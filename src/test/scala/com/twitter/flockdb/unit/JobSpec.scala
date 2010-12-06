@@ -237,7 +237,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = new Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, forwardingManager, scheduler)
+      val job = new Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
       val json = job.toJson
       json mustMatch "Archive"
       json mustMatch "\"source_id\":" + bob
@@ -257,7 +257,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, forwardingManager, scheduler)
+      val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
       val json = job.toJson
       json mustMatch "Unarchive"
       json mustMatch "\"source_id\":" + bob
@@ -277,7 +277,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, forwardingManager, scheduler)
+      val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
       val json = job.toJson
       json mustMatch "RemoveAll"
       json mustMatch "\"source_id\":" + bob

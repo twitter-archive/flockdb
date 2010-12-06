@@ -27,7 +27,7 @@ import jobs.multi
 import flockdb.operations.{ExecuteOperations, ExecuteOperationType}
 
 
-class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingManager: ForwardingManager) {
+class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingManager: ForwardingManager, aggregateJobPageSize: Int) {
   @throws(classOf[ShardException])
   def apply(program: ExecuteOperations) {
     val now = Time.now
@@ -48,25 +48,25 @@ class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingMa
           processDestinations(term) { (sourceId, destinationId) =>
             single.Add(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
+            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
           }
         case ExecuteOperationType.Remove =>
           processDestinations(term) { (sourceId, destinationId) =>
             single.Remove(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
+            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
           }
         case ExecuteOperationType.Archive =>
           processDestinations(term) { (sourceId, destinationId) =>
             single.Archive(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
+            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
           }
         case ExecuteOperationType.Negate =>
           processDestinations(term) { (sourceId, destinationId) =>
             single.Negate(sourceId, term.graphId, destinationId, position, time, null, null)
           } {
-            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, null, null)
+            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
           }
         case n =>
           throw new InvalidQueryException("Unknown operation " + n)

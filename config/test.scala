@@ -18,7 +18,7 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     val interval = 60.seconds
   }
 
-  query.debug = DebugLog
+//  query.debug = DebugLog
   database.memoize = true
   database.pool = new ApachePoolingDatabase {
     sizeMin = 2
