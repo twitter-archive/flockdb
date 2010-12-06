@@ -47,7 +47,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       forwardingManager = mock[ForwardingManager]
       shard = mock[Shard]
       shard2 = mock[Shard]
-      selectCompiler = new SelectCompiler(forwardingManager)
+      selectCompiler = new SelectCompiler(forwardingManager, new flockdb.config.IntersectionQuery { })
     }
 
     "execute a simple wildcard query" in {
@@ -84,7 +84,6 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
         new SelectOperation(SelectOperationType.Intersection, None) :: Nil
       val query = selectCompiler(program)
       query.getClass.getName mustMatch "IntersectionQuery"
-      (query.asInstanceOf[queries.IntersectionQuery]).config("edges.average_intersection_proportion") = "1.0"
       query.sizeEstimate mustEqual 2
     }
 

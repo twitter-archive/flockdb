@@ -30,9 +30,8 @@ import conversions.EdgeResults._
 import conversions.Results._
 import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
 import thrift.{Results, EdgeResults}
-import test.EdgesDatabase
 
-class SqlShardSpec extends ConfiguredSpecification with JMocker with EdgesDatabase {
+class SqlShardSpec extends IntegrationSpecification with JMocker {
   "Edge SqlShard" should {
     val alice = 1L
     val bob = 2L

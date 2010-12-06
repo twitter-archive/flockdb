@@ -47,7 +47,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
     val future = mock[Future]
     val copyFactory = mock[CopyJobFactory[Shard]]
-    val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
+    val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future, config.intersectionQuery))
 
     "add" in {
       Time.freeze()

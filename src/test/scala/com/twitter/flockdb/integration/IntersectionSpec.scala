@@ -18,7 +18,6 @@ package com.twitter.flockdb.integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import test.EdgesDatabase
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 object IntersectionSpec extends IntegrationSpecification {
@@ -79,13 +78,13 @@ object IntersectionSpec extends IntegrationSpecification {
     }
 
     "with a large intersection" >>  {
-      config.intersectionPageSizeMax = 1
+      config.intersectionQuery.intersectionPageSizeMax = 1
 
       intersectAlot
     }
 
     "with a small intersection" >> {
-      config.intersectionPageSizeMax = Integer.MAX_VALUE - 1
+      config.intersectionQuery.intersectionPageSizeMax = Integer.MAX_VALUE - 1
 
       intersectAlot
     }
