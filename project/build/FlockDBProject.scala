@@ -3,7 +3,7 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher {
-  val gizzard   = "com.twitter" % "gizzard" % "1.4.13"
+  val gizzard   = "com.twitter" % "gizzard" % "1.4.14-SNAPSHOT"
   val results   = "com.twitter" % "results" % "1.0"
 
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
