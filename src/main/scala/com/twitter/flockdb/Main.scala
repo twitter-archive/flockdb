@@ -57,6 +57,7 @@ object Main extends Service {
 
   def main(args: Array[String]) {
     shards.QueryClass.SelectModify // Hack to force allocation of QueryClass
+    shards.QueryClass.SelectIntersection
 
     runtime.load(args)
     config = Configgy.config
