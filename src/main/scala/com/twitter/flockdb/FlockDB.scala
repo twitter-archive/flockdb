@@ -85,7 +85,7 @@ object FlockDB {
     shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
 
     val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository, None)
+                                           shardRepository)
 
     val forwardingManager = new ForwardingManager(nameServer)
     nameServer.reload()
