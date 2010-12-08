@@ -24,6 +24,7 @@ import net.lag.logging.Logger
 
 object StaticEdges extends Database {
   shards.QueryClass.SelectModify
+  shards.QueryClass.SelectIntersection
 
   val log = Logger.get
   val config = Configgy.config
