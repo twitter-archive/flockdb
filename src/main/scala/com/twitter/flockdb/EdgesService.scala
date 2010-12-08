@@ -19,7 +19,8 @@ package com.twitter.flockdb
 import com.twitter.gizzard.Future
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException, ShardTimeoutException}
+import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
+  ShardOfflineException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import operations.{ExecuteOperations, SelectOperation}
 import com.twitter.ostrich.Stats
