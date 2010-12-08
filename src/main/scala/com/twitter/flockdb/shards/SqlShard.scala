@@ -327,7 +327,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
       val (rv, msec) = Stats.duration {
-        queryEvaluator.select(SelectIntersection"SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+        queryEvaluator.select(SelectIntersection, "SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
           List(sourceId, states.map(_.id).toList, destinationIds): _*) { row =>
           makeEdge(row)
         }
