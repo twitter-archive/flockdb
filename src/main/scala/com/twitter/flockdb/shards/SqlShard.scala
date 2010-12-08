@@ -18,6 +18,7 @@ package com.twitter.flockdb.shards
 
 import java.sql.{ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
+import com.twitter.ostrich.Stats
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
 import com.twitter.results.{Cursor, ResultWindow}
@@ -95,15 +96,25 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private val randomGenerator = new util.Random
 
   def get(sourceId: Long, destinationId: Long) = {
-    queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
-      makeEdge(row)
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
+        makeEdge(row)
+      }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    rv
   }
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
-    queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
-      Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+        Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+      }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+    rv
   }
 
   def selectAllMetadata(cursor: Cursor, count: Int) = {
@@ -112,54 +123,74 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = Cursor.End
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
-      if (i < count) {
-        val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
-        nextCursor = Cursor(sourceId)
-        i += 1
-      } else {
-        returnedCursor = nextCursor
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.select("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?", cursor.position, count + 1) { row =>
+        if (i < count) {
+          val sourceId = row.getLong("source_id")
+          metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+          nextCursor = Cursor(sourceId)
+          i += 1
+        } else {
+          returnedCursor = nextCursor
+        }
       }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
 
     (metadatas, returnedCursor)
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
-    queryEvaluator.selectOne("SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
-      states.foldLeft(0) { (result, state) =>
-        result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.selectOne("SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+        states.foldLeft(0) { (result, state) =>
+          result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
+        }
+      } getOrElse {
+        populateMetadata(sourceId, Normal)
+        count(sourceId, states)
       }
-    } getOrElse {
-      populateMetadata(sourceId, Normal)
-      count(sourceId, states)
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+    rv
   }
 
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int]) {
-    queryEvaluator.select("SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
-      results(row.getLong("source_id")) = row.getInt("count")
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.select("SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
+        results(row.getLong("source_id")) = row.getInt("count")
+      }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
   }
 
   private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time(0.seconds)) }
 
   private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     try {
-      queryEvaluator.execute(
-        "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
-        sourceId,
-        computeCount(sourceId, state),
-        state.id,
-        updatedAt.inSeconds)
+      val (rv, msec) = Stats.duration {
+        queryEvaluator.execute(
+          "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
+          sourceId,
+          computeCount(sourceId, state),
+          state.id,
+          updatedAt.inSeconds)
+      }
+      Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+      Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+      rv
     } catch {
       case e: SQLIntegrityConstraintViolationException =>
     }
   }
 
   private def computeCount(sourceId: Long, state: State) = {
-    queryEvaluator.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
+    Stats.time("x-stats-table-timing-"+tablePrefix+"_edges") {
+      queryEvaluator.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
+    }
   }
 
   def selectAll(cursor: (Cursor, Cursor), count: Int): (Seq[Edge], (Cursor, Cursor)) = {
@@ -168,15 +199,19 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     var returnedCursor = (Cursor.End, Cursor.End)
 
     var i = 0
-    queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?", cursor._1.position, cursor._2.position, cursor._1.position, count + 1) { row =>
-      if (i < count) {
-        edges += makeEdge(row)
-        nextCursor = (Cursor(row.getLong("source_id")), Cursor(row.getLong("destination_id")))
-        i += 1
-      } else {
-        returnedCursor = nextCursor
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?", cursor._1.position, cursor._2.position, cursor._1.position, count + 1) { row =>
+        if (i < count) {
+          edges += makeEdge(row)
+          nextCursor = (Cursor(row.getLong("source_id")), Cursor(row.getLong("destination_id")))
+          i += 1
+        } else {
+          returnedCursor = nextCursor
+        }
       }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
 
     (edges, returnedCursor)
   }
@@ -213,9 +248,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     val (continueCursorQuery, args1) = query(cursorName, index, 1, cursor, opposite(order), opposite(inequality), conditions, args)
     val (edgesQuery, args2) = query(cursorName, index, count + 1, cursor, order, inequality, conditions, args)
     val totalQuery = continueCursorQuery + " UNION " + edgesQuery
-    queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
-      edges += (row.getLong("destination_id"), Cursor(row.getLong(cursorName)))
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
+        edges += (row.getLong("destination_id"), Cursor(row.getLong(cursorName)))
+      }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
 
     var page = edges.projection
     if (cursor < Cursor.Start) page = page.reverse
@@ -231,9 +270,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     val (continueCursorQuery, args2) = query("*", "position", "PRIMARY", 1, cursor, opposite(order), opposite(inequality), conditions, args)
 
     val edges = new mutable.ArrayBuffer[(Edge, Cursor)]
-    queryEvaluator.select(continueCursorQuery + " UNION " + edgesQuery, args1 ++ args2: _*) { row =>
-      edges += (makeEdge(row), Cursor(row.getLong("position")))
+    val (rv, msec) = Stats.duration {
+      queryEvaluator.select(continueCursorQuery + " UNION " + edgesQuery, args1 ++ args2: _*) { row =>
+        edges += (makeEdge(row), Cursor(row.getLong("position")))
+      }
     }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
 
     var page = edges.projection
     if (cursor < Cursor.Start) page = page.reverse
@@ -268,19 +311,29 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select("SELECT destination_id FROM " + tablePrefix + "_edges WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
-        List(sourceId, states.map(_.id).toList, destinationIds): _*) { row =>
-        row.getLong("destination_id")
+      val (rv, msec) = Stats.duration {
+        queryEvaluator.select("SELECT destination_id FROM " + tablePrefix + "_edges WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+          List(sourceId, states.map(_.id).toList, destinationIds): _*) { row =>
+          row.getLong("destination_id")
+        }
       }
+      Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+      Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+      rv
     }
   }
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
-        List(sourceId, states.map(_.id).toList, destinationIds): _*) { row =>
-        makeEdge(row)
+      val (rv, msec) = Stats.duration {
+        queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+          List(sourceId, states.map(_.id).toList, destinationIds): _*) { row =>
+          makeEdge(row)
+        }
       }
+      Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+      Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+      rv
     }
   }
 
@@ -330,11 +383,14 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private class MissingMetadataRow extends Exception("Missing Count Row")
 
   private def insertEdge(transaction: Transaction, metadata: Metadata, edge: Edge): Int = {
-    val insertedRows =
-      transaction.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, " +
-                          "updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)",
-                          edge.sourceId, edge.position, edge.updatedAt.inSeconds,
-                          edge.destinationId, edge.count, edge.state.id)
+    val (rv, msec) = Stats.duration { transaction.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, " +
+                            "updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)",
+                            edge.sourceId, edge.position, edge.updatedAt.inSeconds,
+                            edge.destinationId, edge.count, edge.state.id)
+      }
+    Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+    val insertedRows = rv;
     if (edge.state == metadata.state) insertedRows else 0
   }
 
@@ -365,29 +421,44 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
 
     val updatedRows = if (oldEdge.state != Archived && edge.state == Normal) {
-      transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
-                          "position = ?, count = 0, state = ? " +
-                          "WHERE source_id = ? AND destination_id = ? AND " +
-                          "updated_at <= ?",
-                          edge.updatedAt.inSeconds, edge.position, edge.state.id,
-                          edge.sourceId, edge.destinationId, edge.updatedAt.inSeconds)
+      val (rv, msec) = Stats.duration {
+        transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
+                            "position = ?, count = 0, state = ? " +
+                            "WHERE source_id = ? AND destination_id = ? AND " +
+                            "updated_at <= ?",
+                            edge.updatedAt.inSeconds, edge.position, edge.state.id,
+                            edge.sourceId, edge.destinationId, edge.updatedAt.inSeconds)
+      }
+      Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+      Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+      rv
     } else {
       try {
-        transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
-                            "count = 0, state = ? " +
-                            "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
-                            edge.updatedAt.inSeconds, edge.state.id, edge.sourceId,
-                            edge.destinationId, edge.updatedAt.inSeconds)
+        val (rv, msec) = Stats.duration {
+          transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
+                              "count = 0, state = ? " +
+                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
+                              edge.updatedAt.inSeconds, edge.state.id, edge.sourceId,
+                              edge.destinationId, edge.updatedAt.inSeconds)
+        }
+        Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+        Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+        rv
       } catch {
         case e: SQLIntegrityConstraintViolationException =>
           // usually this is a (source_id, state, position) violation. scramble the position more.
           // FIXME: hacky. remove with the new schema.
-          transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
-                              "count = 0, state = ?, position = position + ? " +
-                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
-                              edge.updatedAt.inSeconds, edge.state.id,
-                              (randomGenerator.nextInt() % 999) + 1, edge.sourceId,
-                              edge.destinationId, edge.updatedAt.inSeconds)
+          val (rv, msec) = Stats.duration {
+            transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
+                                "count = 0, state = ?, position = position + ? " +
+                                "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
+                                edge.updatedAt.inSeconds, edge.state.id,
+                                (randomGenerator.nextInt() % 999) + 1, edge.sourceId,
+                                edge.destinationId, edge.updatedAt.inSeconds)
+          }
+          Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", msec.toInt)
+          Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", msec.toInt)
+          rv
       }
     }
     if (edge.state != oldEdge.state &&
@@ -399,9 +470,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private def writeEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                         predictExistence: Boolean): Int = {
     val countDelta = if (predictExistence) {
+      val start = Time.now
       transaction.selectOne(SelectModify,
                             "SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
                             "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
+        val dur = Time.now - start
+        Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", dur.inMillis.toInt)
+        Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", dur.inMillis.toInt)
         makeEdge(row)
       }.map { oldRow =>
         updateEdge(transaction, metadata, edge, oldRow)
@@ -413,9 +488,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
         insertEdge(transaction, metadata, edge)
       } catch {
         case e: SQLIntegrityConstraintViolationException =>
+          val start = Time.now
           transaction.selectOne(SelectModify,
                                 "SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
                                 "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
+            val dur = Time.now - start
+            Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_edges", dur.inMillis.toInt)
+            Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_edges", dur.inMillis.toInt)
             makeEdge(row)
           }.map { oldRow =>
             updateEdge(transaction, metadata, edge, oldRow)
@@ -434,8 +513,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
       atomically(edge.sourceId) { (transaction, metadata) =>
         val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
         if (countDelta != 0) {
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
-                              "WHERE source_id = ?", countDelta, edge.sourceId)
+          val (rv, msec) = Stats.duration {
+            transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
+                                "WHERE source_id = ?", countDelta, edge.sourceId)
+          }
+          Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+          Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+          rv
         }
       }
     } catch {
@@ -469,8 +553,13 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
           }
         } finally {
           if (countDelta != 0) {
-            transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
-                                "WHERE source_id = ?", countDelta, currentSourceId)
+            val (rv, msec) = Stats.duration {
+              transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
+                                  "WHERE source_id = ?", countDelta, currentSourceId)
+            }
+            Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+            Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+            rv
           }
         }
       }
@@ -488,8 +577,12 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
     try {
       queryEvaluator.transaction { transaction =>
+        val start = Time.now
         transaction.selectOne(SelectModify,
                               "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ? FOR UPDATE", sourceId) { row =>
+          val dur = Time.now - start
+          Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", dur.inMillis.toInt)
+          Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", dur.inMillis.toInt)
           f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
         } getOrElse(throw new MissingMetadataRow)
       }
@@ -502,16 +595,24 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   def writeMetadata(metadata: Metadata) {
     try {
-      queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
-                             "updated_at) VALUES (?, ?, ?, ?)",
-                             metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
+      val (rv, msec) = Stats.duration {
+        queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
+                               "updated_at) VALUES (?, ?, ?, ?)",
+                               metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
+      }
+      Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+      Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
     } catch {
       case e: SQLIntegrityConstraintViolationException =>
         atomically(metadata.sourceId) { (transaction, oldMetadata) =>
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
-                              "WHERE source_id = ? AND updated_at <= ?",
-                              metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
-                              metadata.updatedAt.inSeconds)
+          val (rv, msec) = Stats.duration {
+            transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
+                                "WHERE source_id = ? AND updated_at <= ?",
+                                metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
+                                metadata.updatedAt.inSeconds)
+          }
+          Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+          Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
         }
     }
   }
@@ -522,8 +623,12 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     atomically(sourceId) { (transaction, metadata) =>
       if ((updatedAt != metadata.updatedAt) || ((metadata.state max state) == state)) {
-        transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
-          state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
+        val (rv, msec) = Stats.duration {
+          transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
+            state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
+        }
+        Stats.incr("x-stats-total-table-timing-"+tablePrefix+"_metadata", msec.toInt)
+        Stats.addTiming("x-stats-table-timing-"+tablePrefix+"_metadata", msec.toInt)
       }
     }
   }
