@@ -16,11 +16,12 @@
 
 package com.twitter.flockdb.shards
 
-import java.sql.{ResultSet, SQLException, SQLIntegrityConstraintViolationException}
+import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
 import com.twitter.results.{Cursor, ResultWindow}
+import com.twitter.ostrich.Stats
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query.{QueryClass => QQueryClass, SqlQueryTimeoutException}
 import com.twitter.xrayspecs.Time
@@ -339,15 +340,22 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     if (edge.state == metadata.state) insertedRows else 0
   }
 
-  def bulkUnsafeInsertEdges(edges: Seq[Edge]) = {
-    if (edges.length > 0) {
+  def bulkUnsafeInsertEdges(edges: Seq[Edge]) {
+    bulkUnsafeInsertEdges(queryEvaluator, State.Normal, edges)
+  }
+
+  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, currentState: State, edges: Seq[Edge]) = {
+    var count = 0
+    if (edges.size > 0) {
       val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
-      queryEvaluator.executeBatch(query) { batch =>
+      transaction.executeBatch(query) { batch =>
         edges.foreach { edge =>
           batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
+          if (edge.state == currentState) count += 1
         }
       }
     }
+    count
   }
 
   def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
@@ -465,8 +473,14 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
       var countDelta = 0
       atomically(currentSourceId) { (transaction, metadata) =>
         try {
-          burst.foreach { edge =>
-            countDelta += writeEdge(transaction, metadata, edge, false)
+          try {
+            countDelta += bulkUnsafeInsertEdges(transaction, metadata.state, burst)
+          } catch {
+            case e: BatchUpdateException =>
+              Stats.incr("x-copy-fallback")
+              burst.foreach { edge =>
+                countDelta += writeEdge(transaction, metadata, edge, false)
+              }
           }
         } finally {
           if (countDelta != 0) {
