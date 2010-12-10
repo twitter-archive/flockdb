@@ -62,8 +62,6 @@ class ProductionNameServerReplica(host: String) extends Mysql {
 }
 
 new FlockDB {
-  aggregateJobsPageSize = 500
-
   val server = new FlockDBServer with THsHaServer {
     timeout = 100.millis
     idleTimeout = 60.seconds
@@ -101,7 +99,7 @@ new FlockDB {
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
-    val database = "edges_test"
+    val database = "edges"
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
@@ -119,6 +117,7 @@ new FlockDB {
     override val jobQueueName = name + "_jobs"
     val schedulerType = new KestrelScheduler {
       val queuePath = "/var/spool/kestrel"
+      override val maxMemorySize = 36000000L
     }
 
     errorLimit = 100

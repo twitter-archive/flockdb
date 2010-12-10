@@ -7,13 +7,8 @@ import java.io.File
 
 object ConfigValidationSpec extends Specification {
   "Configuration Validation" should {
-    "production_sjc.scala" >> {
-      val config = Eval[flockdb.config.FlockDB](new File("config/production_common.scala"), new File("config/production_sjc.scala"))
-      config mustNot beNull
-    }
-
-    "production_slc.scala" >> {
-      val config = Eval[flockdb.config.FlockDB](new File("config/production_common.scala"), new File("config/production_slc.scala"))
+    "production.scala" >> {
+      val config = Eval[flockdb.config.FlockDB](new File("config/production.scala"))
       config mustNot beNull
     }
     "development.scala" >> {
