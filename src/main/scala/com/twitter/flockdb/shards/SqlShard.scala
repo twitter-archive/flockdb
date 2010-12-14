@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS %s (
 }
 
 
-class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
+class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
                val weight: Int, val children: Seq[Shard], config: ConfigMap) extends Shard {
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
@@ -464,28 +464,54 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
     }
   }
 
+  /**
+   * Mysql may throw an exception for a bulk operation that actually partially completed.
+   * If that happens, try to pick up the pieces and indicate what happened.
+   */
+  case class BurstResult(completed: Seq[Edge], failed: Seq[Edge])
+
+  def writeBurst(transaction: Transaction, state: State, edges: Seq[Edge]): BurstResult = {
+    try {
+      val modified = bulkUnsafeInsertEdges(transaction, state, edges)
+      BurstResult(edges, Nil)
+    } catch {
+      case e: BatchUpdateException =>
+        val completed = new mutable.ArrayBuffer[Edge]
+        val failed = new mutable.ArrayBuffer[Edge]
+        e.getUpdateCounts().zip(edges.toArray).foreach { case (errorCode, edge) =>
+          if (errorCode < 0) {
+            failed += edge
+          } else {
+            completed += edge
+          }
+        }
+        BurstResult(completed, failed)
+    }
+  }
+
   def writeCopies(edges: Seq[Edge]) {
     var remaining = edges
+    val burst = new mutable.ArrayBuffer[Edge]
     while (remaining.size > 0) {
-      val burst = new mutable.ArrayBuffer[Edge]
+      burst.clear()
       val currentSourceId = remaining(0).sourceId
       var index = 0
       while (remaining.size > index && remaining(index).sourceId == currentSourceId) {
         burst += remaining(index)
         index += 1
       }
+      Stats.addTiming("x-copy-burst", edges.size)
 
       var countDelta = 0
       atomically(currentSourceId) { (transaction, metadata) =>
         try {
-          try {
-            countDelta += bulkUnsafeInsertEdges(transaction, metadata.state, burst)
-          } catch {
-            case e: BatchUpdateException =>
-              Stats.incr("x-copy-fallback")
-              burst.foreach { edge =>
-                countDelta += writeEdge(transaction, metadata, edge, false)
-              }
+          val result = writeBurst(transaction, metadata.state, burst)
+          countDelta += result.completed.size
+          if (result.failed.size > 0) {
+            Stats.incr("x-copy-fallback")
+            result.failed.foreach { edge =>
+              countDelta += writeEdge(transaction, metadata, edge, false)
+            }
           }
         } finally {
           if (countDelta != 0) {
