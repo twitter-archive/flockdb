@@ -20,7 +20,7 @@ import java.sql.SQLException
 import scala.collection.mutable
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.querulous.evaluator.{StandardQueryEvaluatorFactory, QueryEvaluator, QueryEvaluatorFactory}
+import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, StandardQueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
@@ -674,13 +674,48 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           new Edge(frank, carl, 5, Time.now, 1, State.Normal) ::
           new Edge(frank, darcy, 6, Time.now, 1, State.Normal) ::
           Nil
-        shard.writeCopies(edges)
-        shard.get(alice, bob) mustEqual Some(edges(0))
-        shard.get(alice, darcy) mustEqual Some(edges(1))
-        shard.get(bob, carl) mustEqual Some(edges(2))
-        shard.get(frank, bob) mustEqual Some(edges(3))
-        shard.get(frank, carl) mustEqual Some(edges(4))
-        shard.get(frank, darcy) mustEqual Some(edges(5))
+
+        "no conflicts" in {
+          shard.writeCopies(edges)
+          shard.get(alice, bob) mustEqual Some(edges(0))
+          shard.get(alice, darcy) mustEqual Some(edges(1))
+          shard.get(bob, carl) mustEqual Some(edges(2))
+          shard.get(frank, bob) mustEqual Some(edges(3))
+          shard.get(frank, carl) mustEqual Some(edges(4))
+          shard.get(frank, darcy) mustEqual Some(edges(5))
+        }
+
+        "conflicts" in {
+          shard.add(frank, carl, 5, Time.now)
+          shard.writeCopies(edges)
+          shard.get(alice, bob) mustEqual Some(edges(0))
+          shard.get(alice, darcy) mustEqual Some(edges(1))
+          shard.get(bob, carl) mustEqual Some(edges(2))
+          shard.get(frank, bob) mustEqual Some(edges(3))
+          shard.get(frank, carl) must beSome[Edge]
+          shard.get(frank, darcy) mustEqual Some(edges(5))
+        }
+
+        "retries edges that failed a bulk-insert" in {
+          val stubShard = new SqlShard(queryEvaluator, shardInfo, 0, Nil, config) {
+            override def writeBurst(transaction: Transaction, state: State, edges: Seq[Edge]) = {
+              val completed = new mutable.ArrayBuffer[Edge]
+              val failed = new mutable.ArrayBuffer[Edge]
+              edges.foreach { edge =>
+                if (edge.destinationId == darcy) {
+                  failed += edge
+                } else {
+                  completed += edge
+                }
+              }
+              BurstResult(completed, failed)
+            }
+          }
+
+          stubShard.writeCopies(edges)
+          shard.get(alice, darcy) mustEqual Some(edges(1))
+          shard.get(frank, darcy) mustEqual Some(edges(5))
+        }
       }
     }
   }
