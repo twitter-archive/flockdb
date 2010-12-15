@@ -449,7 +449,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       atomically(edge.sourceId) { (transaction, metadata) =>
         val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
         if (countDelta != 0) {
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
+          transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
                               "WHERE source_id = ?", countDelta, edge.sourceId)
         }
       }
