@@ -42,8 +42,6 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
 }
 
 new FlockDB {
-  aggregateJobsPageSize         = 500
-
   val server = new FlockDBServer with THsHaServer {
     timeout = 100.millis
     idleTimeout = 60.seconds
