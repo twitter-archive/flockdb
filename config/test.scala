@@ -29,12 +29,12 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     testOnBorrow = false
   }
 
-/*  database.timeout = new TimingOutDatabase {
+  database.timeout = new TimingOutDatabase {
     poolSize = 10
     queueSize = 10000
     open = 1.second
     initialize = 1.second
-  } */
+  }
 
   override def apply(stats: StatsCollector) = {
     MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats) } )
@@ -42,8 +42,6 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
 }
 
 new FlockDB {
-  aggregateJobsPageSize         = 500
-
   val server = new FlockDBServer with THsHaServer {
     timeout = 100.millis
     idleTimeout = 60.seconds
