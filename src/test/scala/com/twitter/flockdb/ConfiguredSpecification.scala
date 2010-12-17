@@ -49,7 +49,9 @@ abstract class ConfiguredSpecification extends Specification {
 
 abstract class IntegrationSpecification extends ConfiguredSpecification with NameServerDatabase {
   val (manager, nameServer, flock, jobScheduler) = {
-    val f = new FlockDB(config, new W3CStats(Logger.get, Array()))
+    // XXX: Ostrich has a bug which causes a NPE when you pass in an empty array to W3CStats.
+    // Remove this when we upgrade ostrich to a version that contains commit 71d07d32dcb76b029bdc11c519c867d7a2431cc2
+    val f = new FlockDB(config, new W3CStats(Logger.get, Array("workaround")))
     (f.managerServer, f.nameServer, f.flockService, f.jobScheduler)
   }
 
