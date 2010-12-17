@@ -24,7 +24,7 @@ import conversions.Numeric._
 import shards.Shard
 
 
-abstract class SingleJobParser extends JsonJobParser[JsonJob] {
+abstract class SingleJobParser extends JsonJobParser {
   def apply(attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
     createJob(
