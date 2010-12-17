@@ -697,8 +697,8 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         }
 
         "retries edges that failed a bulk-insert" in {
-          val stubShard = new SqlShard(queryEvaluator, shardInfo, 0, Nil, config) {
-            override def writeBurst(transaction: Transaction, state: State, edges: Seq[Edge]) = {
+          val stubShard = new SqlShard(queryEvaluator, shardInfo, 0, Nil, 0) {
+            override def writeBurst(transaction: Transaction, edges: Seq[Edge]) = {
               val completed = new mutable.ArrayBuffer[Edge]
               val failed = new mutable.ArrayBuffer[Edge]
               edges.foreach { edge =>

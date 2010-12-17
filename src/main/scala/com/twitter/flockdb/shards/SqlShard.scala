@@ -350,21 +350,18 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def bulkUnsafeInsertEdges(edges: Seq[Edge]) {
-    bulkUnsafeInsertEdges(queryEvaluator, State.Normal, edges)
+    bulkUnsafeInsertEdges(queryEvaluator, edges)
   }
 
-  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, currentState: State, edges: Seq[Edge]) = {
-    var count = 0
+  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, edges: Seq[Edge]) = {
     if (edges.size > 0) {
       val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
       transaction.executeBatch(query) { batch =>
         edges.foreach { edge =>
           batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
-          if (edge.state == currentState) count += 1
         }
       }
     }
-    count
   }
 
   def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
@@ -473,9 +470,9 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
    */
   case class BurstResult(completed: Seq[Edge], failed: Seq[Edge])
 
-  def writeBurst(transaction: Transaction, state: State, edges: Seq[Edge]): BurstResult = {
+  def writeBurst(transaction: Transaction, edges: Seq[Edge]): BurstResult = {
     try {
-      val modified = bulkUnsafeInsertEdges(transaction, state, edges)
+      bulkUnsafeInsertEdges(transaction, edges)
       BurstResult(edges, Nil)
     } catch {
       case e: BatchUpdateException =>
@@ -492,39 +489,51 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
+  private def updateCount(transaction: QueryEvaluator, sourceId: Long, countDelta: Int) = {
+    transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
+                        "WHERE source_id = ?", countDelta, sourceId)
+  }
+
   def writeCopies(edges: Seq[Edge]) {
-    var remaining = edges
-    val burst = new mutable.ArrayBuffer[Edge]
-    while (remaining.size > 0) {
-      burst.clear()
-      val currentSourceId = remaining(0).sourceId
-      var index = 0
-      while (remaining.size > index && remaining(index).sourceId == currentSourceId) {
-        burst += remaining(index)
-        index += 1
-      }
-      Stats.addTiming("x-copy-burst", edges.size)
+    Stats.addTiming("x-copy-burst", edges.size)
 
-      var countDelta = 0
-      atomically(currentSourceId) { (transaction, metadata) =>
-        try {
-          val result = writeBurst(transaction, metadata.state, burst)
-          countDelta += result.completed.size
-          if (result.failed.size > 0) {
-            Stats.incr("x-copy-fallback")
-            result.failed.foreach { edge =>
-              countDelta += writeEdge(transaction, metadata, edge, false)
-            }
+    var sourceIdsSet = Set[Long]()
+    edges.foreach { edge => sourceIdsSet += edge.sourceId }
+    val sourceIds = sourceIdsSet.toSeq
+
+    atomically(sourceIds) { (transaction, metadataById) =>
+      val result = writeBurst(transaction, edges)
+      if (result.completed.size > 0) {
+        var currentSourceId = -1L
+        var countDeltas = new Array[Int](4)
+        result.completed.foreach { edge =>
+          if (edge.sourceId != currentSourceId) {
+            if (currentSourceId != -1)
+              updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
+            currentSourceId = edge.sourceId
+            countDeltas = new Array[Int](4)
           }
-        } finally {
-          if (countDelta != 0) {
-            transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
-                                "WHERE source_id = ?", countDelta, currentSourceId)
-          }
+          countDeltas(edge.state.id) += 1
         }
+        updateCount(transaction, currentSourceId,
+                    countDeltas(metadataById(currentSourceId).state.id))
       }
 
-      remaining = remaining.drop(index)
+      if (result.failed.size > 0) {
+        Stats.incr("x-copy-fallback")
+        var currentSourceId = -1L
+        var countDelta = 0
+        result.failed.foreach { edge =>
+          if (edge.sourceId != currentSourceId) {
+            if (currentSourceId != -1)
+              updateCount(transaction, currentSourceId, countDelta)
+            currentSourceId = edge.sourceId
+            countDelta = 0
+          }
+          countDelta += writeEdge(transaction, metadataById(edge.sourceId), edge, false)
+        }
+        updateCount(transaction, currentSourceId, countDelta)
+      }
     }
   }
 
@@ -546,6 +555,25 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       case e: MissingMetadataRow =>
         populateMetadata(sourceId, Normal)
         atomically(sourceId)(f)
+    }
+  }
+
+  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
+    try {
+      val metadataMap = mutable.Map[Long, Metadata]()
+      queryEvaluator.transaction { transaction =>
+        transaction.select(SelectModify,
+                           "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE", sourceIds) { row =>
+          metadataMap.put(row.getLong("source_id"), Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+        }
+        if (metadataMap.size < sourceIds.length)
+          throw new MissingMetadataRow
+        f(transaction, metadataMap)
+      }
+    } catch {
+      case e: MissingMetadataRow =>
+        sourceIds.foreach { sourceId => populateMetadata(sourceId, Normal) }
+        atomically(sourceIds)(f)
     }
   }
 
