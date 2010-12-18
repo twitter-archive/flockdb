@@ -17,7 +17,17 @@
 package com.twitter.flockdb
 
 import com.twitter.util.Time
-
+import com.twitter.flockdb.jobs.single._
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
-                state: State)
+                state: State) {
+  def toJob(tableId: Int, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
+    val job = state match {
+      case State.Normal => Add
+      case State.Removed => Remove
+      case State.Archived => Archive
+      case State.Negative => Negate
+    }
+    job(sourceId, tableId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
+  }
+}
