@@ -68,6 +68,9 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   val copyPriority = Priority.Medium.id
   val copyFactory = new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id))
 
+  val splitFactory = new jobs.SplitFactory(nameServer, jobScheduler(Priority.Medium.id))
+  managerServer.addCopyFactory(splitFactory)
+
   val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
