@@ -3,7 +3,7 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher with InlineDependencies {
-  inline("com.twitter" % "gizzard" % "1.6-mc-SNAPSHOT")
+  inline("com.twitter" % "gizzard" % "1.6-splittable-SNAPSHOT")
   override def filterScalaJars = false
 
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.7.7"

@@ -29,6 +29,7 @@ import shards.{Metadata, Shard}
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")
   val shard2Id = ShardId("test", "shard2")
+  val dests = List(CopyDestination(shard2Id, None))
   val count = 2300
 
   "Copy" should {
@@ -40,7 +41,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val shard2 = mock[Shard]
 
     "apply" in {
-      val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count, nameServer, scheduler)
+      val job = new Copy(shard1Id, dests, (cursor1, cursor2), count, nameServer, scheduler)
       val edge = new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)
 
       "continuing work" >> {
@@ -50,7 +51,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAll((cursor1, cursor2), count) willReturn (List(edge), (cursor1, Cursor(cursor2.position + 1)))
           one(shard2).writeCopies(List(edge))
-          one(scheduler).put(new Copy(shard1Id, shard2Id, (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
+          one(scheduler).put(new Copy(shard1Id, dests, (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
         }
         job.apply()
       }
@@ -61,7 +62,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAll((cursor1, cursor2), count) willThrow new ShardTimeoutException(100.milliseconds, null)
-          one(scheduler).put(new Copy(shard1Id, shard2Id, (cursor1, cursor2), (count.toFloat * 0.9).toInt, nameServer, scheduler))
+          one(scheduler).put(new Copy(shard1Id, dests, (cursor1, cursor2), (count.toFloat * 0.9).toInt, nameServer, scheduler))
         }
         job.apply()
      }
@@ -81,7 +82,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "toJson" in {
-      val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count, nameServer, scheduler)
+      val job = new Copy(shard1Id, dests, (cursor1, cursor2), count, nameServer, scheduler)
       val json = job.toJson
       json mustMatch "Copy"
       json mustMatch "\"cursor1\":" + cursor1.position
@@ -95,7 +96,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[JobScheduler[JsonJob]]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
-    val job = new MetadataCopy(shard1Id, shard2Id, cursor, count, nameServer, scheduler)
+    val job = new MetadataCopy(shard1Id, dests, cursor, count, nameServer, scheduler)
 
     "apply" in {
       "continuing work" >> {
@@ -106,7 +107,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor(cursor.position + 1))
           one(shard2).writeMetadata(metadata)
-          one(scheduler).put(new MetadataCopy(shard1Id, shard2Id, Cursor(cursor.position + 1), count, nameServer, scheduler))
+          one(scheduler).put(new MetadataCopy(shard1Id, dests, Cursor(cursor.position + 1), count, nameServer, scheduler))
         }
         job.apply()
       }
@@ -119,7 +120,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
           one(shard2).writeMetadata(metadata)
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-          one(scheduler).put(new Copy(shard1Id, shard2Id, (Cursor.Start, Cursor.Start), Copy.COUNT, nameServer, scheduler))
+          one(scheduler).put(new Copy(shard1Id, dests, (Cursor.Start, Cursor.Start), Copy.COUNT, nameServer, scheduler))
         }
         job.apply()
       }

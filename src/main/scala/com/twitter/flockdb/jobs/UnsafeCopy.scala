@@ -35,31 +35,31 @@ object UnsafeCopy {
 
 class UnsafeCopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobFactory[Shard] {
-  def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
-    new MetadataUnsafeCopy(sourceShardId, destinationShardId, MetadataUnsafeCopy.START,
+  def apply(sourceShardId: ShardId, destinations: List[CopyDestination]) =
+    new MetadataUnsafeCopy(sourceShardId, destinations, MetadataUnsafeCopy.START,
                            UnsafeCopy.COUNT, nameServer, scheduler)
 }
 
 class UnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinations: List[CopyDestination], count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toInt),
                   Cursor(attributes("cursor2").asInstanceOf[AnyVal].toInt))
-    new UnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
+    new UnsafeCopy(sourceId, destinations, cursor, count, nameServer, scheduler)
   }
 }
 
-class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: UnsafeCopy.CopyCursor,
+class UnsafeCopy(sourceShardId: ShardId, destinations: List[CopyDestination], cursor: UnsafeCopy.CopyCursor,
                  count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
-      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
-  def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+      extends CopyJob[Shard](sourceShardId, destinations, count, nameServer, scheduler) {
+  def copyPage(sourceShard: Shard, destinationShards: List[CopyDestinationShard[Shard]], count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.bulkUnsafeInsertEdges(items)
+    destinationShards.foreach(_.shard.bulkUnsafeInsertEdges(items))
     Stats.incr("edges-copy", items.size)
     if (newCursor == UnsafeCopy.END) {
       None
     } else {
-      Some(new UnsafeCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
+      Some(new UnsafeCopy(sourceShardId, destinations, newCursor, count, nameServer, scheduler))
     }
   }
 
@@ -74,25 +74,25 @@ object MetadataUnsafeCopy {
 
 class MetadataUnsafeCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinations: List[CopyDestination], count: Int) = {
     val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toInt)
-    new MetadataUnsafeCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
+    new MetadataUnsafeCopy(sourceId, destinations, cursor, count, nameServer, scheduler)
   }
 }
 
-class MetadataUnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId,
+class MetadataUnsafeCopy(sourceShardId: ShardId, destinations: List[CopyDestination],
                          cursor: MetadataUnsafeCopy.CopyCursor, count: Int,
                          nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
-      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
-  def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+      extends CopyJob[Shard](sourceShardId, destinations, count, nameServer, scheduler) {
+  def copyPage(sourceShard: Shard, destinationShards: List[CopyDestinationShard[Shard]], count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    destinationShard.bulkUnsafeInsertMetadata(items)
+    destinationShards.map(_.shard.bulkUnsafeInsertMetadata(items))
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataUnsafeCopy.END)
-      Some(new UnsafeCopy(sourceShardId, destinationShardId, UnsafeCopy.START, UnsafeCopy.COUNT,
+      Some(new UnsafeCopy(sourceShardId, destinations, UnsafeCopy.START, UnsafeCopy.COUNT,
                           nameServer, scheduler))
     else
-      Some(new MetadataUnsafeCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
+      Some(new MetadataUnsafeCopy(sourceShardId, destinations, newCursor, count, nameServer, scheduler))
   }
 
   def serialize = Map("cursor" -> cursor.position)

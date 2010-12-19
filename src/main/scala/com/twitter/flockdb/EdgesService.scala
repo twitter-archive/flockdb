@@ -122,9 +122,9 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
         countAndRethrow(e)
       case e: ShardDatabaseTimeoutException =>
         countAndRethrow(e)
-      case e: Throwable =>
-        Stats.incr("unknown-exceptions")
+      case e: Throwable =>  
         log.error(e, "Unhandled error in EdgesService: %s", e)
+        Stats.incr("unknown-exceptions")
         throw(new FlockException(e.toString))
     }
   }

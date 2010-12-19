@@ -35,31 +35,31 @@ object Copy {
 
 class CopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobFactory[Shard] {
-  def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
-    new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
+  def apply(sourceShardId: ShardId, destinations: List[CopyDestination]) =
+    new MetadataCopy(sourceShardId, destinations, MetadataCopy.START, Copy.COUNT,
                      nameServer, scheduler)
 }
 
 class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinations: List[CopyDestination], count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
                   Cursor(attributes("cursor2").asInstanceOf[AnyVal].toLong))
-    new Copy(sourceId, destinationId, cursor, count, nameServer, scheduler)
+    new Copy(sourceId, destinations, cursor, count, nameServer, scheduler)
   }
 }
 
-class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.CopyCursor,
+class Copy(sourceShardId: ShardId, destinations: List[CopyDestination], cursor: Copy.CopyCursor,
            count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
-      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
-  def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+      extends CopyJob[Shard](sourceShardId, destinations, count, nameServer, scheduler) {
+  def copyPage(sourceShard: Shard, destinationShards: List[CopyDestinationShard[Shard]], count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.writeCopies(items)
+    destinationShards.map(_.shard.writeCopies(items))
     Stats.incr("edges-copy", items.size)
     if (newCursor == Copy.END) {
       None
     } else {
-      Some(new Copy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
+      Some(new Copy(sourceShardId, destinations, newCursor, count, nameServer, scheduler))
     }
   }
 
@@ -74,23 +74,25 @@ object MetadataCopy {
 
 class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
       extends CopyJobParser[Shard] {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinations: List[CopyDestination], count: Int) = {
     val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
-    new MetadataCopy(sourceId, destinationId, cursor, count, nameServer, scheduler)
+    new MetadataCopy(sourceId, destinations, cursor, count, nameServer, scheduler)
   }
 }
 
-class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.CopyCursor,
+class MetadataCopy(sourceShardId: ShardId, destinations: List[CopyDestination], cursor: MetadataCopy.CopyCursor,
                    count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
-      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
-  def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+      extends CopyJob[Shard](sourceShardId, destinations, count, nameServer, scheduler) {
+  def copyPage(sourceShard: Shard, destinationShards: List[CopyDestinationShard[Shard]], count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    items.foreach { destinationShard.writeMetadata(_) }
+    destinationShards.foreach { destination => 
+      items.foreach { destination.shard.writeMetadata(_) }
+    }
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
-      Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))
+      Some(new Copy(sourceShardId, destinations, Copy.START, Copy.COUNT, nameServer, scheduler))
     else
-      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
+      Some(new MetadataCopy(sourceShardId, destinations, newCursor, count, nameServer, scheduler))
   }
 
   def serialize = Map("cursor" -> cursor.position)
