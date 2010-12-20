@@ -4,7 +4,7 @@ import com.twitter.querulous.config._
 import com.twitter.querulous.StatsCollector
 import com.twitter.util.TimeConversions._
 import com.twitter.flockdb.shards.QueryClass
-import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
+import com.twitter.flockdb.Priority
 
 trait Credentials extends Connection {
   val username = "root"
