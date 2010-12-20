@@ -111,8 +111,9 @@ case class Unarchive(sourceId: Long, graphId: Int, direction: Direction, updated
                      priority: Priority.Value, aggregateJobPageSize: Int, forwardingManager: ForwardingManager,
                       scheduler: PrioritizingJobScheduler[JsonJob])
            extends Multi(sourceId, graphId, direction, updatedAt, priority, aggregateJobPageSize, forwardingManager, scheduler) {
-  protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
+  protected def update(sourceId: Long, graphId: Int, destinationId: Long) = {
     new single.Add(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
+  }
   protected def updateMetadata(shard: Shard) = shard.add(sourceId, updatedAt)
 }
 

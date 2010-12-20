@@ -20,6 +20,7 @@ import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.util.Time
+import com.twitter.flockdb.SelectQuery
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
@@ -30,284 +31,45 @@ import thrift._
 class FlockFixRegressionSpec extends IntegrationSpecification {
   val alice = 1L
   val FOLLOWS = 1
-  doBefore {
-    reset(config)
-    for(i <- 0 until 20) {
-      if (i % 2 == 0) {
-        flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
-      } else {
-        flock.execute(Select(alice, FOLLOWS, i).archive.toThrift)
-      }
-      Thread.sleep(1) // milli
-    }
-  }
-  "select results" should {
-    "be in order" in {
-      val term = new thrift.QueryTerm(alice, FOLLOWS, true)
-      // term.setDestination_ids(List[Long](bob).pack)
-      term.setState_ids(List[Int](State.Normal.id).toJavaList)
-      
-      val op = new SelectOperation(SelectOperationType.SimpleQuery)
-      op.setTerm(term)
-      
-      val page = new Page(1, Cursor.Start.position)
-      flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(10))
-    }
-  }
-  
-}
-  // val FOLLOWS = 1
-  // 
-  // val bob = 1L
-  // val mary = 23L
-  // val carl = 42L
-  // val jane = 56L
-  // val darcy = 62L
-  // 
-  // val uuidGenerator = IdentityUuidGenerator
-  // var forwardingManager: ForwardingManager = null
-  // var shard1: Shard = null
-  // var shard2: Shard = null
-  // var shard3: Shard = null
-  // var shard4: Shard = null
-  // var lockingShard1: Shard = null
-  // var lockingShard2: Shard = null
-  // val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+  val pageSize = 100
 
-//   "Add" should {
-//     doBefore {
-//       forwardingManager = mock[ForwardingManager]
-//       shard1 = mock[Shard]
-//       shard2 = mock[Shard]
-//       lockingShard1 = new FakeLockingShard(shard1)
-//       lockingShard2 = new FakeLockingShard(shard2)
-//       Time.freeze
-//     }
-// 
-//     "apply" in {
-//       "when the add takes effect" >> {
-//         val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-// 
-//         expect {
-//           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//           one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//           one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-//           one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-//           one(shard1).add(bob, mary, 1, Time.now)
-//           one(shard2).add(mary, bob, 1, Time.now)
-//         }
-// 
-//         job.apply()
-//       }
-// 
-//   //     "when the add does not take effect" >> {
-//   //       "when the forward direction causes it to not take effect" >> {
-//   //         val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   // 
-//   //         expect {
-//   //           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//   //           one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//   //           one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Archived, 1, Time.now))
-//   //           one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-//   //           one(shard1).archive(bob, mary, 1, Time.now)
-//   //           one(shard2).archive(mary, bob, 1, Time.now)
-//   //         }
-//   // 
-//   //         job.apply()
-//   //       }
-//   // 
-//   //       "when the backward direction causes it to not take effect" >> {
-//   //         val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   // 
-//   //         expect {
-//   //           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//   //           one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//   //           one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-//   //           one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Archived, 1, Time.now))
-//   //           one(shard1).archive(bob, mary, 1, Time.now)
-//   //           one(shard2).archive(mary, bob, 1, Time.now)
-//   //         }
-//   // 
-//   //         job.apply()
-//   //       }
-//   //     }
-//   //   }
-//   // 
-//   //   "toJson" in {
-//   //     val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   //     val json = job.toJson
-//   //     json mustMatch "Add"
-//   //     json mustMatch "\"source_id\":" + bob
-//   //     json mustMatch "\"graph_id\":" + FOLLOWS
-//   //     json mustMatch "\"destination_id\":" + mary
-//   //     json mustMatch "\"updated_at\":" + Time.now
-//   //   }
-//   // }
-//   // 
-//   // "Remove" should {
-//   //   doBefore {
-//   //     forwardingManager = mock[ForwardingManager]
-//   //     shard1 = mock[Shard]
-//   //     shard2 = mock[Shard]
-//   //     lockingShard1 = new FakeLockingShard(shard1)
-//   //     lockingShard2 = new FakeLockingShard(shard2)
-//   //   }
-//   // 
-//   //   "apply" in {
-//   //     "when the remove takes effect" >> {
-//   //       val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   // 
-//   //       expect {
-//   //         one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//   //         one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//   //         one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-//   //         one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-//   //         one(shard1).remove(bob, mary, 1, Time.now)
-//   //         one(shard2).remove(mary, bob, 1, Time.now)
-//   //       }
-//   // 
-//   //       job.apply()
-//   //     }
-//   //   }
-//   // 
-//   //   "toJson" in {
-//   //     val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   //     val json = job.toJson
-//   //     json mustMatch "Remove"
-//   //     json mustMatch "\"source_id\":" + bob
-//   //     json mustMatch "\"graph_id\":" + FOLLOWS
-//   //     json mustMatch "\"destination_id\":" + mary
-//   //     json mustMatch "\"updated_at\":" + Time.now
-//   //   }
-//   // }
-//   // 
-//   // "Archive" should {
-//   //   doBefore {
-//   //     forwardingManager = mock[ForwardingManager]
-//   //     shard1 = mock[Shard]
-//   //     shard2 = mock[Shard]
-//   //     lockingShard1 = new FakeLockingShard(shard1)
-//   //     lockingShard2 = new FakeLockingShard(shard2)
-//   //   }
-//   // 
-//   //   "apply" in {
-//   //     "when the archive takes effect" >> {
-//   //       val time = System.currentTimeMillis
-//   //       val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   // 
-//   //       expect {
-//   //         one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//   //         one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//   //         one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-//   //         one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-//   //         one(shard1).archive(bob, mary, 1, Time.now)
-//   //         one(shard2).archive(mary, bob, 1, Time.now)
-//   //       }
-//   // 
-//   //       job.apply()
-//   //     }
-//   // 
-//   //     "when the archive does not take effect" >> {
-//   //       "when the forward direction causes it to not take effect" >> {
-//   //         val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   // 
-//   //         expect {
-//   //           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//   //           one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//   //           one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Removed, 1, Time.now))
-//   //           one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-//   //           one(shard1).remove(bob, mary, 1, Time.now)
-//   //           one(shard2).remove(mary, bob, 1, Time.now)
-//   //         }
-//   // 
-//   //         job.apply()
-//   //       }
-//   // 
-//   //       "when the backward direction causes it to not take effect" >> {
-//   //         val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   // 
-//   //         expect {
-//   //           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-//   //           one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-//   //           one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-//   //           one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Removed, 1, Time.now))
-//   //           one(shard1).remove(bob, mary, 1, Time.now)
-//   //           one(shard2).remove(mary, bob, 1, Time.now)
-//   //         }
-//   // 
-//   //         job.apply()
-//   //       }
-//   //     }
-//   //   }
-//   // 
-//   //   "toJson" in {
-//   //     val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-//   //     val json = job.toJson
-//   //     json mustMatch "Archive"
-//   //     json mustMatch "\"source_id\":" + bob
-//   //     json mustMatch "\"graph_id\":" + FOLLOWS
-//   //     json mustMatch "\"destination_id\":" + mary
-//   //     json mustMatch "\"updated_at\":" + Time.now
-//   //   }
-//   // }
-//   // 
-//   // "Archive" should {
-//   //   doBefore {
-//   //     forwardingManager = mock[ForwardingManager]
-//   //     shard1 = mock[Shard]
-//   //     shard2 = mock[Shard]
-//   //     shard3 = mock[Shard]
-//   //     shard4 = mock[Shard]
-//   //   }
-//   // 
-//   //   "toJson" in {
-//   //     val job = new Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
-//   //     val json = job.toJson
-//   //     json mustMatch "Archive"
-//   //     json mustMatch "\"source_id\":" + bob
-//   //     json mustMatch "\"graph_id\":" + FOLLOWS
-//   //     json mustMatch "\"updated_at\":" + Time.now
-//   //     json mustMatch "\"priority\":" + Priority.Low.id
-//   //   }
-//   // }
-//   // 
-//   // "Unarchive" should {
-//   //   doBefore {
-//   //     forwardingManager = mock[ForwardingManager]
-//   //     shard1 = mock[Shard]
-//   //     shard2 = mock[Shard]
-//   //     shard3 = mock[Shard]
-//   //     shard4 = mock[Shard]
-//   //   }
-//   // 
-//   //   "toJson" in {
-//   //     val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
-//   //     val json = job.toJson
-//   //     json mustMatch "Unarchive"
-//   //     json mustMatch "\"source_id\":" + bob
-//   //     json mustMatch "\"graph_id\":" + FOLLOWS
-//   //     json mustMatch "\"updated_at\":" + Time.now
-//   //     json mustMatch "\"priority\":" + Priority.Low.id
-//   //   }
-//   // }
-//   // 
-//   // "RemoveAll" should {
-//   //   doBefore {
-//   //     forwardingManager = mock[ForwardingManager]
-//   //     shard1 = mock[Shard]
-//   //     shard2 = mock[Shard]
-//   //     shard3 = mock[Shard]
-//   //     shard4 = mock[Shard]
-//   //   }
-//   // 
-//   //   "toJson" in {
-//   //     val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
-//   //     val json = job.toJson
-//   //     json mustMatch "RemoveAll"
-//   //     json mustMatch "\"source_id\":" + bob
-//   //     json mustMatch "\"graph_id\":" + FOLLOWS
-//   //     json mustMatch "\"updated_at\":" + Time.now
-//   //     json mustMatch "\"priority\":" + Priority.Low.id
-//   //   }
-//   }
-// }
+  def alicesFollowings() = {
+    val term = new QueryTerm(alice, FOLLOWS, true)
+    term.setState_ids(List[Int](State.Normal.id).toJavaList)
+    val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
+    val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
+    resultsList.size mustEqual 1
+    println("alice: " + resultsList(0).edges.size)
+    resultsList(0).edges
+  }
+
+  "select results" should {
+    "be in order and still in order after unarchive" in {
+      reset(config)  // I don't know why this isn't working in doBefore
+
+      for(i <- 0 until 10) {
+        if (i % 2 == 0) {
+          flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        } else {
+          flock.execute(Select(alice, FOLLOWS, i).archive.toThrift)
+        }
+        Thread.sleep(2) // prevent same-millisecond collision
+      }
+
+      jobScheduler.size must eventually(be(0)) // Make sure adds get applied.  I can't wait for Time.asOf()
+
+      alicesFollowings().size must eventually(be_==(5))
+      alicesFollowings().toList.map(_.destination_id) mustEqual List(8,6,4,2,0)
+
+      Time.now += 1.second
+
+      val job = Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, flockdb.Priority.High, pageSize, flock.edges.forwardingManager, flock.edges.schedule)
+      job()
+
+      alicesFollowings().size must eventually(be(10))
+
+      alicesFollowings().toList.map(_.destination_id) mustEqual List(9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+    }
+  }
+
+}
