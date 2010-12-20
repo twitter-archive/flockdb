@@ -17,7 +17,7 @@
 package com.twitter.flockdb
 
 import com.twitter.gizzard.Future
-import com.twitter.gizzard.nameserver.NameServer
+import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
@@ -115,6 +115,12 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     try {
       block
     } catch {
+      case e: NonExistentShard => 
+        log.error(e, "NonexistentShard: %s", e)
+        throw(new FlockException(e.getMessage))
+      case e: InvalidShard =>
+        log.error(e, "NonexistentShard: %s", e)
+        throw(new FlockException(e.getMessage))
       case e: FlockException =>
         Stats.incr(e.getClass.getName)
         throw(e)
@@ -123,6 +129,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
       case e: ShardDatabaseTimeoutException =>
         countAndRethrow(e)
       case e: Throwable =>
+        e.printStackTrace
         Stats.incr("unknown-exceptions")
         log.error(e, "Unhandled error in EdgesService: %s", e)
         throw(new FlockException(e.toString))
