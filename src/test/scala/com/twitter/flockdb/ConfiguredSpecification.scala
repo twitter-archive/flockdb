@@ -63,7 +63,7 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
     nameServer.reload()
 
     val rootQueryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection.withoutDatabase)
-    rootQueryEvaluator.execute("DROP DATABASE IF EXISTS " + config.databaseConnection.database)
+    //rootQueryEvaluator.execute("DROP DATABASE IF EXISTS " + config.databaseConnection.database)
     val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
 
     for (graph <- (1 until 10)) {
