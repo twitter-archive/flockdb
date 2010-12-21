@@ -28,7 +28,6 @@ class ProductionQueryEvaluator extends QueryEvaluator {
   }
 
   database.timeout = new TimingOutDatabase {
-    initialize = 1.second
     open = 50.millis
     poolSize = 10
     queueSize = 10000
@@ -114,10 +113,11 @@ new FlockDB {
   }
 
   class ProductionScheduler(val name: String) extends Scheduler {
-    override val jobQueueName = name + "_jobs"
+    jobQueueName = name + "_jobs"
+
     val schedulerType = new KestrelScheduler {
-      val queuePath = "/var/spool/kestrel"
-      override val maxMemorySize = 36000000L
+      path = "/var/spool/kestrel"
+      maxMemorySize = 36000000L
     }
 
     errorLimit = 100
