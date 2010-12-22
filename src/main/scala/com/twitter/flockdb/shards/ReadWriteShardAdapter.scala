@@ -41,6 +41,7 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
 
   def writeCopies(edges: Seq[Edge])                                                                  = shard.writeOperation(_.writeCopies(edges))
   def writeMetadata(metadata: Metadata)                                                              = shard.writeOperation(_.writeMetadata(metadata))
+  def writeMetadata(metadata: Seq[Metadata])                                                         = shard.writeOperation(_.writeMetadata(metadata))
   def updateMetadata(metadata: Metadata)                                                             = shard.writeOperation(_.updateMetadata(metadata))
   def remove(sourceId: Long, updatedAt: Time)                                                        = shard.writeOperation(_.remove(sourceId, updatedAt))
   def remove(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                   = shard.writeOperation(_.remove(sourceId, destinationId, position, updatedAt))

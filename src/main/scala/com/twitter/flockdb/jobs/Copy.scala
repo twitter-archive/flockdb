@@ -85,7 +85,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    items.foreach { destinationShard.writeMetadata(_) }
+    destinationShard.writeMetadata(items)
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
       Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))

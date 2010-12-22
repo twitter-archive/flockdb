@@ -40,6 +40,7 @@ trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def writeCopies(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def updateMetadata(metadata: Metadata)
   @throws(classOf[shards.ShardException]) def writeMetadata(metadata: Metadata)
+  @throws(classOf[shards.ShardException]) def writeMetadata(metadata: Seq[Metadata])
 
   @throws(classOf[shards.ShardException]) def bulkUnsafeInsertEdges(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def bulkUnsafeInsertMetadata(edge: Seq[Metadata])

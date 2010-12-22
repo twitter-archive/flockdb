@@ -105,7 +105,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor(cursor.position + 1))
-          one(shard2).writeMetadata(metadata)
+          one(shard2).writeMetadata(List(metadata))
           one(scheduler).put(new MetadataCopy(shard1Id, shard2Id, Cursor(cursor.position + 1), count, nameServer, scheduler))
         }
         job.apply()
@@ -117,7 +117,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
-          one(shard2).writeMetadata(metadata)
+          one(shard2).writeMetadata(List(metadata))
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(scheduler).put(new Copy(shard1Id, shard2Id, (Cursor.Start, Cursor.Start), Copy.COUNT, nameServer, scheduler))
         }
