@@ -17,11 +17,8 @@
 package com.twitter.flockdb.queries
 
 import scala.util.Sorting
-import net.lag.configgy.Configgy
 
 class UnionQuery(query1: Query, query2: Query) extends Query {
-  val config = Configgy.config
-
   def sizeEstimate() = query1.sizeEstimate max query2.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
