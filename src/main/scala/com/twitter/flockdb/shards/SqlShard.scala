@@ -593,6 +593,23 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
+  def writeMetadata(metadatas: Seq[Metadata])  = {
+    try {
+      val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"
+      queryEvaluator.executeBatch(query) { batch =>
+        metadatas.foreach { metadata =>
+          batch(metadata.sourceId, metadata.state.id, metadata.updatedAt.inSeconds)
+        }
+      }
+    } catch {
+      case e: BatchUpdateException =>
+        e.getUpdateCounts().zip(metadatas.toArray).foreach { case (errorCode, metadata) =>
+          if (errorCode < 0)
+            writeMetadata(metadata)
+        }
+    }
+  }
+
   def updateMetadata(metadata: Metadata): Unit = updateMetadata(metadata.sourceId, metadata.state, metadata.updatedAt)
 
   // FIXME: computeCount could be really expensive. :(
