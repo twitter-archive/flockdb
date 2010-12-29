@@ -16,27 +16,34 @@
 
 package com.twitter.flockdb.shards
 
+import java.util.Random
 import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
 import com.twitter.ostrich.Stats
+import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
-import com.twitter.querulous.query.{QueryClass, SqlQueryTimeoutException}
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.querulous.query
+import com.twitter.querulous.query.{SqlQueryTimeoutException}
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
 import net.lag.configgy.ConfigMap
 import net.lag.logging.Logger
 import State._
 
-object FlockQueryClass {
-  val SelectModify = QueryClass("select_modify")
-  val SelectCopy = QueryClass("select_copy")
+object QueryClass {
+  val Select       = query.QueryClass.Select
+  val Execute      = query.QueryClass.Execute
+  val SelectModify = query.QueryClass("select_modify")
+  val SelectCopy   = query.QueryClass("select_copy")
 }
 
-class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, config: ConfigMap)
+class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
   extends shards.ShardFactory[Shard] {
+
+  val deadlockRetries = 3
 
   val EDGE_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
@@ -64,20 +71,16 @@ CREATE TABLE IF NOT EXISTS %s (
 """
 
   def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
-    val queryEvaluator = instantiatingQueryEvaluatorFactory(List(shardInfo.hostname), config("edges.db_name"), config("db.username"), config("db.password"))
-    new SqlExceptionWrappingProxy(shardInfo.id).apply[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, config))
+    val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
+    new SqlExceptionWrappingProxy(shardInfo.id).apply[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, deadlockRetries))
   }
 
   def materialize(shardInfo: shards.ShardInfo) = {
     try {
-      val queryEvaluator = materializingQueryEvaluatorFactory(
-        List(shardInfo.hostname),
-        null,
-        config("db.username"),
-        config("db.password"))
-      queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + config("edges.db_name"))
-      queryEvaluator.execute(EDGE_TABLE_DDL.format(config("edges.db_name") + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
-      queryEvaluator.execute(METADATA_TABLE_DDL.format(config("edges.db_name") + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
+      val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
+      queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database)
+      queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
+      queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
     } catch {
       case e: SQLException => throw new shards.ShardException(e.toString)
       case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException(e.timeout, shardInfo.id, e)
@@ -87,12 +90,12 @@ CREATE TABLE IF NOT EXISTS %s (
 
 
 class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
-               val weight: Int, val children: Seq[Shard], config: ConfigMap) extends Shard {
+               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard {
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
-  private val randomGenerator = new util.Random
+  private val randomGenerator = new Random
 
-  import FlockQueryClass._
+  import QueryClass._
 
   def get(sourceId: Long, destinationId: Long) = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
@@ -212,7 +215,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     select(QueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
   }
 
-  private def select(queryClass: QueryClass, cursorName: String, index: String, count: Int,
+  private def select(queryClass: querulous.query.QueryClass, cursorName: String, index: String, count: Int,
                      cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
     var edges = new mutable.ArrayBuffer[(Long, Cursor)]
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"
@@ -347,21 +350,18 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def bulkUnsafeInsertEdges(edges: Seq[Edge]) {
-    bulkUnsafeInsertEdges(queryEvaluator, State.Normal, edges)
+    bulkUnsafeInsertEdges(queryEvaluator, edges)
   }
 
-  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, currentState: State, edges: Seq[Edge]) = {
-    var count = 0
+  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, edges: Seq[Edge]) = {
     if (edges.size > 0) {
       val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
       transaction.executeBatch(query) { batch =>
         edges.foreach { edge =>
           batch(edge.sourceId, edge.position, edge.updatedAt.inSeconds, edge.destinationId, edge.count, edge.state.id)
-          if (edge.state == currentState) count += 1
         }
       }
     }
-    count
   }
 
   def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
@@ -441,7 +441,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   private def write(edge: Edge) {
-    write(edge, config("errors.deadlock_retries").toInt, true)
+    write(edge, deadlockRetries, true)
   }
 
   private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
@@ -470,9 +470,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
    */
   case class BurstResult(completed: Seq[Edge], failed: Seq[Edge])
 
-  def writeBurst(transaction: Transaction, state: State, edges: Seq[Edge]): BurstResult = {
+
+  def writeBurst(transaction: Transaction, edges: Seq[Edge]): BurstResult = {
     try {
-      val modified = bulkUnsafeInsertEdges(transaction, state, edges)
+      bulkUnsafeInsertEdges(transaction, edges)
       BurstResult(edges, Nil)
     } catch {
       case e: BatchUpdateException =>
@@ -489,45 +490,57 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
+  private def updateCount(transaction: QueryEvaluator, sourceId: Long, countDelta: Int) = {
+    transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
+                        "WHERE source_id = ?", countDelta, sourceId)
+  }
+
   def writeCopies(edges: Seq[Edge]) {
-    var remaining = edges
-    val burst = new mutable.ArrayBuffer[Edge]
-    while (remaining.size > 0) {
-      burst.clear()
-      val currentSourceId = remaining(0).sourceId
-      var index = 0
-      while (remaining.size > index && remaining(index).sourceId == currentSourceId) {
-        burst += remaining(index)
-        index += 1
-      }
-      Stats.addTiming("x-copy-burst", edges.size)
+    Stats.addTiming("x-copy-burst", edges.size)
 
-      var countDelta = 0
-      atomically(currentSourceId) { (transaction, metadata) =>
-        try {
-          val result = writeBurst(transaction, metadata.state, burst)
-          countDelta += result.completed.size
-          if (result.failed.size > 0) {
-            Stats.incr("x-copy-fallback")
-            result.failed.foreach { edge =>
-              countDelta += writeEdge(transaction, metadata, edge, false)
-            }
+    var sourceIdsSet = Set[Long]()
+    edges.foreach { edge => sourceIdsSet += edge.sourceId }
+    val sourceIds = sourceIdsSet.toSeq
+
+    atomically(sourceIds) { (transaction, metadataById) =>
+      val result = writeBurst(transaction, edges)
+      if (result.completed.size > 0) {
+        var currentSourceId = -1L
+        var countDeltas = new Array[Int](4)
+        result.completed.foreach { edge =>
+          if (edge.sourceId != currentSourceId) {
+            if (currentSourceId != -1)
+              updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
+            currentSourceId = edge.sourceId
+            countDeltas = new Array[Int](4)
           }
-        } finally {
-          if (countDelta != 0) {
-            transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
-                                "WHERE source_id = ?", countDelta, currentSourceId)
-          }
+          countDeltas(edge.state.id) += 1
         }
+        updateCount(transaction, currentSourceId,
+                    countDeltas(metadataById(currentSourceId).state.id))
       }
 
-      remaining = remaining.drop(index)
+      if (result.failed.size > 0) {
+        Stats.incr("x-copy-fallback")
+        var currentSourceId = -1L
+        var countDelta = 0
+        result.failed.foreach { edge =>
+          if (edge.sourceId != currentSourceId) {
+            if (currentSourceId != -1)
+              updateCount(transaction, currentSourceId, countDelta)
+            currentSourceId = edge.sourceId
+            countDelta = 0
+          }
+          countDelta += writeEdge(transaction, metadataById(edge.sourceId), edge, false)
+        }
+        updateCount(transaction, currentSourceId, countDelta)
+      }
     }
   }
 
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     atomically(sourceId) { (transaction, metadata) =>
-      f(new SqlShard(transaction, shardInfo, weight, children, config), metadata)
+      f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
     }
   }
 
@@ -546,6 +559,25 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
+  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
+    try {
+      val metadataMap = mutable.Map[Long, Metadata]()
+      queryEvaluator.transaction { transaction =>
+        transaction.select(SelectModify,
+                           "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE", sourceIds) { row =>
+          metadataMap.put(row.getLong("source_id"), Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+        }
+        if (metadataMap.size < sourceIds.length)
+          throw new MissingMetadataRow
+        f(transaction, metadataMap)
+      }
+    } catch {
+      case e: MissingMetadataRow =>
+        sourceIds.foreach { sourceId => populateMetadata(sourceId, Normal) }
+        atomically(sourceIds)(f)
+    }
+  }
+
   def writeMetadata(metadata: Metadata) {
     try {
       queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
@@ -558,6 +590,23 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
                               "WHERE source_id = ? AND updated_at <= ?",
                               metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
                               metadata.updatedAt.inSeconds)
+        }
+    }
+  }
+
+  def writeMetadata(metadatas: Seq[Metadata])  = {
+    try {
+      val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"
+      queryEvaluator.executeBatch(query) { batch =>
+        metadatas.foreach { metadata =>
+          batch(metadata.sourceId, metadata.state.id, metadata.updatedAt.inSeconds)
+        }
+      }
+    } catch {
+      case e: BatchUpdateException =>
+        e.getUpdateCounts().zip(metadatas.toArray).foreach { case (errorCode, metadata) =>
+          if (errorCode < 0)
+            writeMetadata(metadata)
         }
     }
   }

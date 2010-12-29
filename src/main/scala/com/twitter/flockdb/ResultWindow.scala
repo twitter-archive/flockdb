@@ -17,8 +17,8 @@
 package com.twitter.flockdb
 
 import scala.util.Sorting
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 
 
 case class ResultWindowRow[T](id: T, cursor: Cursor) extends Ordered[ResultWindowRow[T]] {

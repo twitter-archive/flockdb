@@ -22,8 +22,8 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
@@ -47,52 +47,60 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
     val future = mock[Future]
     val copyFactory = mock[CopyJobFactory[Shard]]
-    val flock = new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
+    val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future, config.intersectionQuery, config.aggregateJobsPageSize))
 
     "add" in {
-      Time.freeze()
-      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
-      expect {
-        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+      Time.withCurrentTimeFrozen { time =>
+        val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        expect {
+          one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+        }
+        flock.execute(Select(bob, FOLLOWS, mary).add.toThrift)
       }
-      flock.execute(Select(bob, FOLLOWS, mary).add.toThrift)
     }
 
     "add_at" in {
-      val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
-      expect {
-        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+      Time.withCurrentTimeFrozen { time =>
+        val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        expect {
+          one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+        }
+        flock.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
       }
-      flock.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
     }
 
     "remove" in {
-      Time.freeze()
-      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
-      expect {
-        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+      Time.withCurrentTimeFrozen { time =>
+        val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        expect {
+          one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+        }
+        flock.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
       }
-      flock.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
     }
 
     "remove_at" in {
-      val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
-      expect {
-        one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-        one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+      Time.withCurrentTimeFrozen { time =>
+        val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        expect {
+          one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
+          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+        }
+        flock.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)
       }
-      flock.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)
     }
 
     "contains" in {
-      expect {
-        one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
-        one(shard).get(bob, mary) willReturn Some(new Edge(bob, mary, 0, Time.now, 1, State.Normal))
+      Time.withCurrentTimeFrozen { time =>
+        expect {
+          one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
+          one(shard).get(bob, mary) willReturn Some(new Edge(bob, mary, 0, Time.now, 1, State.Normal))
+        }
+        flock.contains(bob, FOLLOWS, mary) must beTrue
       }
-      flock.contains(bob, FOLLOWS, mary) must beTrue
     }
   }
 }

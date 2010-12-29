@@ -18,13 +18,9 @@ package com.twitter.flockdb.integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import test.{EdgesDatabase, StaticEdges}
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
-object IntersectionSpec extends ConfiguredSpecification with EdgesDatabase {
-  val poolConfig = config.configMap("db.connection_pool")
-
-  import StaticEdges._
+object IntersectionSpec extends IntegrationSpecification {
 
   val FOLLOWS = 1
 
@@ -34,7 +30,6 @@ object IntersectionSpec extends ConfiguredSpecification with EdgesDatabase {
   val darcy = 4L
   var queryEvaluatorFactories: List[QueryEvaluatorFactory] = null
 
-  materialize(config.configMap("edges.nameservers"))
 
   def intersection_of(user1: Long, user2: Long, page: Page) = {
     val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
@@ -79,17 +74,17 @@ object IntersectionSpec extends ConfiguredSpecification with EdgesDatabase {
 
   "Intersection" should {
     doBefore {
-      reset(flock)
+      reset(config)
     }
 
     "with a large intersection" >>  {
-      doBefore { config("edges.intersection_page_size_max") = 1 }
+      config.intersectionQuery.intersectionPageSizeMax = 1
 
       intersectAlot
     }
 
     "with a small intersection" >> {
-      doBefore { config("edges.intersection_page_size_max") = Integer.MAX_VALUE - 1 }
+      config.intersectionQuery.intersectionPageSizeMax = Integer.MAX_VALUE - 1
 
       intersectAlot
     }
