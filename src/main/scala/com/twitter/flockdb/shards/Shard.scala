@@ -18,8 +18,8 @@ package com.twitter.flockdb.shards
 
 import scala.collection.mutable
 import com.twitter.gizzard.shards
-import com.twitter.xrayspecs.Time
-import com.twitter.xrayspecs.TimeConversions._
+import com.twitter.util.Time
+import com.twitter.util.TimeConversions._
 
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time)
 
@@ -40,6 +40,7 @@ trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def writeCopies(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def updateMetadata(metadata: Metadata)
   @throws(classOf[shards.ShardException]) def writeMetadata(metadata: Metadata)
+  @throws(classOf[shards.ShardException]) def writeMetadata(metadata: Seq[Metadata])
 
   @throws(classOf[shards.ShardException]) def bulkUnsafeInsertEdges(edge: Seq[Edge])
   @throws(classOf[shards.ShardException]) def bulkUnsafeInsertMetadata(edge: Seq[Metadata])

@@ -16,6 +16,7 @@
 
 package com.twitter.flockdb
 
+import java.util.Random
 
 trait UuidGenerator extends (Long => Long) {
   def apply(updatedAt: Long): Long
@@ -23,7 +24,7 @@ trait UuidGenerator extends (Long => Long) {
 }
 
 object OrderedUuidGenerator extends UuidGenerator {
-  private val randomGenerator = new util.Random
+  private val randomGenerator = new Random
   // 64 bits - 20 leaves 44 bits of milliseconds, or over 500 years.
   private val unusedBits = 20
   private val randomMask = (1 << unusedBits) - 1

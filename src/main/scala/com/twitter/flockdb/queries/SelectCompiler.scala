@@ -24,7 +24,7 @@ import thrift.FlockException
 
 class InvalidQueryException(reason: String) extends FlockException(reason)
 
-class SelectCompiler(forwardingManager: ForwardingManager) {
+class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: config.IntersectionQuery) {
   def apply(program: Seq[SelectOperation]): Query = {
     val stack = new mutable.Stack[Query]
 
@@ -41,7 +41,7 @@ class SelectCompiler(forwardingManager: ForwardingManager) {
         stack.push(query)
       case SelectOperationType.Intersection =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
-        stack.push(new IntersectionQuery(stack.pop, stack.pop))
+        stack.push(intersectionConfig.intersect(stack.pop, stack.pop))
       case SelectOperationType.Union =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
         stack.push(new UnionQuery(stack.pop, stack.pop))
@@ -49,7 +49,7 @@ class SelectCompiler(forwardingManager: ForwardingManager) {
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
         val rightSide = stack.pop
         val leftSide = stack.pop
-        stack.push(new DifferenceQuery(leftSide, rightSide))
+        stack.push(intersectionConfig.difference(leftSide, rightSide))
       case n =>
         throw new InvalidQueryException("Unknown operation " + n)
     }

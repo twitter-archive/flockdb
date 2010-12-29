@@ -19,11 +19,12 @@ package com.twitter.flockdb
 import java.lang.{Long => JLong, String}
 import java.util.{ArrayList => JArrayList, List => JList}
 import scala.collection.mutable
-import com.twitter.gizzard.Future
+import com.twitter.gizzard.{Future, GizzardServer}
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard}
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
 import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
@@ -37,8 +38,6 @@ import com.twitter.flockdb.conversions.Page._
 import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
 import com.twitter.flockdb.conversions.SelectOperation._
-import com.twitter.xrayspecs.{Duration, Time}
-import com.twitter.xrayspecs.TimeConversions._
 import net.lag.configgy.{Config, ConfigMap}
 import net.lag.logging.Logger
 import queries._
@@ -47,71 +46,79 @@ import jobs.single.{Add, Remove}
 import Direction._
 import thrift.FlockException
 
+class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
 
-object FlockDB {
-  private val log = Logger.get(getClass.getName)
-
-  def statsCollector(w3c: W3CStats) = {
-    new StatsCollector {
-      def incr(name: String, count: Int) = w3c.incr(name, count)
-      def time[A](name: String)(f: => A): A = w3c.time(name)(f)
+  object FlockExceptionWrappingProxy extends ExceptionHandlingProxy({ e =>
+    e match {
+      case _: thrift.FlockException =>
+        throw e
+      case _ =>
+        log.error(e, "Error in FlockDB: " + e)
+        throw new thrift.FlockException(e.toString)
     }
+  })
+
+  val stats = new StatsCollector {
+    def incr(name: String, count: Int) = w3c.incr(name, count)
+    def time[A](name: String)(f: => A): A = w3c.time(name)(f)
   }
 
-  def apply(config: ConfigMap, w3c: W3CStats): FlockDB = {
-    @volatile val __trickJava = List(
-      shards.FlockQueryClass.SelectModify,
-      shards.FlockQueryClass.SelectCopy)
+  val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)
+  val jobPriorities = List(Priority.Low, Priority.Medium, Priority.High).map(_.id)
+  val copyPriority = Priority.Medium.id
+  val copyFactory = new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id))
 
-    val stats = statsCollector(w3c)
-    val dbQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("db"), Some(stats))
-    val materializingQueryEvaluatorFactory = QueryEvaluatorFactory.fromConfig(config.configMap("materializing_db"), Some(stats))
+  val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
+  val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
-    val codec = new JsonCodec[JsonJob]({ unparsable: Array[Byte] =>
-      log.error("Unparsable job: %s", unparsable.map { n => "%02x".format(n.toInt & 0xff) }.mkString(", "))
-    })
+  shardRepo += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
+  // for backward compat:
+  shardRepo.setupPackage("com.twitter.service.flock.edges")
+  shardRepo += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
 
-    val badJobQueue = new JsonJobLogger[JsonJob](Logger.get("bad_jobs"))
-//  :(    val jobParser = new LoggingJobParser(Stats, w3c, new JobWithTasksParser(polymorphicJobParser))
-    val scheduler = PrioritizingJobScheduler(config.configMap("edges.queue"), codec,
-      Map(Priority.High.id -> "primary", Priority.Medium.id -> "copy", Priority.Low.id -> "slow"),
-      Some(badJobQueue))
+  val forwardingManager = new ForwardingManager(nameServer)
 
-    val shardRepository = new nameserver.BasicShardRepository[shards.Shard](
-      new shards.ReadWriteShardAdapter(_), None)
-    shardRepository += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
-    // for backward compat:
-    shardRepository.setupPackage("com.twitter.service.flock.edges")
-    shardRepository += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config))
+  jobCodec += ("single.Add".r, new jobs.single.AddParser(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.Remove".r, new jobs.single.RemoveParser(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.Archive".r, new jobs.single.ArchiveParser(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.Negate".r, new jobs.single.NegateParser(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("multi.Archive".r, new jobs.multi.ArchiveParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Unarchive".r, new jobs.multi.UnarchiveParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Negate".r, new jobs.multi.NegateParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
 
-    val nameServer = nameserver.NameServer(config.configMap("edges.nameservers"), Some(stats),
-                                           shardRepository)
+  jobCodec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
+  jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
 
-    val forwardingManager = new ForwardingManager(nameServer)
-    nameServer.reload()
+  val flockService = {
+    val future = config.readFuture("readFuture")
+    val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future, config.intersectionQuery, config.aggregateJobsPageSize)
+    new FlockDBThriftAdapter(edges)
+  }
 
-    codec += ("single.Add".r, new jobs.single.AddParser(forwardingManager, OrderedUuidGenerator))
-    codec += ("single.Remove".r, new jobs.single.RemoveParser(forwardingManager, OrderedUuidGenerator))
-    codec += ("single.Archive".r, new jobs.single.ArchiveParser(forwardingManager, OrderedUuidGenerator))
-    codec += ("single.Negate".r, new jobs.single.NegateParser(forwardingManager, OrderedUuidGenerator))
-    codec += ("multi.Archive".r, new jobs.multi.ArchiveParser(forwardingManager, scheduler))
-    codec += ("multi.Unarchive".r, new jobs.multi.UnarchiveParser(forwardingManager, scheduler))
-    codec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, scheduler))
-    codec += ("multi.Negate".r, new jobs.multi.NegateParser(forwardingManager, scheduler))
+  lazy val flockThriftServer = {
+    val processor = new flockdb.thrift.FlockDB.Processor(
+      FlockExceptionWrappingProxy(
+        LoggingProxy[flockdb.thrift.FlockDB.Iface](
+          Stats, w3c, "FlockDB",
+          flockService)))
 
-    codec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, scheduler(Priority.Medium.id)))
-    codec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, scheduler(Priority.Medium.id)))
+    config.server(processor)
+  }
 
-    val future = new Future("EdgesFuture", config.configMap("edges.future"))
+  def start() {
+    startGizzard()
+    val runnable = new Runnable { def run() { flockThriftServer.serve() } }
+    new Thread(runnable, "FlockDBServerThread").start()
+  }
 
-    scheduler.start()
-
-    val copyFactory = new jobs.CopyFactory(nameServer, scheduler(Priority.Medium.id))
-    new FlockDB(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future))
+  def shutdown(quiesce: Boolean) {
+    flockThriftServer.stop()
+    shutdownGizzard(quiesce)
   }
 }
 
-class FlockDB(val edges: EdgesService) extends thrift.FlockDB.Iface {
+class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
