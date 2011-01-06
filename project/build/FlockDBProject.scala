@@ -3,11 +3,12 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with SubversionPublisher with InlineDependencies {
-  inline("com.twitter" % "gizzard" % "1.6-mc-SNAPSHOT")
+
   override def filterScalaJars = false
 
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.7.7"
 
+  val gizzard =  "com.twitter" % "gizzard" % "1.6-mc-SNAPSHOT"
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
   val cglib     = "cglib" % "cglib" % "2.1_3" % "test"
   val hamcrest  = "org.hamcrest" % "hamcrest-all" % "1.1" % "test"

@@ -26,6 +26,8 @@ object Main extends Service {
     "kestrel-put-timing",
     "db-select-count",
     "db-select-timing",
+    "db-select_modify-count",
+    "db-select_modify-timing",
     "db-execute-count",
     "db-execute-timing",
     "db-query-count-default",

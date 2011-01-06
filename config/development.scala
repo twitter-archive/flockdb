@@ -28,7 +28,6 @@ class ProductionQueryEvaluator extends QueryEvaluator {
   }
 
   database.timeout = new TimingOutDatabase {
-    initialize = 1.second
     open = 50.millis
     poolSize = 10
     queueSize = 10000
@@ -114,7 +113,7 @@ new FlockDB {
     }
   }
 
-  class ProductionScheduler(val name: String) extends Scheduler {
+  class DevelopmentScheduler(val name: String) extends Scheduler {
     override val jobQueueName = name + "_jobs"
     val schedulerType = new KestrelScheduler {
       val queuePath = "."
@@ -128,9 +127,9 @@ new FlockDB {
   }
 
   val jobQueues = Map(
-    Priority.High.id    -> new ProductionScheduler("edges") { threads = 32 },
-    Priority.Medium.id  -> new ProductionScheduler("copy") { threads = 12; errorRetryDelay = 60.seconds },
-    Priority.Low.id     -> new ProductionScheduler("edges_slow") { threads = 2 }
+    Priority.High.id    -> new DevelopmentScheduler("edges") { threads = 32 },
+    Priority.Medium.id  -> new DevelopmentScheduler("copy") { threads = 12; errorRetryDelay = 60.seconds },
+    Priority.Low.id     -> new DevelopmentScheduler("edges_slow") { threads = 2 }
   )
 
   val adminConfig = new AdminConfig {

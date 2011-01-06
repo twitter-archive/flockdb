@@ -33,7 +33,6 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     poolSize = 10
     queueSize = 10000
     open = 1.second
-    initialize = 1.second
   }
 
   override def apply(stats: StatsCollector) = {
@@ -106,12 +105,12 @@ new FlockDB {
   // schedulers
 
   class TestScheduler(val name: String) extends Scheduler {
-    override val jobQueueName = name + "_jobs"
+    jobQueueName = name + "_jobs"
 
     val schedulerType = new KestrelScheduler {
-      val queuePath = "/tmp"
-      override val keepJournal = false
-      override val maxMemorySize = 36000000L
+      path = "/tmp"
+      keepJournal = false
+      maxMemorySize = 36000000L
     }
 
     threads = 1
