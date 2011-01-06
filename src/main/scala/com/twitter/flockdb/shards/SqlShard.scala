@@ -562,6 +562,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
+    if (sourceIds.isEmpty) error("sourceIds is mysteriously empty")
+
     try {
       val metadataMap = mutable.Map[Long, Metadata]()
       queryEvaluator.transaction { transaction =>
