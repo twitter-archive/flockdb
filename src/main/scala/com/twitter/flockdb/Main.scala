@@ -20,6 +20,8 @@ object Main extends Service {
     "result-count",
     "db-timing",
     "db-open-timing",
+    "db-open-timeout-count",
+    "db-close-timeout-count",
     "db-close-timing",
     "connection-pool-release-timing",
     "connection-pool-reserve-timing",
