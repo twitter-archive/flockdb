@@ -379,7 +379,11 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
                          oldEdge: Edge): Int = {
     if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
 
-    val updatedRows = if (oldEdge.state != Archived && edge.state == Normal) {
+    val updatedRows = if (
+      oldEdge.state != Archived &&  // Only update position when coming from removed or negated into normal
+      oldEdge.state != Normal &&
+      edge.state == Normal
+    ) {
       transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                           "position = ?, count = 0, state = ? " +
                           "WHERE source_id = ? AND destination_id = ? AND " +
@@ -411,6 +415,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   // returns +1, 0, or -1, depending on how the metadata count should change after this operation.
   // `predictExistence`=true for normal operations, false for copy/migrate.
+
   private def writeEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                         predictExistence: Boolean): Int = {
     val countDelta = if (predictExistence) {

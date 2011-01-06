@@ -344,11 +344,13 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
 
         "when the row already exists" >> {
           "when the already-existing row is older than the row to be inserted" >> {
+
+            // Flock-fix redefines a re-insert as a no-op
             "when the already existing row is not deleted" >> {
               shard.add(alice, bob, 1, now)
 
               shard.add(alice, bob, 2, now + 10.seconds)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, now + 10.seconds, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
             }
 
             "when the already existing row is not archived" >> {

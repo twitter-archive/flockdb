@@ -75,8 +75,7 @@ new FlockDB {
     jobRelay = NoJobRelay
 
     val replicas = Seq(
-      new ProductionNameServerReplica("flockdb001.twitter.com"),
-      new ProductionNameServerReplica("flockdb002.twitter.com")
+      new ProductionNameServerReplica("localhost")
     )
   }
 
@@ -114,10 +113,11 @@ new FlockDB {
     }
   }
 
-  class ProductionScheduler(val name: String) extends Scheduler {
-    jobQueueName = name + "_jobs"
-
-    val schedulerType = new KestrelScheduler { path = "/var/spool/kestrel" }
+  class DevelopmentScheduler(val name: String) extends Scheduler {
+    override val jobQueueName = name + "_jobs"
+    val schedulerType = new KestrelScheduler {
+      val queuePath = "."
+    }
 
     errorLimit = 100
     errorRetryDelay = 15.minutes
@@ -127,9 +127,9 @@ new FlockDB {
   }
 
   val jobQueues = Map(
-    Priority.High.id    -> new ProductionScheduler("edges") { threads = 32 },
-    Priority.Medium.id  -> new ProductionScheduler("copy") { threads = 12; errorRetryDelay = 60.seconds },
-    Priority.Low.id     -> new ProductionScheduler("edges_slow") { threads = 2 }
+    Priority.High.id    -> new DevelopmentScheduler("edges") { threads = 32 },
+    Priority.Medium.id  -> new DevelopmentScheduler("copy") { threads = 12; errorRetryDelay = 60.seconds },
+    Priority.Low.id     -> new DevelopmentScheduler("edges_slow") { threads = 2 }
   )
 
   val adminConfig = new AdminConfig {
@@ -139,37 +139,13 @@ new FlockDB {
 
   logging = new LogConfigString("""
 log {
-  filename = "/var/log/flock/production.log"
+  filename = "development.log"
   level = "info"
   roll = "hourly"
   throttle_period_msec = 60000
   throttle_rate = 10
   truncate_stack_traces = 100
 
-  w3c {
-    node = "w3c"
-    use_parents = false
-    filename = "/var/log/flock/w3c.log"
-    level = "info"
-    roll = "hourly"
-  }
-
-  stats {
-    node = "stats"
-    use_parents = false
-    level = "info"
-    scribe_category = "flock-stats"
-    scribe_server = "localhost"
-    scribe_max_packet_size = 100
-  }
-
-  bad_jobs {
-    node = "bad_jobs"
-    use_parents = false
-    filename = "/var/log/flock/bad_jobs.log"
-    level = "info"
-    roll = "never"
-  }
 }
   """)
 }

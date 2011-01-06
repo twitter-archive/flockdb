@@ -27,7 +27,7 @@ if [ "x$DB_USERNAME" = "x" ]; then
 fi
 
 if gizzmo --help > /dev/null; then
-  gizzmo="gizzmo -H localhost -P 7917"
+  gizzmo="gizzmo -H localhost -P 7920"
 else
   echo "Make sure you have gizzmo available on your path."
   echo "Find it here: http://github.com/twitter/gizzmo"
@@ -53,7 +53,7 @@ exec_sql "DROP DATABASE IF EXISTS flockdb_development"
 exec_sql "CREATE DATABASE IF NOT EXISTS flockdb_development"
 
 JAVA_OPTS="-Xms256m -Xmx256m -XX:NewSize=64m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -server"
-java -Dstage=development $JAVA_OPTS -jar ./dist/flockdb/flockdb-${VERSION}.jar &
+java $JAVA_OPTS -jar ./dist/flockdb/flockdb-${VERSION}.jar config/development.scala &
 sleep 10
 
 echo "Creating shards..."
