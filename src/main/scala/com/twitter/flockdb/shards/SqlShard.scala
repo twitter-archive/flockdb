@@ -496,44 +496,46 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def writeCopies(edges: Seq[Edge]) {
-    Stats.addTiming("x-copy-burst", edges.size)
+    if (!edges.isEmpty) {
+      Stats.addTiming("x-copy-burst", edges.size)
 
-    var sourceIdsSet = Set[Long]()
-    edges.foreach { edge => sourceIdsSet += edge.sourceId }
-    val sourceIds = sourceIdsSet.toSeq
+      var sourceIdsSet = Set[Long]()
+      edges.foreach { edge => sourceIdsSet += edge.sourceId }
+      val sourceIds = sourceIdsSet.toSeq
 
-    atomically(sourceIds) { (transaction, metadataById) =>
-      val result = writeBurst(transaction, edges)
-      if (result.completed.size > 0) {
-        var currentSourceId = -1L
-        var countDeltas = new Array[Int](4)
-        result.completed.foreach { edge =>
-          if (edge.sourceId != currentSourceId) {
-            if (currentSourceId != -1)
-              updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
-            currentSourceId = edge.sourceId
-            countDeltas = new Array[Int](4)
+      atomically(sourceIds) { (transaction, metadataById) =>
+        val result = writeBurst(transaction, edges)
+        if (result.completed.size > 0) {
+          var currentSourceId = -1L
+          var countDeltas = new Array[Int](4)
+          result.completed.foreach { edge =>
+            if (edge.sourceId != currentSourceId) {
+              if (currentSourceId != -1)
+                updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
+              currentSourceId = edge.sourceId
+              countDeltas = new Array[Int](4)
+            }
+            countDeltas(edge.state.id) += 1
           }
-          countDeltas(edge.state.id) += 1
+          updateCount(transaction, currentSourceId,
+                      countDeltas(metadataById(currentSourceId).state.id))
         }
-        updateCount(transaction, currentSourceId,
-                    countDeltas(metadataById(currentSourceId).state.id))
-      }
 
-      if (result.failed.size > 0) {
-        Stats.incr("x-copy-fallback")
-        var currentSourceId = -1L
-        var countDelta = 0
-        result.failed.foreach { edge =>
-          if (edge.sourceId != currentSourceId) {
-            if (currentSourceId != -1)
-              updateCount(transaction, currentSourceId, countDelta)
-            currentSourceId = edge.sourceId
-            countDelta = 0
+        if (result.failed.size > 0) {
+          Stats.incr("x-copy-fallback")
+          var currentSourceId = -1L
+          var countDelta = 0
+          result.failed.foreach { edge =>
+            if (edge.sourceId != currentSourceId) {
+              if (currentSourceId != -1)
+                updateCount(transaction, currentSourceId, countDelta)
+              currentSourceId = edge.sourceId
+              countDelta = 0
+            }
+            countDelta += writeEdge(transaction, metadataById(edge.sourceId), edge, false)
           }
-          countDelta += writeEdge(transaction, metadataById(edge.sourceId), edge, false)
+          updateCount(transaction, currentSourceId, countDelta)
         }
-        updateCount(transaction, currentSourceId, countDelta)
       }
     }
   }
@@ -595,19 +597,21 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def writeMetadata(metadatas: Seq[Metadata])  = {
-    try {
-      val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"
-      queryEvaluator.executeBatch(query) { batch =>
-        metadatas.foreach { metadata =>
-          batch(metadata.sourceId, metadata.state.id, metadata.updatedAt.inSeconds)
+    if (!metadatas.isEmpty) {
+      try {
+        val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"
+        queryEvaluator.executeBatch(query) { batch =>
+          metadatas.foreach { metadata =>
+            batch(metadata.sourceId, metadata.state.id, metadata.updatedAt.inSeconds)
+          }
         }
+      } catch {
+        case e: BatchUpdateException =>
+          e.getUpdateCounts().zip(metadatas.toArray).foreach { case (errorCode, metadata) =>
+            if (errorCode < 0)
+              writeMetadata(metadata)
+          }
       }
-    } catch {
-      case e: BatchUpdateException =>
-        e.getUpdateCounts().zip(metadatas.toArray).foreach { case (errorCode, metadata) =>
-          if (errorCode < 0)
-            writeMetadata(metadata)
-        }
     }
   }
 
