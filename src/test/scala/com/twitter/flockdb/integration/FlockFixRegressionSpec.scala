@@ -61,7 +61,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
       alicesFollowings().size must eventually(be_==(5))
       alicesFollowings().toList.map(_.destination_id) mustEqual List(8,6,4,2,0)
 
-      Time.now += 1.second
+      Thread.sleep(1000)
 
       val job = Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, flockdb.Priority.High, pageSize, flock.edges.forwardingManager, flock.edges.schedule)
       job()
