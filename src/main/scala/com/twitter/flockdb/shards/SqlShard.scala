@@ -232,7 +232,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       val filtered = edges.filter{ edge => !existing.contains((edge.sourceId, edge.destinationId)) }
       if(!filtered.isEmpty){
         // FIXME: WTF DIY SQL
-        val values = filtered.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", 1)"}.mkString(",")
+        val values = filtered.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", -1)"}.mkString(",")
         val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, count, position, state) VALUES " + values
         queryEvaluator.execute(query)
       }
