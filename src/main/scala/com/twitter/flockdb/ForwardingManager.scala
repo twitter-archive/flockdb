@@ -53,13 +53,15 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
    */
   def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit): Seq[NodePair] = {
     def directionalId(id: Long, direction: Direction) = if (direction == Direction.Forward) id else -id
+
     def getState(stateMap: mutable.Map[Long, State], id: Long, direction: Direction) = {
       val did = directionalId(id, direction)
-      try {
-        stateMap.getOrElseUpdate(did, find(id, graphId, direction).getMetadata(id).map(_.state).getOrElse(State.Normal))
+
+      stateMap.getOrElseUpdate(did, try {
+        find(id, graphId, direction).getMetadata(id).map(_.state).getOrElse(State.Normal)
       } catch {
         case e: ShardBlackHoleException => State.Normal
-      }
+      })
     }
 
     val initialStateMap = mutable.Map.empty[Long, State]
