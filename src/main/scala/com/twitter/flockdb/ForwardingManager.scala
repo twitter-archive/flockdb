@@ -18,7 +18,7 @@ package com.twitter.flockdb
 
 import scala.collection.{immutable, mutable}
 import com.twitter.gizzard.nameserver.{Forwarding, NameServer}
-import com.twitter.gizzard.shards.ShardException
+import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import shards.Shard
 
@@ -55,13 +55,20 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
     def directionalId(id: Long, direction: Direction) = if (direction == Direction.Forward) id else -id
     def getState(stateMap: mutable.Map[Long, State], id: Long, direction: Direction) = {
       val did = directionalId(id, direction)
-      stateMap.getOrElseUpdate(did, find(id, graphId, direction).getMetadata(id).map(_.state).getOrElse(State.Normal))
+      try {
+        stateMap.getOrElseUpdate(did, find(id, graphId, direction).getMetadata(id).map(_.state).getOrElse(State.Normal))
+      } catch {
+        case e: ShardBlackHoleException => State.Normal
+      }
     }
 
     val initialStateMap = mutable.Map.empty[Long, State]
     nodePairs.foreach { nodePair =>
       val nodeState = getState(initialStateMap, nodePair.sourceId, Direction.Forward) max getState(initialStateMap, nodePair.destinationId, Direction.Backward)
-      f(find(nodePair.sourceId, graphId, Direction.Forward), find(nodePair.destinationId, graphId, Direction.Backward), nodePair, nodeState)
+      val sourceShard = find(nodePair.sourceId, graphId, Direction.Forward)
+      val destinationShard = find(nodePair.destinationId, graphId, Direction.Backward)
+
+      f(sourceShard, destinationShard, nodePair, nodeState)
     }
 
     val rv = new mutable.ListBuffer[NodePair]
