@@ -225,14 +225,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def initializeEdges(queryEvaluator: QueryEvaluator, edges: Seq[Edge]) = {
     if (!edges.isEmpty) {
-      val existing = existingEdges(edges)
-      val filtered = edges.filter{ edge => !existing.contains((edge.sourceId, edge.destinationId)) }
-      if(!filtered.isEmpty){
-        // FIXME: WTF DIY SQL
-        val values = filtered.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", -1)"}.mkString(",")
-        val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, count, position, state) VALUES " + values
-        queryEvaluator.execute(query)
-      }
+      // FIXME: WTF DIY SQL
+      val values = edges.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", -1)"}.mkString(",")
+      val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, count, position, state) VALUES " + values
+      queryEvaluator.execute(query)
     }
   }
 
@@ -260,37 +256,33 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
           }
           log.info("init metadata ("+ sourceIdSet.size +" rows) elapsed millis: "+ metaInitTime.inMilliseconds)
 
-
-          queryEvaluator.transaction { transaction =>
-
-            // Initialize edges
-            val edgesInitTime = time {
-              initializeEdges(transaction, edges)
-            }
-            log.info("init edges ("+ edges.length +" rows) elapsed millis: "+ edgesInitTime.inMilliseconds)
-
-
-            val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
-              "SET " +
-              "    metadata.count = metadata.count + " + incr("?") + "," +
-              "    edges.state            = ?, " +
-              "    edges.position         = IF(metadata.state = 1, ?, edges.position), " +
-              "    edges.updated_at       = ? " +
-              "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
-              "(" + statePriority("edges.state") + " < " + statePriority("?") + ")))" +
-              "  AND edges.source_id      = ? " +
-              "  AND edges.destination_id = ? " +
-              "  AND metadata.source_id   = ? "
-            val edgeWriteTimes = edges.map { edge =>
-              time {
-                transaction.execute(query, edge.state.id, edge.state.id, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.state.id, edge.state.id, edge.sourceId, edge.destinationId, edge.sourceId)
-              }.inMilliseconds
-            }
-
-            val edgeWriteAvg = edgeWriteTimes.reduceLeft(_ + _) / edges.length.toFloat
-
-            log.info("average edge write millis: "+ edgeWriteAvg)
+          // Initialize edges
+          val edgesInitTime = time {
+            initializeEdges(queryEvaluator, edges)
           }
+          log.info("init edges ("+ edges.length +" rows) elapsed millis: "+ edgesInitTime.inMilliseconds)
+
+          val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
+                      "SET " +
+                      "    metadata.count = metadata.count + " + incr("?") + "," +
+                      "    edges.state            = ?, " +
+                      "    edges.position         = IF(metadata.state = 1, ?, edges.position), " +
+                      "    edges.updated_at       = ? " +
+                      "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
+                      "(" + statePriority("edges.state") + " < " + statePriority("?") + ")))" +
+                      "  AND edges.source_id      = ? " +
+                      "  AND edges.destination_id = ? " +
+                      "  AND metadata.source_id   = ? "
+
+          val edgeWriteTimes = edges.map { edge =>
+            time {
+              queryEvaluator.execute(query, edge.state.id, edge.state.id, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.state.id, edge.state.id, edge.sourceId, edge.destinationId, edge.sourceId)
+            }.inMilliseconds
+          }
+
+          val edgeWriteAvg = edgeWriteTimes.reduceLeft(_ + _) / edges.length.toFloat
+
+          log.info("average edge write millis: "+ edgeWriteAvg)
         }
 
         log.info("end writing "+ edges.length +" edges. Elapsed millis: "+ totalTime.inMilliseconds)
