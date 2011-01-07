@@ -579,25 +579,20 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     var sourceIdsSet = Set[Long]()
     edges.foreach { edge => sourceIdsSet += edge.sourceId }
     val sourceIds = sourceIdsSet.toSeq
-    println("a")
     atomically(sourceIds) { (transaction, metadataById) =>
       val result = writeBurst(transaction, edges)
-      println("b")
       if (result.completed.size > 0) {
         var currentSourceId = -1L
         var countDeltas = new Array[Int](4)
         result.completed.foreach { edge =>
-          println("c")
           if (edge.sourceId != currentSourceId) {
             if (currentSourceId != -1)
               updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
             currentSourceId = edge.sourceId
-            println("d")
             countDeltas = new Array[Int](4)
           }
           countDeltas(edge.state.id) += 1
         }
-        println("e")
         updateCount(transaction, currentSourceId,
                     countDeltas(metadataById(currentSourceId).state.id))
       }
@@ -608,15 +603,12 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         var countDelta = 0
         result.failed.foreach { edge =>
           if (edge.sourceId != currentSourceId) {
-            println("f")
             if (currentSourceId != -1)
               updateCount(transaction, currentSourceId, countDelta)
             currentSourceId = edge.sourceId
             countDelta = 0
           }
-          println("y")
           countDelta += writeEdgeOld (transaction, metadataById(edge.sourceId), edge, false)
-          println("g")
         }
         updateCount(transaction, currentSourceId, countDelta)
       }
