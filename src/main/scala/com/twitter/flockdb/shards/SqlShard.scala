@@ -422,7 +422,9 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  override def hashCode = tablePrefix.hashCode * 37 + queryEvaluator.hashCode
+  override def hashCode = {
+    (if (tablePrefix == null) 37 else tablePrefix.hashCode * 37) + (if(queryEvaluator == null) 1 else queryEvaluator.hashCode)
+  }
 
   private class MissingMetadataRow extends Exception("Missing Count Row")
 
@@ -537,7 +539,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
                         "WHERE source_id = ?", countDelta, sourceId)
   }
-  
+
   // returns +1, 0, or -1, depending on how the metadata count should change after this operation.
   // `predictExistence`=true for normal operations, false for copy/migrate.
   private def writeEdgeOld(transaction: Transaction, metadata: Metadata, edge: Edge,
@@ -568,7 +570,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
     if (edge.state == metadata.state) countDelta else -countDelta
   }
-  
+
 
   def writeCopies(edges: Seq[Edge]) {
     if (!edges.isEmpty) {
