@@ -1,3 +1,4 @@
+import scala.collection.jcl
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
@@ -8,8 +9,9 @@ import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
 
 
 trait Credentials extends Connection {
-  val username = "root"
-  val password = ""
+  val env = jcl.Map(System.getenv())
+  val username = env.get("DB_USERNAME").getOrElse("root")
+  val password = env.get("DB_PASSWORD").getOrElse("")
 }
 
 class TestQueryEvaluator(label: String) extends QueryEvaluator {
