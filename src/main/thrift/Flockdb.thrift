@@ -128,6 +128,13 @@ struct EdgeResults {
   3: i64 prev_cursor
 }
 
+struct UnsafeAddQuery {
+  1: i64 source_id
+  2: i32 graph_id
+  3: i64 destination_id
+  4: i64 created_at
+}
+
 service FlockDB {
   # return true if the edge exists.
   bool contains(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
@@ -147,6 +154,7 @@ service FlockDB {
   list<EdgeResults> select_edges(1: list<EdgeQuery> queries) throws(1: FlockException ex)
 
   void execute(1: ExecuteOperations operations) throws(1: FlockException ex)
+  void unsafeAdd(1: list<UnsafeAddQuery> queries) throws (1:FlockException ex)
 
   # deprecated:
   i32 count(1: list<SelectOperation> operations) throws(1: FlockException ex)

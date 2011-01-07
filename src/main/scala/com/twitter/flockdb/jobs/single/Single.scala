@@ -23,6 +23,39 @@ import com.twitter.util.TimeConversions._
 import conversions.Numeric._
 import shards.Shard
 
+class UnsafeAddJobParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends JsonJobParser {
+  def apply(attributes: Map[String, Any]): JsonJob = {
+    val casted = attributes.asInstanceOf[Map[String, AnyVal]]
+    new UnsafeAddJob(
+      casted("source_id").toLong,
+      casted("graph_id").toInt,
+      casted("destination_id").toLong,
+      casted("position").toLong,
+      Time(casted("updated_at").toInt.seconds), forwardingManager, uuidGenerator)
+  }
+}
+
+class UnsafeAddJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
+                   forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends JsonJob {
+  def toMap = {
+    Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
+  }
+
+  def shards() = {
+    val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
+    val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
+    (forwardShard, backwardShard)
+  }
+
+  def apply() = {
+    val (forwardShard, backwardShard) = shards()
+    val uuid = uuidGenerator(position)
+
+    forwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
+    backwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
+  }
+}
+
 abstract class SingleJobParser extends JsonJobParser {
   def apply(attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]

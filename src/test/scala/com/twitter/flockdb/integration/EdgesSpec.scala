@@ -23,6 +23,7 @@ import com.twitter.util.TimeConversions._
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
+import conversions.UnsafeAddQuery._
 
 class EdgesSpec extends IntegrationSpecification {
 
@@ -37,6 +38,20 @@ class EdgesSpec extends IntegrationSpecification {
   "Edge Integration" should {
     doBefore {
       reset(config)
+    }
+
+    "unsafe add" in {
+      "existing graph" in {
+        Time.withCurrentTimeFrozen { time =>
+          flock.unsafeAdd(List[UnsafeAddQuery](new thrift.UnsafeAddQuery(alice, FOLLOWS, bob, Time.now)).toJavaList)
+          val op = new SelectOperation(SelectOperationType.SimpleQuery)
+          val term = new QueryTerm(alice, FOLLOWS, true)
+          term.setDestination_ids(List[Long](bob).pack)
+          term.setState_ids(List[Int](State.Normal.id).toJavaList)
+          op.setTerm(term)
+          flock.select(List(op).toJavaList, new Page(1, Cursor.Start.position)).ids.array.size must eventually(be_>(0))
+        }
+      }
     }
 
     "add" in {

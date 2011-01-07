@@ -38,6 +38,7 @@ import com.twitter.flockdb.conversions.Page._
 import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
 import com.twitter.flockdb.conversions.SelectOperation._
+import com.twitter.flockdb.conversions.UnsafeAddQuery._
 import net.lag.configgy.{Config, ConfigMap}
 import net.lag.logging.Logger
 import queries._
@@ -82,6 +83,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   jobCodec += ("single.Remove".r, new jobs.single.RemoveParser(forwardingManager, OrderedUuidGenerator))
   jobCodec += ("single.Archive".r, new jobs.single.ArchiveParser(forwardingManager, OrderedUuidGenerator))
   jobCodec += ("single.Negate".r, new jobs.single.NegateParser(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.UnsafeAdd".r, new jobs.single.UnsafeAddJobParser(forwardingManager, OrderedUuidGenerator))
   jobCodec += ("multi.Archive".r, new jobs.multi.ArchiveParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
   jobCodec += ("multi.Unarchive".r, new jobs.multi.UnarchiveParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
   jobCodec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
@@ -143,6 +145,15 @@ class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.Iface
   def execute(operations: thrift.ExecuteOperations) = {
     try {
       edges.execute(operations.fromThrift)
+    } catch {
+      case e: ShardException =>
+        throw new FlockException(e.toString)
+    }
+  }
+
+  def unsafeAdd(operations: JList[thrift.UnsafeAddQuery]) = {
+    try {
+      edges.unsafeAdd(operations.toSeq.map { _.fromThrift} )
     } catch {
       case e: ShardException =>
         throw new FlockException(e.toString)

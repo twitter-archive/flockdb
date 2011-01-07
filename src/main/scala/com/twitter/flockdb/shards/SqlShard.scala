@@ -299,6 +299,13 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     write(new Edge(sourceId, destinationId, position, updatedAt, 1, Normal))
   }
 
+  def addUnsafe(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
+    queryEvaluator.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, state, count) VALUES (?, ?, ?, ?, ?, 0) " +
+                           "ON DUPLICATE KEY UPDATE source_id = VALUES(source_id), destination_id = VALUES(destination_id), "+
+                                                                "position = VALUES(position), updated_at = VALUES(updated_at)",
+      sourceId, position, updatedAt.inSeconds, destinationId, Normal.id)
+  }
+
   def add(sourceId: Long, updatedAt: Time) {
     updateMetadata(sourceId, Normal, updatedAt)
   }

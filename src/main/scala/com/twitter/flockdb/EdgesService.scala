@@ -18,7 +18,7 @@ package com.twitter.flockdb
 
 import com.twitter.gizzard.Future
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
-import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
+import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, JsonNestedJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
   ShardOfflineException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
@@ -27,6 +27,8 @@ import com.twitter.ostrich.Stats
 import queries._
 import thrift.FlockException
 import net.lag.logging.Logger
+import jobs.single.UnsafeAddJob
+import com.twitter.util.Time
 
 class EdgesService(val nameServer: NameServer[shards.Shard],
                    val forwardingManager: ForwardingManager,
@@ -96,6 +98,14 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   def execute(operations: ExecuteOperations) {
     rethrowExceptionsAsThrift {
       executeCompiler(operations)
+    }
+  }
+
+  def unsafeAdd(operations: Seq[UnsafeAddQuery]) {
+    rethrowExceptionsAsThrift {
+      schedule.put(Priority.High.id, new JsonNestedJob(operations.map {
+        op => new UnsafeAddJob(op.sourceId, op.graphId, op.destinationId, op.createdAt.inMillis, Time.now, null, null)
+      } ))
     }
   }
 

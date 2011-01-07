@@ -59,4 +59,6 @@ trait Shard extends shards.Shard {
 
   @throws(classOf[shards.ShardException]) def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]): Seq[Long]
   @throws(classOf[shards.ShardException]) def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]): Seq[Edge]
+
+  @throws(classOf[shards.ShardException]) def addUnsafe(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)
 }

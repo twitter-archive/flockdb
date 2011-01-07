@@ -81,6 +81,25 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       }
     }
 
+    "add unsafe" in {
+      "nonexisting row" >> {
+        shard.addUnsafe(alice, bob, 1, now)
+        shard.addUnsafe(carl, bob, 15, now)
+        val (result, cursor) = shard.selectAll((Cursor.Start, Cursor.Start), 3)
+        result.toList mustEqual List(Edge(alice, bob, 1, now, 0, State.Normal), Edge(carl, bob, 15, now, 0, State.Normal))
+      }
+
+      "existing row" >> {
+        shard.addUnsafe(alice, bob, 1, now)
+        shard.addUnsafe(alice, bob, 5, now)
+        shard.addUnsafe(carl, bob, 15, now)
+        shard.addUnsafe(carl, alice, 15, now)
+
+        val (result, cursor) = shard.selectAll((Cursor.Start, Cursor.Start), 5)
+        result.toList mustEqual List(Edge(alice, bob, 5, now, 0, State.Normal), Edge(carl, alice, 15, now, 0, State.Normal))
+      }
+    }
+
     "count" in {
       "when the state is normal" >> {
         "when the count is materialized" >> {
