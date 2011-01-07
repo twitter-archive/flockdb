@@ -42,13 +42,14 @@ class EdgesSpec extends IntegrationSpecification {
     "add" in {
       "existing graph" in {
         Time.withCurrentTimeFrozen { time =>
-          flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
           val term = new QueryTerm(alice, FOLLOWS, true)
+          val op = new SelectOperation(SelectOperationType.SimpleQuery)
           term.setDestination_ids(List[Long](bob).pack)
           term.setState_ids(List[Int](State.Normal.id).toJavaList)
-          val op = new SelectOperation(SelectOperationType.SimpleQuery)
           op.setTerm(term)
           val page = new Page(1, Cursor.Start.position)
+          flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(0))
+          flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
           flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_>(0))
           time.advance(1.second)
           flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)

@@ -132,6 +132,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
       case e: ShardOfflineException =>
         countAndRethrow(e)
       case e: Throwable =>
+        e.printStackTrace
         Stats.incr("exceptions-unknown")
         log.error(e, "Unhandled error in EdgesService: %s", e)
         throw(new FlockException(e.toString))
