@@ -148,7 +148,6 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.remove(alice, now)
           shard.archive(alice, bob, 1, now)
           shard.remove(alice, bob, 1, now + 1.second)
-          Thread.sleep(190000)
           shard.count(alice, List(State.Removed)) mustEqual 1
         }
       }

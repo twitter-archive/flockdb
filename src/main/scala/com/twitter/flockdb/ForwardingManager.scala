@@ -16,11 +16,13 @@
 
 package com.twitter.flockdb
 
+import scala.collection.{immutable, mutable}
 import com.twitter.gizzard.nameserver.{Forwarding, NameServer}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import shards.Shard
 
+case class NodePair(sourceId: Long, destinationId: Long)
 
 class ForwardingManager(nameServer: NameServer[Shard]) {
   @throws(classOf[ShardException])
@@ -39,5 +41,37 @@ class ForwardingManager(nameServer: NameServer[Shard]) {
   @throws(classOf[ShardException])
   def findCurrentForwarding(tableId: List[Int], id: Long): Shard = {
     find(id, tableId(0), if (tableId(1) > 0) Direction.Forward else Direction.Backward)
+  }
+
+  /**
+   * Grab an "optimistic lock" on the list of NodePairs given, and then call a method on each
+   * NodePair with the forward shard, backward shard, pair, and current consensus state.
+   * Afterwards, re-check the metadata, and return a list of the NodePairs that failed to hold
+   * on to their lock. (They need to be replayed or punted to an error queue.)
+   *
+   * FIXME: May want to optimize the (frequent) case of one NodePair.
+   */
+  def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit): Seq[NodePair] = {
+    def directionalId(id: Long, direction: Direction) = if (direction == Direction.Forward) id else -id
+    def getState(stateMap: mutable.Map[Long, State], id: Long, direction: Direction) = {
+      val did = directionalId(id, direction)
+      stateMap.getOrElseUpdate(did, find(id, graphId, direction).getMetadata(id).map(_.state).getOrElse(State.Normal))
+    }
+
+    val initialStateMap = mutable.Map.empty[Long, State]
+    nodePairs.foreach { nodePair =>
+      val nodeState = getState(initialStateMap, nodePair.sourceId, Direction.Forward) max getState(initialStateMap, nodePair.destinationId, Direction.Backward)
+      f(find(nodePair.sourceId, graphId, Direction.Forward), find(nodePair.destinationId, graphId, Direction.Backward), nodePair, nodeState)
+    }
+
+    val rv = new mutable.ListBuffer[NodePair]
+    val afterStateMap = mutable.Map.empty[Long, State]
+    nodePairs.foreach { nodePair =>
+      if (getState(afterStateMap, nodePair.sourceId, Direction.Forward) != initialStateMap(directionalId(nodePair.sourceId, Direction.Forward)) ||
+          getState(afterStateMap, nodePair.destinationId, Direction.Backward) != initialStateMap(directionalId(nodePair.destinationId, Direction.Backward))) {
+        rv += nodePair
+      }
+    }
+    rv.toList
   }
 }
