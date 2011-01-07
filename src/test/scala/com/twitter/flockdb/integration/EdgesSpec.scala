@@ -76,6 +76,14 @@ class EdgesSpec extends IntegrationSpecification {
           flock.count(Select(alice, BLACKHOLE, Nil).toThrift) mustEqual 0
         }
       }
+
+      "remove" in {
+        flock.execute(Select(bob, FOLLOWS, alice).add.toThrift)
+        flock.count(Select(bob, FOLLOWS, alice).toThrift) == 1 must eventually(beTrue)
+        flock.execute(Select(bob, FOLLOWS, alice).remove.toThrift)
+        (!flock.contains(bob, FOLLOWS, alice) &&
+          flock.count(Select(bob, FOLLOWS, Nil).toThrift) == 0) must eventually(beTrue)
+      }
     }
 
     "add" in {
