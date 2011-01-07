@@ -194,11 +194,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def statePriority(state: String): String = "-IF(" + state + "=0, 4, " + state + ")"
 
-  def initializeMetadata(sourceId: Long): Unit = initializeMetadata(Set(sourceId))
-
-  def initializeMetadata(sourceIds: Set[Long]): Unit = initializeMetadata(queryEvaluator, sourceIds)
-
-  def initializeMetadata(queryEvaluator: QueryEvaluator, sourceIds: Set[Long]): Unit = {
+  private def initializeMetadata(queryEvaluator: QueryEvaluator, sourceIds: Set[Long]): Unit = {
     if (!sourceIds.isEmpty) {
       val values = sourceIds.map("(" + _ + ")").mkString(",")
       val query = "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id) VALUES " + values
@@ -206,9 +202,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  def initializeEdges(edges: Seq[Edge]): Unit = initializeEdges(queryEvaluator, edges)
-
-  def initializeEdges(queryEvaluator: QueryEvaluator, edges: Seq[Edge]) = {
+  private def initializeEdges(queryEvaluator: QueryEvaluator, edges: Seq[Edge]) = {
     if (!edges.isEmpty) {
       // FIXME: WTF DIY SQL
       val values = edges.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", -1)"}.mkString(",")
@@ -220,6 +214,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   private def incr(newColor: String) = {
     "IF(" + newColor + " = edges.state, 0, " +
       "IF(metadata.state = " + newColor + ", 1, IF(metadata.state = edges.state, -1, 0)))"
+  }
+
+  private def write(edge: Edge) {
+    write(Seq(edge), deadlockRetries)
   }
 
   private def write(edges: Seq[Edge], tries: Int) {
@@ -477,14 +475,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
     if (edge.state != oldEdge.state &&
         (oldEdge.state == metadata.state || edge.state == metadata.state)) updatedRows else 0
-  }
-
-  private def write(edge: Edge) {
-    write(edge, deadlockRetries, true)
-  }
-
-  private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
-    write(Seq(edge), tries)
   }
 
   /**
