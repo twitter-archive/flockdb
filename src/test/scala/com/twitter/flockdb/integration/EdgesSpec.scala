@@ -17,6 +17,8 @@
 package com.twitter.flockdb.integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
+import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.ostrich.Stats
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
@@ -27,6 +29,7 @@ import conversions.SelectOperation._
 class EdgesSpec extends IntegrationSpecification {
 
   val FOLLOWS = 1
+  val BLACKHOLE = 11
   val BORKEN = 900
 
   val alice = 1L
@@ -37,6 +40,42 @@ class EdgesSpec extends IntegrationSpecification {
   "Edge Integration" should {
     doBefore {
       reset(config)
+    }
+
+    "blackhole graph" >> {
+      doBefore {
+        val shardId = ShardId("localhost", "forward_11")
+        val blackHoleShardId = ShardId("localhost", "backward_blackhole_11")
+
+        nameServer.createShard(ShardInfo(shardId, "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
+        nameServer.createShard(ShardInfo(blackHoleShardId, "BlackHoleShard", "", "", Busy.Normal))
+        nameServer.setForwarding(Forwarding(11, 0, shardId))
+        nameServer.setForwarding(Forwarding(-11, 0, blackHoleShardId))
+
+        val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
+        queryEvaluator.execute("DELETE FROM forward_11_edges")
+        queryEvaluator.execute("DELETE FROM forward_11_metadata")
+
+        nameServer.reload()
+      }
+
+      "add" in {
+        Time.withCurrentTimeFrozen { time =>
+          val term = new QueryTerm(alice, BLACKHOLE, true)
+          val op = new SelectOperation(SelectOperationType.SimpleQuery)
+          term.setDestination_ids(List[Long](bob).pack)
+          term.setState_ids(List[Int](State.Normal.id).toJavaList)
+          op.setTerm(term)
+          val page = new Page(1, Cursor.Start.position)
+          flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(0))
+          flock.execute(Select(alice, BLACKHOLE, bob).add.toThrift)
+          flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_>(0))
+          time.advance(1.second)
+          flock.execute(Select(alice, BLACKHOLE, bob).remove.toThrift)
+          flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(0))
+          flock.count(Select(alice, BLACKHOLE, Nil).toThrift) mustEqual 0
+        }
+      }
     }
 
     "add" in {
