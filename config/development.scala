@@ -1,3 +1,4 @@
+import scala.collection.jcl
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
@@ -7,8 +8,9 @@ import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.Priority
 
 trait Credentials extends Connection {
-  val username = "root"
-  val password = ""
+  val env = jcl.Map(System.getenv())
+  val username = env.get("DB_USERNAME").getOrElse("root")
+  val password = env.get("DB_PASSWORD").getOrElse("")
 }
 
 class ProductionQueryEvaluator extends QueryEvaluator {
@@ -37,7 +39,7 @@ class ProductionQueryEvaluator extends QueryEvaluator {
 class ProductionNameServerReplica(host: String) extends Mysql {
   val connection = new Connection with Credentials {
     val hostnames = Seq(host)
-    val database = "flock_edges_production"
+    val database = "flockdb_development"
   }
 
   queryEvaluator = new ProductionQueryEvaluator {
@@ -63,7 +65,7 @@ class ProductionNameServerReplica(host: String) extends Mysql {
 new FlockDB {
   aggregateJobsPageSize = 500
 
-  val server = new FlockDBServer with THsHaServer {
+  val server = new FlockDBServer with TSelectorServer {
     timeout = 100.millis
     idleTimeout = 60.seconds
     threadPool.minThreads = 250
