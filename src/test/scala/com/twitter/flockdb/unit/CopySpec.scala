@@ -41,7 +41,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "apply" in {
       val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count, nameServer, scheduler)
-      val edge = new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)
+      val edge = new Edge(1L, 2L, 3L, Time.now, State.Normal)
 
       "continuing work" >> {
         expect {

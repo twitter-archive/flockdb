@@ -103,6 +103,7 @@ class EdgesSpec extends IntegrationSpecification {
     }
 
     "archive & unarchive concurrently" in {
+      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0))  // paranoia
       flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
@@ -126,6 +127,7 @@ class EdgesSpec extends IntegrationSpecification {
 
     "toggle polarity" in {
       Time.withCurrentTimeFrozen { time =>
+        flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0)) // paranoia
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
@@ -154,6 +156,7 @@ class EdgesSpec extends IntegrationSpecification {
     "select_edges" in {
       "simple query" in {
         Time.withCurrentTimeFrozen { time =>
+          flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0)) // paranoia
           flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
           time.advance(1.second)
           flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
@@ -172,6 +175,7 @@ class EdgesSpec extends IntegrationSpecification {
       }
 
       "intersection" in {
+        flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0)) // paranoia
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
         flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))
