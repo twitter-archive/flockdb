@@ -192,23 +192,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     (edges, returnedCursor)
   }
 
-  private def existingMetadata(ids: Collection[Long]): Seq[Long] = {
-    queryEvaluator.select("SELECT source_id FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", ids.toList) { row =>
-      row.getLong("source_id")
-    }
-  }
-
-  private def existingEdges(edges: Collection[Edge]) = {
-    val where = edges.map{edge => "(source_id = " + edge.sourceId + " AND destination_id=" +edge.destinationId+")"}.mkString(" OR ")
-    val query = "SELECT source_id, destination_id FROM " + tablePrefix + "_edges WHERE " + where
-
-    val set = new mutable.HashSet[(Long, Long)]
-    queryEvaluator.select(query) { row =>
-      set += ((row.getLong("source_id"), row.getLong("destination_id")))
-    }
-    set
-  }
-
   private def statePriority(state: String): String = "-IF(" + state + "=0, 4, " + state + ")"
 
   def initializeMetadata(sourceId: Long): Unit = initializeMetadata(Set(sourceId))
@@ -216,9 +199,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   def initializeMetadata(sourceIds: Set[Long]): Unit = initializeMetadata(queryEvaluator, sourceIds)
 
   def initializeMetadata(queryEvaluator: QueryEvaluator, sourceIds: Set[Long]): Unit = {
-    val newIds = sourceIds -- existingMetadata(sourceIds)
-    if (!newIds.isEmpty) {
-      val values = newIds.map("(" + _ + ")").mkString(",")
+    if (!sourceIds.isEmpty) {
+      val values = sourceIds.map("(" + _ + ")").mkString(",")
       val query = "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id) VALUES " + values
       queryEvaluator.execute(query)
     }
@@ -228,14 +210,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def initializeEdges(queryEvaluator: QueryEvaluator, edges: Seq[Edge]) = {
     if (!edges.isEmpty) {
-      val existing = existingEdges(edges)
-      val filtered = edges.filter{ edge => !existing.contains((edge.sourceId, edge.destinationId)) }
-      if(!filtered.isEmpty){
-        // FIXME: WTF DIY SQL
-        val values = filtered.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", -1)"}.mkString(",")
-        val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, count, position, state) VALUES " + values
-        queryEvaluator.execute(query)
-      }
+      // FIXME: WTF DIY SQL
+      val values = edges.map{ edge => "(" + edge.sourceId + ", " + edge.destinationId + ", 0, 0, "+edge.position+", -1)"}.mkString(",")
+      val query = "INSERT IGNORE INTO " + tablePrefix + "_edges (source_id, destination_id, updated_at, count, position, state) VALUES " + values
+      queryEvaluator.execute(query)
     }
   }
 
