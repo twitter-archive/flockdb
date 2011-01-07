@@ -249,17 +249,23 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       try {
         val totalTime = time {
           log.info("start writing "+ edges.length +" edges")
-          queryEvaluator.transaction { transaction =>
-            val sourceIdSet = Set(edges.map(_.sourceId): _*)
-            val metaInitTime = time {
-              initializeMetadata(transaction, sourceIdSet)
-            }
-            log.info("init metadata ("+ sourceIdSet.size +" rows) elapsed millis: "+ metaInitTime.inMilliseconds)
 
+          // Initialize metadata
+          val sourceIdSet = Set(edges.map(_.sourceId): _*)
+          val metaInitTime = time {
+            initializeMetadata(transaction, sourceIdSet)
+          }
+          log.info("init metadata ("+ sourceIdSet.size +" rows) elapsed millis: "+ metaInitTime.inMilliseconds)
+
+
+          queryEvaluator.transaction { transaction =>
+
+            // Initialize edges
             val edgesInitTime = time {
               initializeEdges(transaction, edges)
             }
             log.info("init edges ("+ edges.length +" rows) elapsed millis: "+ edgesInitTime.inMilliseconds)
+
 
             val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
               "SET " +
