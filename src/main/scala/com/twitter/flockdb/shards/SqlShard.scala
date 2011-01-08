@@ -214,8 +214,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   private def initializeMetadata(queryEvaluator: QueryEvaluator, sourceIds: Set[Long]): Unit = {
     val newIds = sourceIds -- existingMetadata(sourceIds)
     if (!newIds.isEmpty) {
-      val values = newIds.map("(" + _ + ")").mkString(",")
-      val query = "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id) VALUES " + values
+      val values = newIds.map("(" + _ + ",0,0,0)").mkString(",")
+      val query = "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES " + values
       queryEvaluator.execute(query)
     }
   }
@@ -253,10 +253,9 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
           // Initialize metadata
           val sourceIdSet = Set(edges.map(_.sourceId): _*)
           val metaInitTime = time {
-            initializeMetadata(transaction, sourceIdSet)
+            initializeMetadata(queryEvaluator, sourceIdSet)
           }
           log.info("init metadata ("+ sourceIdSet.size +" rows) elapsed millis: "+ metaInitTime.inMilliseconds)
-
 
           queryEvaluator.transaction { transaction =>
 
