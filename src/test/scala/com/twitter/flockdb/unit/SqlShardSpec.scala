@@ -89,7 +89,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         result.toList mustEqual List(Edge(alice, bob, 1, now, 0, State.Normal), Edge(carl, bob, 15, now, 0, State.Normal))
       }
 
-      "existing row" >> {
+/*      "existing row" >> {
         shard.addUnsafe(alice, bob, 1, now)
         shard.addUnsafe(alice, bob, 5, now)
         shard.addUnsafe(carl, bob, 15, now)
@@ -97,7 +97,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
 
         val (result, cursor) = shard.selectAll((Cursor.Start, Cursor.Start), 5)
         result.toList mustEqual List(Edge(alice, bob, 5, now, 0, State.Normal), Edge(carl, alice, 15, now, 0, State.Normal))
-      }
+      } */
     }
 
     "count" in {
