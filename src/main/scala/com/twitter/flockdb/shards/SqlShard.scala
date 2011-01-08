@@ -228,53 +228,31 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   private def write(edges: Seq[Edge], tries: Int) {
-    def time[A](f: => A) = { val start = Time.now; f; Time.now - start }
-
     if (!edges.isEmpty) {
       try {
-        val totalTime = time {
-          log.info("start writing "+ edges.length +" edges")
+        // Initialize metadata
+        initializeMetadata(queryEvaluator, Set(edges.map(_.sourceId): _*))
 
-          // Initialize metadata
-          val sourceIdSet = Set(edges.map(_.sourceId): _*)
-          val metaInitTime = time {
-            initializeMetadata(queryEvaluator, sourceIdSet)
-          }
-          log.info("init metadata ("+ sourceIdSet.size +" rows) elapsed millis: "+ metaInitTime.inMilliseconds)
+        queryEvaluator.transaction { transaction =>
 
-          queryEvaluator.transaction { transaction =>
+          // Initialize edges
+          initializeEdges(transaction, edges)
 
-            // Initialize edges
-            val edgesInitTime = time {
-              initializeEdges(transaction, edges)
-            }
-            log.info("init edges ("+ edges.length +" rows) elapsed millis: "+ edgesInitTime.inMilliseconds)
-
-
-            val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
-              "SET " +
-              "    metadata.count = metadata.count + " + incr("?") + "," +
-              "    edges.state            = ?, " +
-              "    edges.position         = IF(metadata.state = 1, ?, edges.position), " +
-              "    edges.updated_at       = ? " +
-              "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
-              "(" + statePriority("edges.state") + " < " + statePriority("?") + ")))" +
-              "  AND edges.source_id      = ? " +
-              "  AND edges.destination_id = ? " +
-              "  AND metadata.source_id   = ? "
-            val edgeWriteTimes = edges.map { edge =>
-              time {
-                transaction.execute(query, edge.state.id, edge.state.id, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.state.id, edge.state.id, edge.sourceId, edge.destinationId, edge.sourceId)
-              }.inMilliseconds
-            }
-
-            val edgeWriteAvg = edgeWriteTimes.reduceLeft(_ + _) / edges.length.toFloat
-
-            log.info("average edge write millis: "+ edgeWriteAvg)
+          val query = "UPDATE " + tablePrefix + "_metadata AS metadata, " + tablePrefix + "_edges AS edges " +
+            "SET " +
+            "    metadata.count = metadata.count + " + incr("?") + "," +
+            "    edges.state            = ?, " +
+            "    edges.position         = IF(metadata.state = 1, ?, edges.position), " +
+            "    edges.updated_at       = ? " +
+            "WHERE (edges.updated_at    < ? OR (edges.updated_at = ? AND " +
+            "(" + statePriority("edges.state") + " < " + statePriority("?") + ")))" +
+            "  AND edges.source_id      = ? " +
+            "  AND edges.destination_id = ? " +
+            "  AND metadata.source_id   = ? "
+          edges.foreach { edge =>
+            transaction.execute(query, edge.state.id, edge.state.id, edge.state.id, edge.position, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.updatedAt.inSeconds, edge.state.id, edge.state.id, edge.sourceId, edge.destinationId, edge.sourceId)
           }
         }
-
-        log.info("end writing "+ edges.length +" edges. Elapsed millis: "+ totalTime.inMilliseconds)
       } catch {
         case e: MySQLTransactionRollbackException if (tries > 0) =>
           write(edges, tries - 1)
