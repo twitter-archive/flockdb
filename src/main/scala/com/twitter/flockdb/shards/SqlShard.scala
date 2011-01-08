@@ -201,11 +201,20 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   private def statePriority(state: String): String = "-IF(" + state + "=0, 4, " + state + ")"
 
   private def initializeMetadata(queryEvaluator: QueryEvaluator, sourceIds: Set[Long]): Unit = {
-    val newIds = sourceIds -- existingMetadata(sourceIds)
-    if (!newIds.isEmpty) {
-      val values = newIds.map("(" + _ + ",0,0,0)").mkString(",")
-      val query = "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES " + values
-      queryEvaluator.execute(query)
+    if (!sourceIds.isEmpty) {
+      val values = sourceIds.map("("+ _ +", 0,0,0)").mkString(",")
+
+      val query = if (sourceIds.size == 1) {
+        "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES " + values
+      } else {
+        "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES " + values
+      }
+
+      try {
+        queryEvaluator.execute(query)
+      } catch {
+        case e: SQLIntegrityConstraintViolationException => () // ignore duplicate key exception
+      }
     }
   }
 
