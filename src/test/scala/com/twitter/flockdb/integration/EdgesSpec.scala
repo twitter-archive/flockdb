@@ -24,6 +24,7 @@ import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
 import conversions.UnsafeAddQuery._
+import java.nio.ByteOrder
 
 class EdgesSpec extends IntegrationSpecification {
 
@@ -41,7 +42,7 @@ class EdgesSpec extends IntegrationSpecification {
     }
 
     "unsafe add" in {
-      "existing graph" in {
+      "single row" in {
         Time.withCurrentTimeFrozen { time =>
           flock.unsafeAdd(List[UnsafeAddQuery](new thrift.UnsafeAddQuery(alice, FOLLOWS, bob, Time.now)).toJavaList)
           val op = new SelectOperation(SelectOperationType.SimpleQuery)
@@ -50,6 +51,25 @@ class EdgesSpec extends IntegrationSpecification {
           term.setState_ids(List[Int](State.Normal.id).toJavaList)
           op.setTerm(term)
           flock.select(List(op).toJavaList, new Page(1, Cursor.Start.position)).ids.array.size must eventually(be_>(0))
+        }
+      }
+
+      "honors position" in {
+        Time.withCurrentTimeFrozen { time =>
+          flock.unsafeAdd(List[UnsafeAddQuery](
+            new thrift.UnsafeAddQuery(alice, FOLLOWS, bob, Time.now),
+            new thrift.UnsafeAddQuery(alice, FOLLOWS, darcy, Time.now + 1.hour)
+          ).toJavaList)
+
+          val op = new SelectOperation(SelectOperationType.SimpleQuery)
+          val term = new QueryTerm(alice, FOLLOWS, true)
+          term.setState_ids(List[Int](State.Normal.id).toJavaList)
+          op.setTerm(term)
+          flock.select(List(op).toJavaList, new Page(20, Cursor.Start.position)).ids.array.size must eventually(be_>(8))
+          val idBytes = flock.select(List(op).toJavaList, new Page(20, Cursor.Start.position)).ids
+          idBytes.order(ByteOrder.LITTLE_ENDIAN)
+          val ids = List(idBytes.getLong(), idBytes.getLong())
+          ids mustEqual List(darcy, bob)
         }
       }
     }
