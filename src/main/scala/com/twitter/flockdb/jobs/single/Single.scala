@@ -51,8 +51,16 @@ class UnsafeAddJob(sourceId: Long, graphId: Int, destinationId: Long, position: 
     val (forwardShard, backwardShard) = shards()
     val uuid = uuidGenerator(position)
 
-    forwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
-    backwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
+    try {
+      forwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
+    } catch {
+      case e: ShardBlackHoleException =>
+    }
+    try {
+      backwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
+    } catch {
+      case e: ShardBlackHoleException =>
+    }
   }
 }
 
