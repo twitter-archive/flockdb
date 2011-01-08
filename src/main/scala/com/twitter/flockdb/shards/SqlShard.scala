@@ -300,9 +300,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def addUnsafe(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    queryEvaluator.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, state, count) VALUES (?, ?, ?, ?, ?, 0) " +
-                           "ON DUPLICATE KEY UPDATE source_id = VALUES(source_id), destination_id = VALUES(destination_id), "+
-                                                                "position = VALUES(position), updated_at = VALUES(updated_at)",
+    queryEvaluator.execute("REPLACE INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, state, count) VALUES (?, ?, ?, ?, ?, 0)",
       sourceId, position, updatedAt.inSeconds, destinationId, Normal.id)
   }
 
