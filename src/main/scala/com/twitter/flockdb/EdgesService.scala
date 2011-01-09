@@ -103,7 +103,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def unsafeAdd(operations: Seq[UnsafeAddQuery]) {
     rethrowExceptionsAsThrift {
-      schedule.put(Priority.High.id, new JsonNestedJob(operations.map {
+      schedule.put(Priority.Medium.id, new JsonNestedJob(operations.map {
         op => new UnsafeAddJob(op.sourceId, op.graphId, op.destinationId, op.createdAt.inMillis, Time.now, null, null)
       } ))
     }
