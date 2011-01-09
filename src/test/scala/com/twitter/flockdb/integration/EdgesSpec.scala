@@ -54,6 +54,17 @@ class EdgesSpec extends IntegrationSpecification {
         }
       }
 
+      "backwards direction" in {
+        Time.withCurrentTimeFrozen { time =>
+          flock.unsafeAdd(List[UnsafeAddQuery](new thrift.UnsafeAddQuery(bob, -1 * FOLLOWS, alice, Time.now)).toJavaList)
+          val op = new SelectOperation(SelectOperationType.SimpleQuery)
+          val term = new QueryTerm(bob, FOLLOWS, false)
+          term.setState_ids(List[Int](State.Normal.id).toJavaList)
+          op.setTerm(term)
+          flock.select(List(op).toJavaList, new Page(1, Cursor.Start.position)).ids.array.size must eventually(be_>(0))
+        }
+      }
+
       "honors position" in {
         Time.withCurrentTimeFrozen { time =>
           flock.unsafeAdd(List[UnsafeAddQuery](

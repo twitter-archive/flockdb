@@ -41,23 +41,15 @@ class UnsafeAddJob(sourceId: Long, graphId: Int, destinationId: Long, position: 
     Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
   }
 
-  def shards() = {
-    val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
-    val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
-    (forwardShard, backwardShard)
-  }
-
   def apply() = {
-    val (forwardShard, backwardShard) = shards()
+    val direction = if (graphId > 0) Direction.Forward else Direction.Backward
+    val graph = Math.abs(graphId)
+    val shard = forwardingManager.find(sourceId, graph, direction)
+
     val uuid = uuidGenerator(position)
 
     try {
-      forwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
-    } catch {
-      case e: ShardBlackHoleException =>
-    }
-    try {
-      backwardShard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
+      shard.addUnsafe(sourceId, destinationId, uuid, updatedAt)
     } catch {
       case e: ShardBlackHoleException =>
     }
