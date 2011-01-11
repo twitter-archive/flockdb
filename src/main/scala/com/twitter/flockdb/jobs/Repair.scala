@@ -45,13 +45,14 @@ trait RepairJobFactory[S <: Shard, R <: Repairable[R]] extends ((ShardId, ShardI
  * 'deserialize' to decode any shard-specific data (like a cursor).
  */
 trait RepairJobParser[S <: Shard, R <: Repairable[R]] extends JsonJobParser {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int): RepairJob[S, R]
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int, tableId: Int, dryRun: Boolean): RepairJob[S, R]
 
   def apply(attributes: Map[String, Any]): JsonJob = {
     deserialize(attributes,
       ShardId(attributes("source_shard_hostname").toString, attributes("source_shard_table_prefix").toString),
       ShardId(attributes("destination_shard_hostname").toString, attributes("destination_shard_table_prefix").toString),
-      attributes("count").asInstanceOf[{def toInt: Int}].toInt)
+      attributes("count").asInstanceOf[{def toInt: Int}].toInt, attributes("table_id").asInstanceOf[AnyVal].toInt,
+      attributes("dry_run").asInstanceOf[Boolean])
   }
 }
 
@@ -69,7 +70,8 @@ abstract case class RepairJob[S <: Shard, R <: Repairable[R]](sourceId: ShardId,
                                        tableId: Int,
                                        var count: Int,
                                        nameServer: NameServer[S],
-                                       scheduler: PrioritizingJobScheduler[JsonJob]) extends JsonJob {
+                                       scheduler: PrioritizingJobScheduler[JsonJob],
+                                       dryRun: Boolean) extends JsonJob {
   private val log = Logger.get(getClass.getName)
 
   def finish() {
@@ -107,6 +109,7 @@ abstract case class RepairJob[S <: Shard, R <: Repairable[R]](sourceId: ShardId,
         "destination_shard_hostname" -> destinationId.hostname,
         "destination_shard_table_prefix" -> destinationId.tablePrefix,
         "table_id" -> tableId,
+        "dry_run" -> dryRun,
         "count" -> count
     ) ++ serialize
   }
@@ -171,33 +174,28 @@ object Repair {
   val COUNT = 10000
 }
 
-class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob], dryRun: Boolean)
       extends RepairJobFactory[Shard, Metadata] {
   def apply(sourceShardId: ShardId, destShardId: ShardId, tableId: Int) = 
-    new MetadataRepair(sourceShardId, destShardId, tableId, MetadataRepair.START, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
+    new MetadataRepair(sourceShardId, destShardId, tableId, MetadataRepair.START, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler, dryRun)
 }
 
 class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
       extends RepairJobParser[Shard, Edge] {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int, tableId: Int, dryRun: Boolean) = {
     val srcCursor = (Cursor(attributes("src_cursor1").asInstanceOf[AnyVal].toLong),
                     Cursor(attributes("src_cursor2").asInstanceOf[AnyVal].toLong))
     val destCursor = (Cursor(attributes("dest_cursor1").asInstanceOf[AnyVal].toLong),
                     Cursor(attributes("dest_cursor2").asInstanceOf[AnyVal].toLong))
-    val tableId = attributes("table_id").asInstanceOf[AnyVal].toInt
-    new Repair(sourceId, destinationId, tableId, srcCursor, destCursor, count, nameServer, scheduler)
+    new Repair(sourceId, destinationId, tableId, srcCursor, destCursor, count, nameServer, scheduler, dryRun)
   }
 }
 
 class Repair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, srcCursor: Repair.RepairCursor,
-           destCursor: Repair.RepairCursor, count: Int, nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
-      extends RepairJob[Shard, Edge](sourceShardId, destinationShardId, tableId, count, nameServer, scheduler) {
+           destCursor: Repair.RepairCursor, count: Int, nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob], dryRun: Boolean)
+      extends RepairJob[Shard, Edge](sourceShardId, destinationShardId, tableId, count, nameServer, scheduler, dryRun) {
 
-  def forwardingManager = new ForwardingManager(nameServer)
-
-  def enqueueFirst(list:ListBuffer[Edge]) = {
-    list.remove(0).schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
-  }
+  private val log = Logger.get(getClass.getName)
 
   def generateCursor(edge: Edge) = {
     (Cursor(edge.sourceId), Cursor(edge.destinationId)) 
@@ -210,23 +208,31 @@ class Repair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, 
     scheduleNextRepair(srcEdge, newSrcCursor, destEdge, newDestCursor)
   }
 
+  def enqueueFirst(list:ListBuffer[Edge]) = {
+    val edge = list.remove(0)
+    if (dryRun) log.info("Enqueuing edge (sourceId: %s, destinationId: %s, state: %s)", edge.sourceId, edge.destinationId, edge.state)
+    else edge.schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
+  }
+
+  def forwardingManager = new ForwardingManager(nameServer)
+
   def serialize = Map("src_cursor1" -> srcCursor._1.position, "src_cursor2" -> srcCursor._2.position, "dest_cursor1" -> destCursor._1.position, "dest_cursor2" -> destCursor._2.position, "table_id" -> tableId)
 
-  def scheduleNextRepair(srcEdge: Option[Edge], newSrcCursor: Repair.RepairCursor, destEdge: Option[Edge  ], newDestCursor: Repair.RepairCursor) = {
+  def scheduleNextRepair(srcEdge: Option[Edge], newSrcCursor: Repair.RepairCursor, destEdge: Option[Edge], newDestCursor: Repair.RepairCursor) = {
     (newSrcCursor, newDestCursor) match {
       case (Repair.END, Repair.END) => finish()
       case (_, _) => 
         incrGauge
         scheduler.put(RepairJob.PRIORITY, (srcEdge, destEdge) match {
           case (None, None) =>
-            new Repair(sourceShardId, destinationShardId, tableId, newSrcCursor, newDestCursor, count, nameServer, scheduler)
+            new Repair(sourceShardId, destinationShardId, tableId, newSrcCursor, newDestCursor, count, nameServer, scheduler, dryRun)
           case (_, None) => 
-            new Repair(sourceShardId, destinationShardId, tableId, generateCursor(srcEdge.get), generateCursor(srcEdge.get), count, nameServer, scheduler)
+            new Repair(sourceShardId, destinationShardId, tableId, generateCursor(srcEdge.get), generateCursor(srcEdge.get), count, nameServer, scheduler, dryRun)
           case (None, _) => 
-            new Repair(sourceShardId, destinationShardId, tableId, generateCursor(destEdge.get), generateCursor(destEdge.get), count, nameServer, scheduler)
+            new Repair(sourceShardId, destinationShardId, tableId, generateCursor(destEdge.get), generateCursor(destEdge.get), count, nameServer, scheduler, dryRun)
           case (_, _) => 
             var newCursor = generateCursor(if (srcEdge.get.similar(destEdge.get) <= 0) srcEdge.get else destEdge.get)
-            new Repair(sourceShardId, destinationShardId, tableId, newCursor, newCursor, count, nameServer, scheduler)
+            new Repair(sourceShardId, destinationShardId, tableId, newCursor, newCursor, count, nameServer, scheduler, dryRun)
         })
     }
   }
@@ -241,33 +247,34 @@ object MetadataRepair {
 
 class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
       extends RepairJobParser[Shard, Metadata] {
-  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
+  def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int, tableId: Int, dryRun: Boolean) = {
     val srcCursor  = Cursor(attributes("src_cursor").asInstanceOf[AnyVal].toLong)
     val destCursor = Cursor(attributes("dest_cursor").asInstanceOf[AnyVal].toLong)
-    val tableId = attributes("tableId").asInstanceOf[AnyVal].toInt
-    new MetadataRepair(sourceId, destinationId, tableId, srcCursor, destCursor, count, nameServer, scheduler)
+    new MetadataRepair(sourceId, destinationId, tableId, srcCursor, destCursor, count, nameServer, scheduler, dryRun)
   }
 }
 
 class MetadataRepair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, srcCursor: MetadataRepair.RepairCursor,
-     destCursor: MetadataRepair.RepairCursor, count: Int, nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
-      extends RepairJob[Shard, Metadata](sourceShardId, destinationShardId, tableId, count, nameServer, scheduler) {
+     destCursor: MetadataRepair.RepairCursor, count: Int, nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob], dryRun: Boolean)
+      extends RepairJob[Shard, Metadata](sourceShardId, destinationShardId, tableId, count, nameServer, scheduler, dryRun) {
+
+  private val log = Logger.get(getClass.getName)
 
   def scheduleNextRepair(srcEdge: Option[Metadata], newSrcCursor: MetadataRepair.RepairCursor, destEdge: Option[Metadata], newDestCursor: MetadataRepair.RepairCursor) = {
     scheduler.put(RepairJob.PRIORITY, (newSrcCursor, newDestCursor) match {
-      case (MetadataRepair.END, MetadataRepair.END) => new Repair(sourceShardId, destinationShardId, tableId, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler)
+      case (MetadataRepair.END, MetadataRepair.END) => new Repair(sourceShardId, destinationShardId, tableId, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler, dryRun)
       case (_, _) => 
         incrGauge
         (srcEdge, destEdge) match {
           case (None, None) =>
-            new MetadataRepair(sourceShardId, destinationShardId, tableId, newSrcCursor, newDestCursor, count, nameServer, scheduler)
+            new MetadataRepair(sourceShardId, destinationShardId, tableId, newSrcCursor, newDestCursor, count, nameServer, scheduler, dryRun)
           case (_, None) => 
-            new MetadataRepair(sourceShardId, destinationShardId, tableId, generateCursor(srcEdge.get), generateCursor(srcEdge.get), count, nameServer, scheduler)
+            new MetadataRepair(sourceShardId, destinationShardId, tableId, generateCursor(srcEdge.get), generateCursor(srcEdge.get), count, nameServer, scheduler, dryRun)
           case (None, _) => 
-            new MetadataRepair(sourceShardId, destinationShardId, tableId, generateCursor(destEdge.get), generateCursor(destEdge.get), count, nameServer, scheduler)
+            new MetadataRepair(sourceShardId, destinationShardId, tableId, generateCursor(destEdge.get), generateCursor(destEdge.get), count, nameServer, scheduler, dryRun)
           case (_, _) => 
             var newCursor = generateCursor(if (srcEdge.get.sourceId <= destEdge.get.sourceId) srcEdge.get else destEdge.get)
-            new MetadataRepair(sourceShardId, destinationShardId, tableId, newCursor, newCursor, count, nameServer, scheduler)
+            new MetadataRepair(sourceShardId, destinationShardId, tableId, newCursor, newCursor, count, nameServer, scheduler, dryRun)
         }
     })
   }
@@ -279,7 +286,9 @@ class MetadataRepair(sourceShardId: ShardId, destinationShardId: ShardId, tableI
   def forwardingManager = new ForwardingManager(nameServer)
 
   def enqueueFirst(list:ListBuffer[Metadata]) = {
-    list.remove(0).schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
+    val metadata = list.remove(0)
+    if (dryRun) log.info("Enqueuing edge (sourceId: %s, state: %s)", metadata.sourceId, metadata.state)
+    else metadata.schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
   }
 
   def repair(sourceShard: Shard, destinationShard: Shard) = {

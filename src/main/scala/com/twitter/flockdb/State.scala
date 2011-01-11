@@ -17,7 +17,7 @@
 package com.twitter.flockdb
 
 abstract case class State(id: Int, name: String, ordinal: Int) extends Ordered[State] {
-  def max(s: State)     = if (compare(s) < 0) this else s
+  def max(s: State)     = if (compare(s) > 0) this else s
   def compare(s: State) = ordinal.compare(s.ordinal)
 }
 
