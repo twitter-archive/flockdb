@@ -24,7 +24,8 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.{Copy, MetadataCopy}
-import shards.{Metadata, Shard}
+import shards.{Shard}
+import flockdb.Metadata
 
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")

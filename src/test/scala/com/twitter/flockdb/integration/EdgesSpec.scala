@@ -23,6 +23,7 @@ import com.twitter.util.TimeConversions._
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
+import conversions.Metadata._
 
 class EdgesSpec extends IntegrationSpecification {
 
@@ -37,6 +38,21 @@ class EdgesSpec extends IntegrationSpecification {
   "Edge Integration" should {
     doBefore {
       reset(config)
+    }
+    
+    "contains_metadata"  in {
+      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
+      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
+    }
+    
+    "get_metadata"  in {
+      Time.withCurrentTimeFrozen { time =>
+        flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
+        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
+        flock.get_metadata(alice, FOLLOWS) mustEqual flockdb.Metadata(alice, State.Normal, 1, Time.now).toThrift
+      }
     }
 
     "add" in {

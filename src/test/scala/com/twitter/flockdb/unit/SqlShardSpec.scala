@@ -28,7 +28,8 @@ import org.specs.mock.JMocker
 import conversions.Edge._
 import conversions.EdgeResults._
 import conversions.Results._
-import shards.{Metadata, Shard, SqlShard, SqlShardFactory}
+import shards.{Shard, SqlShard, SqlShardFactory}
+import flockdb.Metadata
 import thrift.{Results, EdgeResults}
 
 class SqlShardSpec extends IntegrationSpecification with JMocker {

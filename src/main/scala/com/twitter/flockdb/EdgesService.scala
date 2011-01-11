@@ -44,6 +44,12 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     schedule.shutdown()
     future.shutdown()
   }
+  
+  def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
+    rethrowExceptionsAsThrift {
+      forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).isDefined
+    }
+  }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
     rethrowExceptionsAsThrift {
@@ -57,6 +63,14 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     rethrowExceptionsAsThrift {
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).getOrElse {
         throw new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId))
+      }
+    }
+  }
+  
+  def getMetadata(sourceId: Long, graphId: Int): Metadata = {
+    rethrowExceptionsAsThrift {
+      forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).getOrElse {
+        throw new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))
       }
     }
   }
