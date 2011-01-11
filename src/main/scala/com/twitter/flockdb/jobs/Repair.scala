@@ -30,6 +30,7 @@ import collection.mutable.ListBuffer
 
 object RepairJob {
   val MIN_COPY = 500
+  val PRIORITY = Priority.Low.id
 }
 
 /**
@@ -89,11 +90,11 @@ abstract case class RepairJob[S <: Shard, R <: Repairable[R]](sourceId: ShardId,
         log.error("Shard block repair failed because one of the shards doesn't exist. Terminating the repair.")
       case e: ShardDatabaseTimeoutException =>
         log.warning("Shard block repair failed to get a database connection; retrying.")
-        scheduler.put(Priority.Medium.id, this)
+        scheduler.put(RepairJob.PRIORITY, this)
       case e: ShardTimeoutException if (count > RepairJob.MIN_COPY) =>
         log.warning("Shard block copy timed out; trying a smaller block size.")
         count = (count * 0.9).toInt
-        scheduler.put(Priority.Medium.id, this)
+        scheduler.put(RepairJob.PRIORITY, this)
       case e: Throwable =>
         log.warning("Shard block repair stopped due to exception: %s", e)
         throw e
@@ -195,7 +196,7 @@ class Repair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, 
   def forwardingManager = new ForwardingManager(nameServer)
 
   def enqueueFirst(list:ListBuffer[Edge]) = {
-    list.remove(0).schedule(tableId, forwardingManager, scheduler)
+    list.remove(0).schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
   }
 
   def generateCursor(edge: Edge) = {
@@ -216,7 +217,7 @@ class Repair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, 
       case (Repair.END, Repair.END) => finish()
       case (_, _) => 
         incrGauge
-        scheduler.put(Priority.Medium.id, (srcEdge, destEdge) match {
+        scheduler.put(RepairJob.PRIORITY, (srcEdge, destEdge) match {
           case (None, None) =>
             new Repair(sourceShardId, destinationShardId, tableId, newSrcCursor, newDestCursor, count, nameServer, scheduler)
           case (_, None) => 
@@ -253,7 +254,7 @@ class MetadataRepair(sourceShardId: ShardId, destinationShardId: ShardId, tableI
       extends RepairJob[Shard, Metadata](sourceShardId, destinationShardId, tableId, count, nameServer, scheduler) {
 
   def scheduleNextRepair(srcEdge: Option[Metadata], newSrcCursor: MetadataRepair.RepairCursor, destEdge: Option[Metadata], newDestCursor: MetadataRepair.RepairCursor) = {
-    scheduler.put(Priority.Medium.id, (newSrcCursor, newDestCursor) match {
+    scheduler.put(RepairJob.PRIORITY, (newSrcCursor, newDestCursor) match {
       case (MetadataRepair.END, MetadataRepair.END) => new Repair(sourceShardId, destinationShardId, tableId, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler)
       case (_, _) => 
         incrGauge
@@ -278,7 +279,7 @@ class MetadataRepair(sourceShardId: ShardId, destinationShardId: ShardId, tableI
   def forwardingManager = new ForwardingManager(nameServer)
 
   def enqueueFirst(list:ListBuffer[Metadata]) = {
-    list.remove(0).schedule(tableId, forwardingManager, scheduler)
+    list.remove(0).schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
   }
 
   def repair(sourceShard: Shard, destinationShard: Shard) = {

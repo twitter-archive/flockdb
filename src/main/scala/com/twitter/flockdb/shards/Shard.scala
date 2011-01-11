@@ -24,7 +24,7 @@ import flockdb.jobs.multi._
 import com.twitter.gizzard.scheduler._
 
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Repairable[Metadata] {
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) = {
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {
     val job = state match {
       case State.Normal => Unarchive
       case State.Removed => RemoveAll
@@ -32,7 +32,7 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) e
       case State.Negative => Negate
     }
 
-    scheduler.put(Priority.Medium.id, job(sourceId, tableId, if (tableId > 0) Direction.Forward else Direction.Backward, updatedAt, Priority.Medium, 500, forwardingManager, scheduler))
+    scheduler.put(priority, job(sourceId, tableId, if (tableId > 0) Direction.Forward else Direction.Backward, updatedAt, Priority.Medium, 500, forwardingManager, scheduler))
   }
 
   def similar(other: Metadata) = {

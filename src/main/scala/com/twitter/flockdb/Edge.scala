@@ -23,8 +23,8 @@ import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob}
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
                 state: State) extends Repairable[Edge] {
 
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) = {
-    scheduler.put(Priority.Medium.id, toJob(tableId, forwardingManager))
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {
+    scheduler.put(priority, toJob(tableId, forwardingManager))
   }
 
   def toJob(tableId: Int, forwardingManager: ForwardingManager) = {
