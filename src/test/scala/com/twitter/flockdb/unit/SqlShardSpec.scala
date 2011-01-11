@@ -113,8 +113,6 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the state is given" >> {
           "when no edges have been added beforehand and a non-normal state is given" >> {
             shard.count(alice, List(State.Archived)) mustEqual 0
-            val metadata = shard.getMetadata(alice).get
-            metadata.state mustEqual State.Normal
           }
 
           "when edges have been added beforehand" >> {
@@ -321,6 +319,14 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(-4)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl).toJavaList, 5, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
         shard.selectEdges(alice, List(State.Normal), 3, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob).toJavaList, Cursor.End.position, Cursor.End.position)
+      }
+    }
+
+    "getMetadata" in {
+      "side-effect rows should be created with a timestamp" >> {
+        shard.add(alice, bob, 1, now)
+        shard.getMetadata(alice).isDefined must eventually(be_==(true))
+        shard.getMetadata(alice).get.updatedAt mustEqual now
       }
     }
 

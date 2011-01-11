@@ -74,9 +74,9 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     (forwardShard, backwardShard)
   }
 
-  private def withLock(state: State, shard: Shard, id: Long)(f: (State, Option[Shard]) => Unit) {
+  private def withLock(state: State, shard: Shard, id: Long, updatedAt: Time)(f: (State, Option[Shard]) => Unit) {
     try {
-      shard.withLock(id) { (newShard, metadata) =>
+      shard.withLock(id, updatedAt) { (newShard, metadata) =>
         f(metadata.state max state, Some(newShard))
       }
     } catch {
@@ -88,8 +88,8 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
   def apply() {
     val (forwardShard, backwardShard) = shards()
     val uuid = uuidGenerator(position)
-    withLock(preferredState, forwardShard, sourceId) { (state, forwardShard) =>
-      withLock(state, backwardShard, destinationId) { (state, backwardShard) =>
+    withLock(preferredState, forwardShard, sourceId, updatedAt) { (state, forwardShard) =>
+      withLock(state, backwardShard, destinationId, updatedAt) { (state, backwardShard) =>
         state match {
           case State.Normal =>
             forwardShard.foreach { _.add(sourceId, destinationId, uuid, updatedAt) }
