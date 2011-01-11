@@ -23,6 +23,7 @@ import com.twitter.util.TimeConversions._
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
+import conversions.Metadata._
 
 class EdgesSpec extends IntegrationSpecification {
 
@@ -37,6 +38,32 @@ class EdgesSpec extends IntegrationSpecification {
   "Edge Integration" should {
     doBefore {
       reset(config)
+    }
+
+    "contains_metadata"  in {
+      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
+      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
+    }
+
+    "get_metadata"  in {
+      Time.withCurrentTimeFrozen { time =>
+        flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
+        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
+
+        // updated_at should not be confused with created_at.  Flock rows are commonly inserted with updated_at t=0.
+        // This is done to make their sort order low, and prevents a race condition in the case where in an empty db:
+        //
+        //      1. Mark alice archived.
+        //      2. Wait 1 second
+        //      3. Insert edge between alice and bob
+        //      4. Play those two operations in the db out of order.
+        //      5. Observe that alice is unfortunately still in the normal state.
+        //
+        flock.get_metadata(alice, FOLLOWS) mustEqual flockdb.Metadata(alice, State.Normal, 1, new Time(0)).toThrift
+
+      }
     }
 
     "add" in {

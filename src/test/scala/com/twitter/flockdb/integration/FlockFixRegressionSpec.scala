@@ -20,12 +20,12 @@ import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.util.Time
-import com.twitter.flockdb.SelectQuery
+import com.twitter.flockdb.{SelectQuery, Metadata}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}
-import shards.{Shard, SqlShard, Metadata}
+import shards.{Shard, SqlShard}
 import thrift._
 
 class FlockFixRegressionSpec extends IntegrationSpecification {
