@@ -112,8 +112,6 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the state is given" >> {
           "when no edges have been added beforehand and a non-normal state is given" >> {
             shard.count(alice, List(State.Archived)) mustEqual 0
-            val metadata = shard.getMetadata(alice).get
-            metadata.state mustEqual State.Normal
           }
 
           "when edges have been added beforehand" >> {
