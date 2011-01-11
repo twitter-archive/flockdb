@@ -216,8 +216,6 @@ class Repair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, 
     scheduleNextRepair(srcEdge, newSrcCursor, destEdge, newDestCursor)
   }
 
-  def atEnd = None
-
   def serialize = Map("src_cursor1" -> srcCursor._1.position, "src_cursor2" -> srcCursor._2.position, "dest_cursor1" -> destCursor._1.position, "dest_cursor2" -> destCursor._2.position, "table_id" -> tableId)
 
   def scheduleNextRepair(srcEdge: Option[Edge], newSrcCursor: Repair.RepairCursor, destEdge: Option[Edge  ], newDestCursor: Repair.RepairCursor) = {
@@ -283,8 +281,6 @@ class MetadataRepair(sourceShardId: ShardId, destinationShardId: ShardId, tableI
   def generateCursor(metadata: Metadata) = {
     Cursor(metadata.sourceId)
   }
-
-  def atEnd = Some()
 
   def forwardingManager = new ForwardingManager(nameServer)
 
