@@ -28,7 +28,7 @@ import thrift.Edge
 
 
 class FakeLockingShard(shard: Shard) extends SqlShard(null, new ShardInfo("a", "b", "c"), 1, Nil, 0) {
-  override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
+  override def withLock[A](sourceId: Long, updatedAt: Time)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
 }
 
 class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {

@@ -138,8 +138,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
     } getOrElse {
-      populateMetadata(sourceId, Normal)
-      count(sourceId, states)
+      0
     }
   }
 
@@ -148,8 +147,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       results(row.getLong("source_id")) = row.getInt("count")
     }
   }
-
-  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time(0.seconds)) }
 
   private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     try {
@@ -451,7 +448,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
     try {
-      atomically(edge.sourceId) { (transaction, metadata) =>
+      atomically(edge.sourceId, edge.updatedAt) { (transaction, metadata) =>
         val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
         if (countDelta != 0) {
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
@@ -508,7 +505,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       edges.foreach { edge => sourceIdsSet += edge.sourceId }
       val sourceIds = sourceIdsSet.toSeq
 
-      atomically(sourceIds) { (transaction, metadataById) =>
+      atomically(sourceIds, edges.map(_.updatedAt)) { (transaction, metadataById) =>
         val result = writeBurst(transaction, edges)
         if (result.completed.size > 0) {
           var currentSourceId = -1L
@@ -545,13 +542,13 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
-    atomically(sourceId) { (transaction, metadata) =>
+  def withLock[A](sourceId: Long, updatedAt: Time)(f: (Shard, Metadata) => A) = {
+    atomically(sourceId, updatedAt) { (transaction, metadata) =>
       f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
     }
   }
 
-  private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
+  private def atomically[A](sourceId: Long, timestamp: Time)(f: (Transaction, Metadata) => A): A = {
     try {
       queryEvaluator.transaction { transaction =>
         transaction.selectOne(SelectModify,
@@ -561,12 +558,16 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       }
     } catch {
       case e: MissingMetadataRow =>
-        populateMetadata(sourceId, Normal)
-        atomically(sourceId)(f)
+        populateMetadata(sourceId, Normal, timestamp)
+        atomically(sourceId, timestamp)(f)
     }
   }
+  
+  private def atomically[A](sourceIds: Seq[Long], timestamp: Time)(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
+    atomically(sourceIds, sourceIds.map{ id => timestamp })(f)
+  }
 
-  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
+  private def atomically[A](sourceIds: Seq[Long], timestamps: Seq[Time])(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
     try {
       val metadataMap = mutable.Map[Long, Metadata]()
       queryEvaluator.transaction { transaction =>
@@ -579,9 +580,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         f(transaction, metadataMap)
       }
     } catch {
-      case e: MissingMetadataRow =>
-        sourceIds.foreach { sourceId => populateMetadata(sourceId, Normal) }
-        atomically(sourceIds)(f)
+      case e: MissingMetadataRow => {
+        for(sourceId <- sourceIds; timestamp <- timestamps) { populateMetadata(sourceId, Normal, timestamp) }
+        atomically(sourceIds, timestamps)(f)
+      }
     }
   }
 
@@ -592,7 +594,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
                              metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
     } catch {
       case e: SQLIntegrityConstraintViolationException =>
-        atomically(metadata.sourceId) { (transaction, oldMetadata) =>
+        atomically(metadata.sourceId, metadata.updatedAt) { (transaction, oldMetadata) =>
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
                               "WHERE source_id = ? AND updated_at <= ?",
                               metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
@@ -624,7 +626,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   // FIXME: computeCount could be really expensive. :(
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
-    atomically(sourceId) { (transaction, metadata) =>
+    atomically(sourceId, updatedAt) { (transaction, metadata) =>
       if ((updatedAt != metadata.updatedAt) || ((metadata.state max state) == state)) {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
           state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
