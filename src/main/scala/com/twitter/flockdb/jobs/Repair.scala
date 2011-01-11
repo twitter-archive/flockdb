@@ -34,14 +34,14 @@ object RepairJob {
 }
 
 /**
- * A factory for creating a new copy job (with default count and a starting cursor) from a source
+ * A factory for creating a new repair job (with default count and a starting cursor) from a source
  * and destination shard ID.
  */
 trait RepairJobFactory[S <: Shard, R <: Repairable[R]] extends ((ShardId, ShardId, Int) => RepairJob[S, R])
 
 /**
- * A parser that creates a copy job out of json. The basic attributes (source shard ID, destination)
- * shard ID, and count) are parsed out first, and the remaining attributes are passed to
+ * A parser that creates a repair job out of json. The basic attributes (source shard ID, destination)
+ * shard ID, count and dry run) are parsed out first, and the remaining attributes are passed to
  * 'deserialize' to decode any shard-specific data (like a cursor).
  */
 trait RepairJobParser[S <: Shard, R <: Repairable[R]] extends JsonJobParser {
@@ -57,12 +57,12 @@ trait RepairJobParser[S <: Shard, R <: Repairable[R]] extends JsonJobParser {
 }
 
 /**
- * A json-encodable job that represents the state of a copy from one shard to another.
+ * A json-encodable job that represents the state of a repair one a shard.
  *
- * The 'toMap' implementation encodes the source and destination shard IDs, and the count of items.
+ * The 'toMap' implementation encodes the source and destination shard IDs, dry run state, and the count of items.
  * Other shard-specific data (like the cursor) can be encoded in 'serialize'.
  *
- * 'copyPage' is called to do the actual data copying. It should return a new CopyJob representing
+ * 'repair' is called to do the actual data repair. It should return a new Some[RepairJob] representing
  * the next chunk of work to do, or None if the entire copying job is complete.
  */
 abstract case class RepairJob[S <: Shard, R <: Repairable[R]](sourceId: ShardId,
