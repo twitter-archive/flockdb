@@ -321,6 +321,14 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       }
     }
 
+    "getMetadata" in {
+      "side-effect rows should be created with a timestamp" >> {
+        shard.add(alice, bob, 1, now)
+        shard.getMetadata(alice).isDefined must eventually(be_==(true))
+        shard.getMetadata(alice).get.updatedAt mustEqual now
+      }
+    }
+
     "get" in {
       shard.add(alice, bob, 1, now)
       shard.archive(carl, darcy, 2, now)
