@@ -1,5 +1,5 @@
 package com.twitter.flockdb
 
-trait Repairable[T] extends JobSchedulable with Ordered[T] {
+trait Repairable[T] extends JobSchedulable {
   def similar(other: T): Int
 }

@@ -59,7 +59,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     }
 
     "resolve normal, archived edges" in {
-      val add = capturingParam[Add]
+      val (add, archive) = (capturingParam[Add], capturingParam[com.twitter.flockdb.jobs.single.Archive])
       expect {
         one(nameServer).findShardById(shard1Id) willReturn shard1
         one(nameServer).findShardById(shard2Id) willReturn shard2
@@ -70,12 +70,15 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           List(new Edge(1L, 2L, 3L, Time.now, 5, State.Archived)), (cursor1, Cursor(cursor2.position + 1))
         )
         one(scheduler).put(will(beEqual(Priority.Medium.id)), add.capture)
+        one(scheduler).put(will(beEqual(Priority.Medium.id)), archive.capture)
         
         one(scheduler).put(Priority.Medium.id, new Repair(shard1Id, shard2Id, tableId, (cursor1, Cursor(cursor2.position + 1)), (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
       }
       job.apply()
       add.captured.sourceId must_== 1L
       add.captured.destinationId must_== 2L
+      archive.captured.sourceId must_== 1L
+      archive.captured.destinationId must_== 2L
     }
 
     "resolve missing edge" in {
@@ -136,8 +139,8 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       job.apply()
     }
 
-    "resolve normal, archived edges" in {
-      val add1 = capturingParam[Unarchive]
+    "resolve normal, archived metadata" in {
+      val (add, archive) = (capturingParam[Unarchive], capturingParam[com.twitter.flockdb.jobs.multi.Archive])
       expect {
         one(nameServer).findShardById(shard1Id) willReturn shard1
         one(nameServer).findShardById(shard2Id) willReturn shard2
@@ -148,12 +151,14 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAllMetadata(cursor1, count) willReturn (
           List(new Metadata(1L, State.Archived, 0, Time.now)), Cursor(cursor1.position + 1)
         )
-        one(scheduler).put(will(beEqual(Priority.Medium.id)), add1.capture)
+        one(scheduler).put(will(beEqual(Priority.Medium.id)), add.capture)
+        one(scheduler).put(will(beEqual(Priority.Medium.id)), archive.capture)
         
         one(scheduler).put(Priority.Medium.id, new MetadataRepair(shard1Id, shard2Id, tableId, Cursor(cursor1.position + 1), Cursor(cursor1.position + 1), count, nameServer, scheduler))
       }
       job.apply()
-      add1.captured.sourceId must_== 1L
+      add.captured.sourceId must_== 1L
+      archive.captured.sourceId must_== 1L
     }
 
     "resolve missing metadata" in {

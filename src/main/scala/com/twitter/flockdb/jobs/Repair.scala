@@ -146,16 +146,10 @@ abstract case class RepairJob[S <: Shard, R <: Repairable[R]](sourceId: ShardId,
           srcEdge.get.similar(destEdge.get) match {
             case x if x < 0 => enqueueFirst(srcItems)
             case x if x > 0 => enqueueFirst(destItems)
-            case _ => 
-              if (srcEdge.get != destEdge.get) {
-                srcEdge.get.compare(destEdge.get) match {
-                  case x if x < 0 => 
-                    enqueueFirst(srcItems)
-                    destItems.remove(0)
-                  case _ => 
-                    enqueueFirst(destItems)
-                    srcItems.remove(0)
-                }
+            case _ =>
+              if (srcEdge != destEdge) {
+                enqueueFirst(srcItems)
+                enqueueFirst(destItems)
               } else {
                 srcItems.remove(0)
                 destItems.remove(0)
@@ -177,10 +171,9 @@ object Repair {
 }
 
 class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
-      extends RepairJobFactory[Shard, Edge] {
+      extends RepairJobFactory[Shard, Metadata] {
   def apply(sourceShardId: ShardId, destShardId: ShardId, tableId: Int) = 
-    null
-    //new MetadataRepair(sourceShardId, destShardId, tableId, MetadataRepair.START, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
+    new MetadataRepair(sourceShardId, destShardId, tableId, MetadataRepair.START, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
 }
 
 class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])

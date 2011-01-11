@@ -37,17 +37,6 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) e
 
   def similar(other: Metadata) = {
     sourceId.compare(other.sourceId)
-    //if (sourceId < other.sourceId) -1
-    //else if (sourceId > other.sourceId) 1
-    //else 0
-  }
-
-  def compare(other: Metadata) = {
-    updatedAt.compare(other.updatedAt) match {
-      case x if x < 0 => -1
-      case x if x > 0 => 1
-      case _ => state.compare(other.state)
-    }
   }
 }
 

@@ -44,12 +44,4 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: 
       case _ => destinationId.compare(other.destinationId)
     }
   }
-
-  def compare(other: Edge) = {
-    updatedAt.compare(other.updatedAt) match {
-      case x if x < 0 => -1
-      case x if x > 0 => 1
-      case _ => state.compareTo(other.state)
-    }
-  }
 }
