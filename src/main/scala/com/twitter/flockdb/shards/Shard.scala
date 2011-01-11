@@ -20,8 +20,36 @@ import scala.collection.mutable
 import com.twitter.gizzard.shards
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
+import flockdb.jobs.multi._
+import com.twitter.gizzard.scheduler._
 
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time)
+case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Repairable[Metadata] {
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) = {
+    val job = state match {
+      case State.Normal => Unarchive
+      case State.Removed => RemoveAll
+      case State.Archived => Archive
+      case State.Negative => Negate
+    }
+
+    scheduler.put(Priority.Medium.id, job(sourceId, tableId, if (tableId > 0) Direction.Forward else Direction.Backward, updatedAt, Priority.Medium, 500, forwardingManager, scheduler))
+  }
+
+  def similar(other: Metadata) = {
+    sourceId.compare(other.sourceId)
+    //if (sourceId < other.sourceId) -1
+    //else if (sourceId > other.sourceId) 1
+    //else 0
+  }
+
+  def compare(other: Metadata) = {
+    updatedAt.compare(other.updatedAt) match {
+      case x if x < 0 => -1
+      case x if x > 0 => 1
+      case _ => state.compare(other.state)
+    }
+  }
+}
 
 trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def get(sourceId: Long, destinationId: Long): Option[Edge]

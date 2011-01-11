@@ -18,16 +18,38 @@ package com.twitter.flockdb
 
 import com.twitter.util.Time
 import com.twitter.flockdb.jobs.single._
+import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob}
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
-                state: State) {
-  def toJob(tableId: Int, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
+                state: State) extends Repairable[Edge] {
+
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob]) = {
+    scheduler.put(Priority.Medium.id, toJob(tableId, forwardingManager))
+  }
+
+  def toJob(tableId: Int, forwardingManager: ForwardingManager) = {
     val job = state match {
       case State.Normal => Add
       case State.Removed => Remove
       case State.Archived => Archive
       case State.Negative => Negate
     }
-    job(sourceId, tableId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
+    job(sourceId, tableId, destinationId, position, updatedAt, forwardingManager, OrderedUuidGenerator)
+  }
+
+  def similar(other:Edge) = {
+    sourceId.compare(other.sourceId) match {
+      case x if x < 0 => -1
+      case x if x > 0 => 1
+      case _ => destinationId.compare(other.destinationId)
+    }
+  }
+
+  def compare(other: Edge) = {
+    updatedAt.compare(other.updatedAt) match {
+      case x if x < 0 => -1
+      case x if x > 0 => 1
+      case _ => state.compareTo(other.state)
+    }
   }
 }

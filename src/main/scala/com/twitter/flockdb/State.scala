@@ -16,9 +16,9 @@
 
 package com.twitter.flockdb
 
-
-abstract case class State(id: Int, name: String, ordinal: Int) {
-  def max(s: State) = if (ordinal > s.ordinal) this else s
+abstract case class State(id: Int, name: String, ordinal: Int) extends Ordered[State] {
+  def max(s: State)     = if (compare(s) < 0) this else s
+  def compare(s: State) = ordinal.compare(s.ordinal)
 }
 
 object State {
@@ -33,4 +33,6 @@ object State {
   case object Negative extends State(3, "Negative", 1)
   case object Removed extends State(1, "Removed", 3)
   case object Archived extends State(2, "Archived", 2)
+
+
 }

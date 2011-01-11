@@ -113,7 +113,9 @@ case class Unarchive(sourceId: Long, graphId: Int, direction: Direction, updated
            extends Multi(sourceId, graphId, direction, updatedAt, priority, aggregateJobPageSize, forwardingManager, scheduler) {
   protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
     new single.Add(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
-  protected def updateMetadata(shard: Shard) = shard.add(sourceId, updatedAt)
+  protected def updateMetadata(shard: Shard) = {
+    shard.add(sourceId, updatedAt)
+  }
 }
 
 case class RemoveAll(sourceId: Long, graphId: Int, direction: Direction, updatedAt: Time,
