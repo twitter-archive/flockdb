@@ -16,17 +16,17 @@
 
 package com.twitter.flockdb.unit
 
+import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
-import jobs.single.{Add, Remove}
+import jobs.single.{Add, Remove, NodePair}
 import shards.{Shard, SqlShard}
 import flockdb.Metadata
 import thrift.Edge
-
 
 class FakeLockingShard(shard: Shard) extends SqlShard(null, new ShardInfo("a", "b", "c"), 1, Nil, 0) {
   override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
@@ -47,29 +47,47 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard2: Shard = null
   var shard3: Shard = null
   var shard4: Shard = null
-  var lockingShard1: Shard = null
-  var lockingShard2: Shard = null
   val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+
+  val wrappedForwardingManager = new ForwardingManager(null) {
+    val shardMap = new mutable.HashMap[Long, Shard]
+    val stateMap = new mutable.HashMap[Long, State]
+    val lostLocks = new mutable.ListBuffer[NodePair]
+
+    override def find(sourceId: Long, graphId: Int, direction: Direction) = forwardingManager.find(sourceId, graphId, direction)
+
+    override def withOptimisticLocks(graphId: Int, nodePairs: Seq[NodePair])(f: (Shard, Shard, NodePair, State) => Unit) = {
+      nodePairs.foreach { nodePair =>
+        val forwardShard = shardMap(nodePair.sourceId)
+        val backwardShard = shardMap(nodePair.destinationId)
+        val forwardState = stateMap(nodePair.sourceId)
+        val backwardState = stateMap(nodePair.destinationId)
+        f(shard1, shard2, nodePair, forwardState max backwardState)
+      }
+      lostLocks.toList
+    }
+  }
 
   "Add" should {
     doBefore {
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
+      wrappedForwardingManager.shardMap.clear()
+      wrappedForwardingManager.stateMap.clear()
+      wrappedForwardingManager.lostLocks.clear()
     }
 
     "apply" in {
       "when the add takes effect" >> {
         Time.withCurrentTimeFrozen { time =>
-          val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+          val job = Add(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+            wrappedForwardingManager.shardMap(bob) = shard1
+            wrappedForwardingManager.shardMap(mary) = shard2
+            wrappedForwardingManager.stateMap(bob) = State.Normal
+            wrappedForwardingManager.stateMap(mary) = State.Normal
             one(shard1).add(bob, mary, 1, Time.now)
             one(shard2).add(mary, bob, 1, Time.now)
           }
@@ -81,13 +99,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       "when the add does not take effect" >> {
         "when the forward direction causes it to not take effect" >> {
           Time.withCurrentTimeFrozen { time =>
-            val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+            val job = Add(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
             expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Archived, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+              wrappedForwardingManager.shardMap(bob) = shard1
+              wrappedForwardingManager.shardMap(mary) = shard2
+              wrappedForwardingManager.stateMap(bob) = State.Archived
+              wrappedForwardingManager.stateMap(mary) = State.Normal
               one(shard1).archive(bob, mary, 1, Time.now)
               one(shard2).archive(mary, bob, 1, Time.now)
             }
@@ -98,13 +116,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
         "when the backward direction causes it to not take effect" >> {
           Time.withCurrentTimeFrozen { time =>
-            val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+            val job = Add(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
             expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Archived, 1, Time.now))
+              wrappedForwardingManager.shardMap(bob) = shard1
+              wrappedForwardingManager.shardMap(mary) = shard2
+              wrappedForwardingManager.stateMap(bob) = State.Normal
+              wrappedForwardingManager.stateMap(mary) = State.Archived
               one(shard1).archive(bob, mary, 1, Time.now)
               one(shard2).archive(mary, bob, 1, Time.now)
             }
@@ -117,7 +135,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+        val job = Add(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
         val json = job.toJson
         json mustMatch "Add"
         json mustMatch "\"source_id\":" + bob
@@ -133,20 +151,21 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
+      wrappedForwardingManager.shardMap.clear()
+      wrappedForwardingManager.stateMap.clear()
+      wrappedForwardingManager.lostLocks.clear()
     }
 
     "apply" in {
       "when the remove takes effect" >> {
         Time.withCurrentTimeFrozen { time =>
-          val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+          val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+            wrappedForwardingManager.shardMap(bob) = shard1
+            wrappedForwardingManager.shardMap(mary) = shard2
+            wrappedForwardingManager.stateMap(bob) = State.Normal
+            wrappedForwardingManager.stateMap(mary) = State.Normal
             one(shard1).remove(bob, mary, 1, Time.now)
             one(shard2).remove(mary, bob, 1, Time.now)
           }
@@ -158,7 +177,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+        val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
         val json = job.toJson
         json mustMatch "Remove"
         json mustMatch "\"source_id\":" + bob
@@ -174,20 +193,21 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       forwardingManager = mock[ForwardingManager]
       shard1 = mock[Shard]
       shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
+      wrappedForwardingManager.shardMap.clear()
+      wrappedForwardingManager.stateMap.clear()
+      wrappedForwardingManager.lostLocks.clear()
     }
 
     "apply" in {
       "when the archive takes effect" >> {
         Time.withCurrentTimeFrozen { time =>
-          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
           expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+            wrappedForwardingManager.shardMap(bob) = shard1
+            wrappedForwardingManager.shardMap(mary) = shard2
+            wrappedForwardingManager.stateMap(bob) = State.Normal
+            wrappedForwardingManager.stateMap(mary) = State.Normal
             one(shard1).archive(bob, mary, 1, Time.now)
             one(shard2).archive(mary, bob, 1, Time.now)
           }
@@ -199,13 +219,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       "when the archive does not take effect" >> {
         "when the forward direction causes it to not take effect" >> {
           Time.withCurrentTimeFrozen { time =>
-            val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+            val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
             expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Removed, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
+              wrappedForwardingManager.shardMap(bob) = shard1
+              wrappedForwardingManager.shardMap(mary) = shard2
+              wrappedForwardingManager.stateMap(bob) = State.Removed
+              wrappedForwardingManager.stateMap(mary) = State.Normal
               one(shard1).remove(bob, mary, 1, Time.now)
               one(shard2).remove(mary, bob, 1, Time.now)
             }
@@ -216,13 +236,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
         "when the backward direction causes it to not take effect" >> {
           Time.withCurrentTimeFrozen { time =>
-            val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+            val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
 
             expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Removed, 1, Time.now))
+              wrappedForwardingManager.shardMap(bob) = shard1
+              wrappedForwardingManager.shardMap(mary) = shard2
+              wrappedForwardingManager.stateMap(bob) = State.Normal
+              wrappedForwardingManager.stateMap(mary) = State.Removed
               one(shard1).remove(bob, mary, 1, Time.now)
               one(shard2).remove(mary, bob, 1, Time.now)
             }
@@ -235,7 +255,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+        val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, wrappedForwardingManager, uuidGenerator)
         val json = job.toJson
         json mustMatch "Archive"
         json mustMatch "\"source_id\":" + bob
