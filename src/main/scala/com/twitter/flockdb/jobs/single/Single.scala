@@ -22,6 +22,10 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
 import shards.Shard
+import gizzard.shards.ShardException
+
+case class NodePair(sourceId: Long, destinationId: Long)
+
 
 abstract class SingleJobParser extends JsonJobParser {
   def apply(attributes: Map[String, Any]): JsonJob = {
@@ -73,41 +77,29 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
     (forwardShard, backwardShard)
   }
-
-  private def withLock(state: State, shard: Shard, id: Long)(f: (State, Option[Shard]) => Unit) {
-    try {
-      shard.withLock(id) { (newShard, metadata) =>
-        f(metadata.state max state, Some(newShard))
-      }
-    } catch {
-      case e: ShardBlackHoleException =>
-        f(state, None)
-    }
-  }
-
-  def apply() {
-    val (forwardShard, backwardShard) = shards()
+  
+  def apply() = {
     val uuid = uuidGenerator(position)
-    withLock(preferredState, forwardShard, sourceId) { (state, forwardShard) =>
-      withLock(state, backwardShard, destinationId) { (state, backwardShard) =>
-        state match {
-          case State.Normal =>
-            forwardShard.foreach { _.add(sourceId, destinationId, uuid, updatedAt) }
-            backwardShard.foreach { _.add(destinationId, sourceId, uuid, updatedAt) }
-          case State.Removed =>
-            forwardShard.foreach { _.remove(sourceId, destinationId, uuid, updatedAt) }
-            backwardShard.foreach { _.remove(destinationId, sourceId, uuid, updatedAt) }
-          case State.Archived =>
-            forwardShard.foreach { _.archive(sourceId, destinationId, uuid, updatedAt) }
-            backwardShard.foreach { _.archive(destinationId, sourceId, uuid, updatedAt) }
-          case State.Negative =>
-            forwardShard.foreach { _.negate(sourceId, destinationId, uuid, updatedAt) }
-            backwardShard.foreach { _.negate(destinationId, sourceId, uuid, updatedAt) }
-        }
+    forwardingManager.withOptimisticLocks(graphId, List(NodePair(sourceId, destinationId))) { (forwardShard, backwardShard, nodePair, state) =>
+      (state max preferredState) match {
+        case State.Normal =>
+          forwardShard.add(sourceId, destinationId, uuid, updatedAt)
+          backwardShard.add(destinationId, sourceId, uuid, updatedAt)
+        case State.Removed =>
+          forwardShard.remove(sourceId, destinationId, uuid, updatedAt)
+          backwardShard.remove(destinationId, sourceId, uuid, updatedAt)
+        case State.Archived =>
+          forwardShard.archive(sourceId, destinationId, uuid, updatedAt)
+          backwardShard.archive(destinationId, sourceId, uuid, updatedAt)
+        case State.Negative =>
+          forwardShard.negate(sourceId, destinationId, uuid, updatedAt)
+          backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
       }
+    }.foreach { nodePair =>
+      throw new ShardException("Lost optimistic lock for " + sourceId + "/" + destinationId)
     }
   }
-
+  
   protected def preferredState: State
 }
 
