@@ -336,7 +336,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  override def hashCode = tablePrefix.hashCode * 37 + queryEvaluator.hashCode
+  override def hashCode = {
+    (if (tablePrefix == null) 37 else tablePrefix.hashCode * 37) + (if(queryEvaluator == null) 1 else queryEvaluator.hashCode)
+  }
+
 
   private class MissingMetadataRow extends Exception("Missing Count Row")
 
