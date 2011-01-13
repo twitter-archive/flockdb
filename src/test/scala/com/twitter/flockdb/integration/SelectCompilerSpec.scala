@@ -32,10 +32,6 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     val carl = 3L
     val darcy = 4L
 
-    doBefore {
-      reset(config)
-    }
-
     def setup1() {
       flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
@@ -53,6 +49,7 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     }
 
     "pagination" in {
+      reset(config)
       setup1()
       val term1 = new QueryTerm(alice, FOLLOWS, true)
       term1.setState_ids(List[Int](State.Normal.id).toJavaList)
@@ -76,6 +73,7 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     }
 
     "one list is empty" in {
+      reset(config)
       setup2()
       var result = new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
       val term1 = new QueryTerm(alice, FOLLOWS, true)
@@ -92,6 +90,7 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     }
 
     "difference" in {
+      reset(config)
       setup2()
       val term1 = new QueryTerm(alice, FOLLOWS, true)
       term1.setState_ids(List[Int](State.Normal.id).toJavaList)

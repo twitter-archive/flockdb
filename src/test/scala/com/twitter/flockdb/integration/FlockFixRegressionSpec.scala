@@ -39,7 +39,6 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
     val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
     val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
     resultsList.size mustEqual 1
-    println("alice: " + resultsList(0).edges.size)
     resultsList(0).edges
   }
 

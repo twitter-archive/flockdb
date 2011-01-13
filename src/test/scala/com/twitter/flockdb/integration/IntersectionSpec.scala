@@ -45,6 +45,7 @@ object IntersectionSpec extends IntegrationSpecification {
   def intersectAlot = {
     "intersection_for" in {
       "pagination" in {
+        reset(config)
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
@@ -63,6 +64,7 @@ object IntersectionSpec extends IntegrationSpecification {
       }
 
       "one list is empty" in {
+        reset(config)
         for (i <- 1 until 11) flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
         flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
 
@@ -73,10 +75,6 @@ object IntersectionSpec extends IntegrationSpecification {
   }
 
   "Intersection" should {
-    doBefore {
-      reset(config)
-    }
-
     "with a large intersection" >>  {
       config.intersectionQuery.intersectionPageSizeMax = 1
 
