@@ -23,8 +23,8 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
 //  query.debug = DebugLog
   database.memoize = true
   database.pool = new ApachePoolingDatabase {
-    sizeMin = 2
-    sizeMax = 2
+    sizeMin = 4
+    sizeMax = 4
     maxWait = 1.second
     minEvictableIdle = 60.seconds
     testIdle = 1.second
@@ -115,7 +115,7 @@ new FlockDB {
       maxMemorySize = 36000000L
     }
 
-    threads = 1
+    threads = 4
     errorLimit = 25
     errorRetryDelay = 900.seconds
     errorStrobeInterval = 30.seconds

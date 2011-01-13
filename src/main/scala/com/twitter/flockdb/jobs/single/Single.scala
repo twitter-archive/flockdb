@@ -77,7 +77,7 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
     (forwardShard, backwardShard)
   }
-  
+
   def apply() = {
     val uuid = uuidGenerator(position)
     forwardingManager.withOptimisticLocks(graphId, List(NodePair(sourceId, destinationId))) { (forwardShard, backwardShard, nodePair, state) =>
@@ -99,7 +99,7 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
       throw new ShardException("Lost optimistic lock for " + sourceId + "/" + destinationId)
     }
   }
-  
+
   protected def preferredState: State
 }
 

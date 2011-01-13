@@ -48,10 +48,10 @@ abstract class ConfiguredSpecification extends Specification {
 }
 
 abstract class IntegrationSpecification extends ConfiguredSpecification with NameServerDatabase {
+  val f = new FlockDB(config, new W3CStats(Logger.get, Array("workaround")))
   val (manager, nameServer, flock, jobScheduler) = {
     // XXX: Ostrich has a bug which causes a NPE when you pass in an empty array to W3CStats.
     // Remove this when we upgrade ostrich to a version that contains commit 71d07d32dcb76b029bdc11c519c867d7a2431cc2
-    val f = new FlockDB(config, new W3CStats(Logger.get, Array("workaround")))
     (f.managerServer, f.nameServer, f.flockService, f.jobScheduler)
   }
 
@@ -85,6 +85,17 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
     }
 
     nameServer.reload()
+  }
+
+  def jobSchedulerMustDrain = {
+    var last = jobScheduler.size
+    while(jobScheduler.size > 0) {
+      jobScheduler.size must eventually(be_<(last))
+      last = jobScheduler.size
+    }
+    while(jobScheduler.activeThreads > 0) {
+      Thread.sleep(10)
+    }
   }
 
   def reset(config: flockdb.config.FlockDB, db: String) {

@@ -29,7 +29,7 @@ import thrift.FlockException
 import net.lag.logging.Logger
 
 class EdgesService(val nameServer: NameServer[shards.Shard],
-                   val forwardingManager: ForwardingManager,
+                   var forwardingManager: ForwardingManager,
                    val copyFactory: CopyJobFactory[shards.Shard],
                    val schedule: PrioritizingJobScheduler[JsonJob],
                    future: Future,
@@ -38,13 +38,13 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   private val log = Logger.get(getClass.getName)
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
-  private val executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
+  private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
 
   def shutdown() {
     schedule.shutdown()
     future.shutdown()
   }
-  
+
   def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
     rethrowExceptionsAsThrift {
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).isDefined
@@ -66,7 +66,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
       }
     }
   }
-  
+
   def getMetadata(sourceId: Long, graphId: Int): Metadata = {
     rethrowExceptionsAsThrift {
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).getOrElse {
@@ -130,7 +130,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     try {
       block
     } catch {
-      case e: NonExistentShard => 
+      case e: NonExistentShard =>
         log.error(e, "NonexistentShard: %s", e)
         throw(new FlockException(e.getMessage))
       case e: InvalidShard =>
