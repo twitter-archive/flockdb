@@ -14,11 +14,11 @@ trait Optimism extends Shard {
       throw new OptimisticLockException("Lost optimistic lock for " + sourceId + ": was " + before.state +", now " + after.state)
     }
   }
-  
+
   def getWinner(sourceId: Long) = {
     // The default metadata
     var winning = Metadata(sourceId, State.Normal, 0, new Time(0))
-    
+
     val metadatas = getMetadatas(sourceId)
     metadatas.foreach { optionMetadata =>
       optionMetadata.foreach { metadata =>

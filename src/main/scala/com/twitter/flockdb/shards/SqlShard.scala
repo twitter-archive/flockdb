@@ -109,9 +109,9 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
     }
   }
-  
+
   def getMetadatas(sourceId: Long) = Seq(getMetadata(sourceId))
-  
+
   def selectAllMetadata(cursor: Cursor, count: Int) = {
     val metadatas = new mutable.ArrayBuffer[Metadata]
     var nextCursor = Cursor.Start
@@ -556,7 +556,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
     }
   }
-    
+
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
     try {
       queryEvaluator.transaction { transaction =>

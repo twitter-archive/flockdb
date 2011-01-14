@@ -27,6 +27,6 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) e
       out
     }
   }
-  
+
   def max(other: Metadata) = if (this > other) this else other
 }

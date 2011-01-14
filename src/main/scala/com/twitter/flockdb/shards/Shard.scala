@@ -26,8 +26,8 @@ trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def getMetadata(sourceId: Long): Option[Metadata]
   @throws(classOf[shards.ShardException]) def getMetadatas(sourceId: Long): Seq[Option[Metadata]]
   @throws(classOf[shards.ShardException]) def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A): A
-  @throws(classOf[shards.ShardException]) def optimistically(sourceId: Long)(f: State => Unit) 
-     
+  @throws(classOf[shards.ShardException]) def optimistically(sourceId: Long)(f: State => Unit)
+
   @throws(classOf[shards.ShardException]) def count(sourceId: Long, states: Seq[State]): Int
   @throws(classOf[shards.ShardException]) def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int])
 

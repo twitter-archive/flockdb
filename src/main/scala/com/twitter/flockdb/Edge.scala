@@ -30,7 +30,7 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: 
     }
     job(sourceId, tableId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
-  
+
   def compare(other: Edge) = {
     val out = updatedAt.compare(other.updatedAt)
     if (out == 0) {
@@ -39,6 +39,6 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: 
       out
     }
   }
-  
+
   def max(other: Edge) = if (this > other) this else other
 }

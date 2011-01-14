@@ -83,7 +83,7 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
       }
     }
   }
-  
+
   def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) = {
     state match {
       case State.Normal =>

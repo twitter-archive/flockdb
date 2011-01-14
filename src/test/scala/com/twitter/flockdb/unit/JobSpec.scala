@@ -62,7 +62,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val carl = 42L
   val jane = 56L
   val darcy = 62L
-  
+
   val uuidGenerator = IdentityUuidGenerator
   var forwardingManager: ForwardingManager = null
   var shard1: Shard = null
@@ -107,15 +107,15 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           applied match {
             case Normal => {
               one(shard1Mock).add(bob, mary, 1, Time.now)
-              one(shard2Mock).add(mary, bob, 1, Time.now)                
+              one(shard2Mock).add(mary, bob, 1, Time.now)
             }
             case Archived => {
               one(shard1Mock).archive(bob, mary, 1, Time.now)
-              one(shard2Mock).archive(mary, bob, 1, Time.now)                
+              one(shard2Mock).archive(mary, bob, 1, Time.now)
             }
             case Removed => {
               one(shard1Mock).remove(bob, mary, 1, Time.now)
-              one(shard2Mock).remove(mary, bob, 1, Time.now)                
+              one(shard2Mock).remove(mary, bob, 1, Time.now)
             }
           }
         }
@@ -123,7 +123,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       }
     }
   }
-    
+
   "Add" should {
     before()
     //                         Input   Before            After             Resulting
@@ -132,7 +132,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     test("lost lock add",      Normal, Normal, Normal,   Normal, Archived, Normal, _.apply must throwA[OptimisticLockException])
     test("when bob archived",  Normal, Archived, Normal, Archived, Normal, Archived, _.apply)
     test("when mary archived", Normal, Normal, Archived, Normal, Archived, Archived, _.apply)
-    
+
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
         val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
@@ -148,7 +148,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
   "Remove" should {
     before()
-    
+
     //                         Input    Before            After             Resulting
     //                         Job      Bob     Mary      Bob     Mary      Job
     test("normal remove",      Removed, Normal, Normal,   Normal, Normal,   Removed, _.apply)
@@ -188,7 +188,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       }
     }
   }
-  
+
   "Archive" should {
     doBefore {
       forwardingManager = mock[ForwardingManager]
