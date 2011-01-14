@@ -72,31 +72,32 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
   }
 
-  def shards() = {
-    val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
-    val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
-    (forwardShard, backwardShard)
-  }
 
   def apply() = {
+    val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
+    val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
     val uuid = uuidGenerator(position)
-    forwardingManager.withOptimisticLocks(graphId, List(NodePair(sourceId, destinationId))) { (forwardShard, backwardShard, nodePair, state) =>
-      (state max preferredState) match {
-        case State.Normal =>
-          forwardShard.add(sourceId, destinationId, uuid, updatedAt)
-          backwardShard.add(destinationId, sourceId, uuid, updatedAt)
-        case State.Removed =>
-          forwardShard.remove(sourceId, destinationId, uuid, updatedAt)
-          backwardShard.remove(destinationId, sourceId, uuid, updatedAt)
-        case State.Archived =>
-          forwardShard.archive(sourceId, destinationId, uuid, updatedAt)
-          backwardShard.archive(destinationId, sourceId, uuid, updatedAt)
-        case State.Negative =>
-          forwardShard.negate(sourceId, destinationId, uuid, updatedAt)
-          backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
+    forwardShard.optimistically(sourceId) { left =>
+      backwardShard.optimistically(destinationId) { right =>
+        write(forwardShard, backwardShard, uuid, left max right max preferredState)
       }
-    }.foreach { nodePair =>
-      throw new ShardException("Lost optimistic lock for " + sourceId + "/" + destinationId)
+    }
+  }
+  
+  def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) = {
+    state match {
+      case State.Normal =>
+        forwardShard.add(sourceId, destinationId, uuid, updatedAt)
+        backwardShard.add(destinationId, sourceId, uuid, updatedAt)
+      case State.Removed =>
+        forwardShard.remove(sourceId, destinationId, uuid, updatedAt)
+        backwardShard.remove(destinationId, sourceId, uuid, updatedAt)
+      case State.Archived =>
+        forwardShard.archive(sourceId, destinationId, uuid, updatedAt)
+        backwardShard.archive(destinationId, sourceId, uuid, updatedAt)
+      case State.Negative =>
+        forwardShard.negate(sourceId, destinationId, uuid, updatedAt)
+        backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
     }
   }
 

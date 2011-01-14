@@ -22,6 +22,7 @@ import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
 import com.twitter.ostrich.Stats
+import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query
@@ -90,7 +91,7 @@ CREATE TABLE IF NOT EXISTS %s (
 
 
 class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
-               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard {
+               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard with Optimism {
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
@@ -108,7 +109,9 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
     }
   }
-
+  
+  def getMetadatas(sourceId: Long) = Seq(getMetadata(sourceId))
+  
   def selectAllMetadata(cursor: Cursor, count: Int) = {
     val metadatas = new mutable.ArrayBuffer[Metadata]
     var nextCursor = Cursor.Start
@@ -553,7 +556,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
     }
   }
-
+    
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
     try {
       queryEvaluator.transaction { transaction =>

@@ -31,13 +31,6 @@ import shards.{Shard, SqlShard}
 import thrift._
 import scala.collection.mutable.ArrayBuffer
 
-class SlowForwardingManager(inner: ForwardingManager) extends ForwardingManager(inner.nameServer) {
-  override def insideTheLock(graphId: Int, nodePairs: Seq[NodePair], initialStateMap: mutable.Map[Long, State], f: (Shard, Shard, NodePair, State) => Unit) = {
-    Thread.sleep(300)
-    super.insideTheLock(graphId, nodePairs, initialStateMap, f)
-  }
-}
-
 class SlowAddParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
     new SlowAdd(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
@@ -45,7 +38,12 @@ class SlowAddParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGen
 }
 
 class SlowAdd(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
-               forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends Add(sourceId, graphId, destinationId, position, updatedAt, new SlowForwardingManager(forwardingManager), uuidGenerator)
+               forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends Add(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
+  override def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) = {
+    Thread.sleep(300)
+    super.write(forwardShard, backwardShard, uuid, state)
+  }
+}
 
 class OptimisticLockRegressionSpec extends IntegrationSpecification() {
   val FOLLOWS = 1
