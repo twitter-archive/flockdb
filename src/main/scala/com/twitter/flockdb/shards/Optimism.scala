@@ -81,6 +81,6 @@ trait Optimism extends Shard {
         winning = metadata max winning
       }
     }
-    MetadataWithEx(winning, metadatas.exceptions.headOption)
+    MetadataWithEx(winning, metadatas.exceptions.firstOption)
   }
 }
