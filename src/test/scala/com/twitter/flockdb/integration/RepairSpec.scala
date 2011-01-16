@@ -30,13 +30,6 @@ import com.twitter.flockdb.jobs._
 
 class RepairSpec extends IntegrationSpecification {
 
-  val FOLLOWS = 1
-
-  val alice = 1L
-  val bob = 2L
-  val carl = 3L
-  val darcy = 4L
-
   "Repair" should {
     doBefore {
       reset(config, 2)
