@@ -39,30 +39,12 @@ class RepairSpec extends IntegrationSpecification {
 
   "Repair" should {
     doBefore {
-      reset(config)
-      val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
-      for (graph <- (1 until 10)) {
-        Seq("forward", "backward").foreach { direction =>
-          val tableId = if (direction == "forward") graph else graph * -1
-          val shardId = ShardId("localhost", direction + "_2_" + graph)
-          val replicatingShardId = ShardId("localhost", "replicating_" + direction + "_" + graph)
-
-          nameServer.createShard(ShardInfo(shardId,
-            "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-          nameServer.createShard(ShardInfo(replicatingShardId,
-            "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-          nameServer.addLink(replicatingShardId, shardId, 1)
-
-          queryEvaluator.execute("DELETE FROM " + direction + "_2_" + graph + "_edges")
-          queryEvaluator.execute("DELETE FROM " + direction + "_2_" + graph + "_metadata")
-        }
-      }
-
+      reset(config, 2)
       nameServer.reload()
     }
 
     val replicatingShardId = ShardId("localhost", "replicating_forward_1")
-    val (shard1id, shard2id) = (ShardId("localhost", "forward_2_1"), ShardId("localhost", "forward_1"))
+    val (shard1id, shard2id) = (ShardId("localhost", "forward_1_1"), ShardId("localhost", "forward_2_1"))
     lazy val shard1 = nameServer.findShardById(shard1id)
     lazy val shard2 = nameServer.findShardById(shard2id)
 

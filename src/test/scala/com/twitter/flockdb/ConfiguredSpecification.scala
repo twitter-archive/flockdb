@@ -57,7 +57,11 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
 
   jobScheduler.start()
 
-  def reset(config: flockdb.config.FlockDB) {
+  def reset(config: flockdb.config.FlockDB): Unit = {
+    reset(config, 1)
+  }
+
+  def reset(config: flockdb.config.FlockDB, count: Int): Unit = {
     materialize(config.nameServer)
     nameServer.rebuildSchema()
     nameServer.reload()
@@ -69,18 +73,21 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
     for (graph <- (1 until 10)) {
       Seq("forward", "backward").foreach { direction =>
         val tableId = if (direction == "forward") graph else graph * -1
-        val shardId = ShardId("localhost", direction + "_" + graph)
         val replicatingShardId = ShardId("localhost", "replicating_" + direction + "_" + graph)
-
-        nameServer.createShard(ShardInfo(shardId,
-          "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
         nameServer.createShard(ShardInfo(replicatingShardId,
           "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        nameServer.addLink(replicatingShardId, shardId, 1)
         nameServer.setForwarding(Forwarding(tableId, 0, replicatingShardId))
 
-        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_edges")
-        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_metadata")
+        for (sqlShardId <- (1 to count)) {
+          val shardId = ShardId("localhost", direction + "_" + sqlShardId + "_" + graph)
+
+          nameServer.createShard(ShardInfo(shardId,
+            "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
+          nameServer.addLink(replicatingShardId, shardId, 1)
+
+          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_edges")
+          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_metadata")
+        }
       }
     }
 
