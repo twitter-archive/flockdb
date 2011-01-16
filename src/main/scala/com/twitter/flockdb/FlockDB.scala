@@ -22,7 +22,7 @@ import scala.collection.mutable
 import com.twitter.gizzard.{Future, GizzardServer}
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard}
+import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
 import com.twitter.ostrich.{Stats, W3CStats}
@@ -68,6 +68,8 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   val copyPriority = Priority.Medium.id
   val copyFactory = new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id))
 
+  val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
+
   val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
@@ -96,7 +98,9 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   val flockService = {
     val future = config.readFuture("readFuture")
     val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future, config.intersectionQuery, config.aggregateJobsPageSize)
-    new FlockDBThriftAdapter(edges)
+    val scheduler = jobScheduler
+    val repairs = repairFactory
+    new FlockDBThriftAdapter(edges, scheduler, repairs)
   }
 
   lazy val flockThriftServer = {
@@ -121,13 +125,20 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   }
 }
 
-class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.Iface {
+class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler[JsonJob], val repairs: jobs.RepairFactory) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
 
   def get(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.get(source_id, graph_id, destination_id).toThrift
+  }
+
+  def repair_shard(sourceId: thrift.ShardId, destinationId: thrift.ShardId, graph_id: Int, dry_run: Int) = {
+    scheduler.put(Priority.Medium.id, repairs(
+      ShardId(sourceId.hostname, sourceId.table_prefix),
+      ShardId(destinationId.hostname, destinationId.table_prefix),
+      graph_id, dry_run))
   }
 
   @deprecated

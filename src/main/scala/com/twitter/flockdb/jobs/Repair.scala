@@ -141,22 +141,23 @@ abstract case class RepairJob[S <: Shard, R <: Repairable[R]](sourceId: ShardId,
         case (true, true, None, None) => running = false
         case (true, true, _, None) => enqueueFirst(srcItems)
         case (true, true, None, _) => enqueueFirst(destItems)
-        case (true, _, _, _) => running = false
-        case (_, true, _, _) => running = false
-        case (_, _, None, None) => running = false
-        case (_, _, _, None) => running = false
-        case (_, _, None, _) => running = false
         case (_, _, _, _) =>
-          srcItem.get.similar(destItem.get) match {
-            case x if x < 0 => enqueueFirst(srcItems)
-            case x if x > 0 => enqueueFirst(destItems)
-            case _ =>
-              if (srcItem != destItem) {
-                enqueueFirst(srcItems)
-                enqueueFirst(destItems)
-              } else {
-                srcItems.remove(0)
-                destItems.remove(0)
+          (srcItem, destItem) match {
+            case (None, None) => running = false
+            case (_, None) => running = false
+            case (None, _) => running = false
+            case (_, _) =>
+              srcItem.get.similar(destItem.get) match {
+                case x if x < 0 => enqueueFirst(srcItems)
+                case x if x > 0 => enqueueFirst(destItems)
+                case _ =>
+                  if (srcItem != destItem) {
+                    enqueueFirst(srcItems)
+                    enqueueFirst(destItems)
+                  } else {
+                    srcItems.remove(0)
+                    destItems.remove(0)
+                  }
               }
           }
       }
@@ -176,8 +177,9 @@ object Repair {
 
 class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
       extends RepairJobFactory[Shard, Metadata] {
-  def apply(sourceShardId: ShardId, destShardId: ShardId, tableId: Int, dryRun: Int) = 
+  def apply(sourceShardId: ShardId, destShardId: ShardId, tableId: Int, dryRun: Int) = {
     new MetadataRepair(sourceShardId, destShardId, tableId, MetadataRepair.START, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler, dryRun)
+  }
 }
 
 class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
@@ -210,8 +212,11 @@ class Repair(sourceShardId: ShardId, destinationShardId: ShardId, tableId: Int, 
 
   def enqueueFirst(list:ListBuffer[Edge]) = {
     val edge = list.remove(0)
-    if (dryRun == 1) log.info("Enqueuing edge (sourceId: %s, destinationId: %s, state: %s)", edge.sourceId, edge.destinationId, edge.state)
-    else edge.schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
+    if (dryRun == 1) {
+      log.info("Enqueuing edge (sourceId: %s, destinationId: %s, state: %s)", edge.sourceId, edge.destinationId, edge.state)
+    } else {
+      edge.schedule(tableId, forwardingManager, scheduler, RepairJob.PRIORITY)
+    }
   }
 
   def forwardingManager = new ForwardingManager(nameServer)
@@ -262,7 +267,8 @@ class MetadataRepair(sourceShardId: ShardId, destinationShardId: ShardId, tableI
 
   def scheduleNextRepair(srcEdge: Option[Metadata], newSrcCursor: MetadataRepair.RepairCursor, destEdge: Option[Metadata], newDestCursor: MetadataRepair.RepairCursor) = {
     scheduler.put(RepairJob.PRIORITY, (newSrcCursor, newDestCursor) match {
-      case (MetadataRepair.END, MetadataRepair.END) => new Repair(sourceShardId, destinationShardId, tableId, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler, dryRun)
+      case (MetadataRepair.END, MetadataRepair.END) =>
+        new Repair(sourceShardId, destinationShardId, tableId, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler, dryRun)
       case (_, _) => 
         incrGauge
         (srcEdge, destEdge) match {
