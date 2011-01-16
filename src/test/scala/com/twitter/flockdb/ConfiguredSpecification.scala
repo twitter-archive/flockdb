@@ -85,7 +85,8 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
     }
 
     nameServer.reload()
-    println("reloaded")
+    // MAGIC F'ing line
+    // println("reloaded")
   }
 
   def reset(config: flockdb.config.FlockDB, db: String) {
