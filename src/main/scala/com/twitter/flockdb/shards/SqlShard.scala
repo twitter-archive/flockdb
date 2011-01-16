@@ -138,8 +138,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
     } getOrElse {
-      populateMetadata(sourceId, Normal)
-      count(sourceId, states)
+      0
     }
   }
 
@@ -149,19 +148,12 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time(0.seconds)) }
-
-  private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
-    try {
-      queryEvaluator.execute(
-        "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
-        sourceId,
-        computeCount(sourceId, state),
-        state.id,
-        updatedAt.inSeconds)
-    } catch {
-      case e: SQLIntegrityConstraintViolationException =>
-    }
+  private def populateMetadata(sourceId: Long) {
+    queryEvaluator.selectOne(SelectModify, "SELECT GET_LOCK('" + tablePrefix + sourceId + "', 0.1)") { row => }
+    queryEvaluator.execute(
+      "INSERT IGNORE INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, 0, 0)",
+      sourceId)
+    queryEvaluator.selectOne(SelectModify, "SELECT RELEASE_LOCK('" + tablePrefix + sourceId + "')") { row => }
   }
 
   private def computeCount(sourceId: Long, state: State) = {
@@ -460,6 +452,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       }
     } catch {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
+      println("dlock")
         write(edge, tries - 1, predictExistence)
       case e: SQLIntegrityConstraintViolationException if (tries > 0) =>
         // temporary. until the position differential between master/slave is fixed, it's
@@ -561,7 +554,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       }
     } catch {
       case e: MissingMetadataRow =>
-        populateMetadata(sourceId, Normal)
+        populateMetadata(sourceId)
         atomically(sourceId)(f)
     }
   }
@@ -580,12 +573,13 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       }
     } catch {
       case e: MissingMetadataRow =>
-        sourceIds.foreach { sourceId => populateMetadata(sourceId, Normal) }
+        sourceIds.foreach { sourceId => populateMetadata(sourceId) }
         atomically(sourceIds)(f)
     }
   }
 
   def writeMetadata(metadata: Metadata) {
+    println("bork")
     try {
       queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
                              "updated_at) VALUES (?, ?, ?, ?)",
@@ -602,6 +596,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def writeMetadata(metadatas: Seq[Metadata])  = {
+    println("bork")
     if (!metadatas.isEmpty) {
       try {
         val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"

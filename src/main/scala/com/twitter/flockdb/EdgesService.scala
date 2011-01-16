@@ -122,6 +122,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   }
 
   private def countAndRethrow(e: Throwable) = {
+    e.printStackTrace
     Stats.incr("exceptions-" + e.getClass.getName.split("\\.").last)
     throw(new FlockException(e.getMessage))
   }

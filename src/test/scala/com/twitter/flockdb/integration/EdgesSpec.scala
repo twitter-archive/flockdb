@@ -61,7 +61,7 @@ class EdgesSpec extends IntegrationSpecification {
         //      4. Play those two operations in the db out of order.
         //      5. Observe that alice is unfortunately still in the normal state.
         //
-        flock.get_metadata(alice, FOLLOWS) mustEqual flockdb.Metadata(alice, State.Normal, 1, new Time(0)).toThrift
+        flock.get_metadata(alice, FOLLOWS) must eventually(be_==(flockdb.Metadata(alice, State.Normal, 1, new Time(0)).toThrift))
 
       }
     }
