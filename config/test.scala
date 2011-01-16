@@ -23,8 +23,8 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
 //  query.debug = DebugLog
   database.memoize = true
   database.pool = new ApachePoolingDatabase {
-    sizeMin = 2
-    sizeMax = 2
+    sizeMin = 16
+    sizeMax = 16
     maxWait = 1.second
     minEvictableIdle = 60.seconds
     testIdle = 1.second
@@ -110,12 +110,13 @@ new FlockDB {
     jobQueueName = name + "_jobs"
 
     val schedulerType = new KestrelScheduler {
-      path = "/tmp"
-      keepJournal = false
+      path = "/tmp/" + System.currentTimeMillis
+      new java.io.File(path).mkdir
+      keepJournal = true
       maxMemorySize = 36000000L
     }
 
-    threads = 1
+    threads = 8
     errorLimit = 25
     errorRetryDelay = 900.seconds
     errorStrobeInterval = 30.seconds

@@ -30,4 +30,8 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: 
     }
     job(sourceId, tableId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
+  
+  def toPair = {
+    sourceId + " - " + destinationId + " "
+  }
 }
