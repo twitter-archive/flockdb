@@ -51,7 +51,7 @@ class RepairSpec extends IntegrationSpecification {
 
       shard2.add(1L, 4L, 4L, Time.now)  // only on two shard
 
-      flock.repair_shard(new thrift.ShardId(shard1id.hostname, shard1id.tablePrefix), new thrift.ShardId(shard2id.hostname, shard2id.tablePrefix), 1, 0)
+      flock.repair_shard(new thrift.ShardId(shard1id.hostname, shard1id.tablePrefix), new thrift.ShardId(shard2id.hostname, shard2id.tablePrefix), 1)
       // TODO: Counts are not correct, they should be, I need to know more about how this should work though.
       shard1.selectAll(Repair.START, Repair.COUNT)._1.map(e=>(e.sourceId, e.destinationId, e.position, e.state)) must eventually(verify(s => s sameElements shard2.selectAll(Repair.START, Repair.COUNT)._1.map(e=>(e.sourceId, e.destinationId, e.position, e.state))))
     }
