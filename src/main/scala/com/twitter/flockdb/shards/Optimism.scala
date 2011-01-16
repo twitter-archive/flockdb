@@ -76,10 +76,10 @@ trait Optimism extends Shard {
         log.info(message)
         throw new OptimisticLockException(message)
       }
-      log.info("sucessful optimistic lock of " + shardInfo.id + " for " + sourceId)
+      log.info("successful optimistic lock of " + shardInfo.id + " for " + sourceId)
     } catch {
       case e: Throwable => {
-        log.info("Exception in optimistic lock of " + shardInfo.id + " for " + sourceId + ": " + e.getMessage)
+        log.info("exception in optimistic lock of " + shardInfo.id + " for " + sourceId + ": " + e.getMessage)
         throw(e)
       }
     }
