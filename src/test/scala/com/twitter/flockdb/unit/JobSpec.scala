@@ -43,7 +43,7 @@ class IdentityShard[ConcreteShard <: Shard](shard: ConcreteShard)
   extends ReadWriteShard[ConcreteShard] {
   val children = Seq(shard)
   val weight = 1
-  def shardInfo = throw new UnsupportedOperationException()
+  def shardInfo =  new ShardInfo("a", "b", "c")
 
   def readAllOperation[A](method: (ConcreteShard => A)) = FanoutResults(method, shard)
   def readOperation[A](method: (ConcreteShard => A)) = method(shard)

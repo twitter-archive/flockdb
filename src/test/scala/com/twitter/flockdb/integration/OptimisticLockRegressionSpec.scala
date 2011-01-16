@@ -74,7 +74,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
       var found = false
       while (errors.size > 0) {
         val job = errors.get.get.job
-        if (job.toString.indexOf("Lost optimistic lock") > 0) {
+        if (job.toString.indexOf("lost optimistic lock") > 0) {
           found = true
         }
         job()
