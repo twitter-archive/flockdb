@@ -51,7 +51,7 @@ class RepairSpec extends IntegrationSpecification {
 
       shard2.add(1L, 4L, 4L, Time.now)  // only on two shard
 
-      flock.repair_shard(new thrift.ShardId(shard1id.hostname, shard1id.tablePrefix), new thrift.ShardId(shard2id.hostname, shard2id.tablePrefix), 1)
+      flock.repair_shard(new thrift.ShardId(shard1id.hostname, shard1id.tablePrefix), new thrift.ShardId(shard2id.hostname, shard2id.tablePrefix))
       shard1.selectAll(Repair.START, Repair.COUNT)._1 must eventually(verify(s => s sameElements shard2.selectAll(Repair.START, Repair.COUNT)._1))
     }
   }

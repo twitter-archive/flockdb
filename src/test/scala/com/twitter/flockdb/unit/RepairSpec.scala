@@ -24,7 +24,7 @@ import com.twitter.flockdb.jobs.single._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
-import jobs.{Repair, MetadataRepair, RepairJob}
+import jobs.{Repair, MetadataRepair}
 import shards.{Metadata, Shard}
 import com.twitter.flockdb.jobs.multi._
 
@@ -41,7 +41,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
-    val job = new Repair(shard1Id, shard2Id, tableId, (cursor1, cursor2), (cursor1, cursor2), count, nameServer, scheduler)
+    val job = new Repair(shard1Id, shard2Id, (cursor1, cursor2), (cursor1, cursor2), count, nameServer, scheduler)
 
     "resolve trivial edges" in {
       expect {
@@ -53,7 +53,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAll((cursor1, cursor2), count) willReturn (
           List(new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)), (cursor1, Cursor(cursor2.position + 1))
         )
-        one(scheduler).put(RepairJob.PRIORITY, new Repair(shard1Id, shard2Id, tableId, (cursor1, Cursor(cursor2.position + 1)), (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
+        one(scheduler).put(Repair.PRIORITY, new Repair(shard1Id, shard2Id, (cursor1, Cursor(cursor2.position + 1)), (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
       }
       job.apply()
     }
@@ -69,10 +69,10 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAll((cursor1, cursor2), count) willReturn (
           List(new Edge(1L, 2L, 3L, Time.now, 5, State.Archived)), (cursor1, Cursor(cursor2.position + 1))
         )
-        one(scheduler).put(will(beEqual(RepairJob.PRIORITY)), add.capture)
-        one(scheduler).put(will(beEqual(RepairJob.PRIORITY)), archive.capture)
+        one(scheduler).put(will(beEqual(Repair.PRIORITY)), add.capture)
+        one(scheduler).put(will(beEqual(Repair.PRIORITY)), archive.capture)
         
-        one(scheduler).put(RepairJob.PRIORITY, new Repair(shard1Id, shard2Id, tableId, (cursor1, Cursor(cursor2.position + 1)), (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
+        one(scheduler).put(Repair.PRIORITY, new Repair(shard1Id, shard2Id, (cursor1, Cursor(cursor2.position + 1)), (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
       }
       job.apply()
       add.captured.sourceId must_== 1L
@@ -92,7 +92,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAll((cursor1, cursor2), count) willReturn (
           List(new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)), (Cursor.End, Cursor.End)
         )
-        one(scheduler).put(will(beEqual(RepairJob.PRIORITY)), add.capture)
+        one(scheduler).put(will(beEqual(Repair.PRIORITY)), add.capture)
       }
       job.apply()
       add.captured.sourceId must_== 1L
@@ -109,7 +109,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAll((cursor1, cursor2), count) willReturn (
           List(new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)), (Cursor(1L), Cursor(3L))
         )
-        one(scheduler).put(RepairJob.PRIORITY, new Repair(shard1Id, shard2Id, tableId, (Cursor(1L), Cursor(2L)), (Cursor(1L), Cursor(2L)), count, nameServer, scheduler))
+        one(scheduler).put(Repair.PRIORITY, new Repair(shard1Id, shard2Id, (Cursor(1L), Cursor(2L)), (Cursor(1L), Cursor(2L)), count, nameServer, scheduler))
       }
       job.apply()
     }
@@ -122,7 +122,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
-    val job = new MetadataRepair(shard1Id, shard2Id, tableId, cursor1, cursor1, count, nameServer, scheduler)
+    val job = new MetadataRepair(shard1Id, shard2Id, cursor1, cursor1, count, nameServer, scheduler)
 
     "resolve trivial metadata" in {
       expect {
@@ -134,7 +134,7 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAllMetadata(cursor1, count) willReturn (
           List(new Metadata(1L, State.Normal, 0, Time.now)), Cursor(cursor1.position + 1)
         )
-        one(scheduler).put(RepairJob.PRIORITY, new MetadataRepair(shard1Id, shard2Id, tableId, Cursor(cursor1.position + 1), Cursor(cursor1.position + 1), count, nameServer, scheduler))
+        one(scheduler).put(Repair.PRIORITY, new MetadataRepair(shard1Id, shard2Id, Cursor(cursor1.position + 1), Cursor(cursor1.position + 1), count, nameServer, scheduler))
       }
       job.apply()
     }
@@ -151,10 +151,10 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAllMetadata(cursor1, count) willReturn (
           List(new Metadata(1L, State.Archived, 0, Time.now)), Cursor(cursor1.position + 1)
         )
-        one(scheduler).put(will(beEqual(RepairJob.PRIORITY)), add.capture)
-        one(scheduler).put(will(beEqual(RepairJob.PRIORITY)), archive.capture)
+        one(scheduler).put(will(beEqual(Repair.PRIORITY)), add.capture)
+        one(scheduler).put(will(beEqual(Repair.PRIORITY)), archive.capture)
         
-        one(scheduler).put(RepairJob.PRIORITY, new MetadataRepair(shard1Id, shard2Id, tableId, Cursor(cursor1.position + 1), Cursor(cursor1.position + 1), count, nameServer, scheduler))
+        one(scheduler).put(Repair.PRIORITY, new MetadataRepair(shard1Id, shard2Id, Cursor(cursor1.position + 1), Cursor(cursor1.position + 1), count, nameServer, scheduler))
       }
       job.apply()
       add.captured.sourceId must_== 1L
@@ -173,9 +173,9 @@ class RepairSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         one(shard2).selectAllMetadata(cursor1, count) willReturn (
           List[Metadata](), MetadataRepair.END
         )
-        one(scheduler).put(will(beEqual(RepairJob.PRIORITY)), add1.capture)
+        one(scheduler).put(will(beEqual(Repair.PRIORITY)), add1.capture)
         
-        one(scheduler).put(RepairJob.PRIORITY, new Repair(shard1Id, shard2Id, tableId, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler))
+        one(scheduler).put(Repair.PRIORITY, new Repair(shard1Id, shard2Id, Repair.START, Repair.START, Repair.COUNT, nameServer, scheduler))
       }
       job.apply()
       add1.captured.sourceId must_== 1L

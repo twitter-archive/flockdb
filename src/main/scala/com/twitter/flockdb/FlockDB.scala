@@ -134,11 +134,10 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
     edges.get(source_id, graph_id, destination_id).toThrift
   }
 
-  def repair_shard(sourceId: thrift.ShardId, destinationId: thrift.ShardId, graph_id: Int) = {
+  def repair_shard(sourceId: thrift.ShardId, destinationId: thrift.ShardId) = {
     scheduler.put(Priority.Medium.id, repairs(
       ShardId(sourceId.hostname, sourceId.table_prefix),
-      ShardId(destinationId.hostname, destinationId.table_prefix),
-      graph_id))
+      ShardId(destinationId.hostname, destinationId.table_prefix)))
   }
 
   @deprecated

@@ -153,7 +153,7 @@ service FlockDB {
 
   void execute(1: ExecuteOperations operations) throws(1: FlockException ex)
 
-  void repair_shard(1: ShardId source_id, 2: ShardId destination_id, 3: i32 graph_id) throws(1: FlockException ex)
+  void repair_shard(1: ShardId source_id, 2: ShardId destination_id) throws(1: FlockException ex)
 
   # deprecated:
   i32 count(1: list<SelectOperation> operations) throws(1: FlockException ex)
