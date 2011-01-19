@@ -18,4 +18,15 @@ package com.twitter.flockdb
 
 import com.twitter.util.Time
 
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time)
+case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Ordered[Metadata] {
+  def compare(other: Metadata) = {
+    val out = updatedAt.compare(other.updatedAt)
+    if (out == 0) {
+      state.compare(other.state)
+    } else {
+      out
+    }
+  }
+
+  def max(other: Metadata) = if (this > other) this else other
+}

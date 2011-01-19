@@ -20,9 +20,11 @@ import com.twitter.gizzard.nameserver.{Forwarding, NameServer}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import shards.Shard
+import scala.collection.{immutable, mutable}
+import jobs.single.NodePair
 
 
-class ForwardingManager(nameServer: NameServer[Shard]) {
+class ForwardingManager(val nameServer: NameServer[Shard]) {
   @throws(classOf[ShardException])
   def find(sourceId: Long, graphId: Int, direction: Direction) = {
     nameServer.findCurrentForwarding(translate(graphId, direction), sourceId)

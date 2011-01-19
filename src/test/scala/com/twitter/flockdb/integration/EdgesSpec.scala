@@ -36,17 +36,15 @@ class EdgesSpec extends IntegrationSpecification {
   val darcy = 4L
 
   "Edge Integration" should {
-    doBefore {
-      reset(config)
-    }
-
     "contains_metadata"  in {
+      reset(config)
       flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
       flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
       flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
     }
 
     "get_metadata"  in {
+      reset(config)
       Time.withCurrentTimeFrozen { time =>
         flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
@@ -61,13 +59,14 @@ class EdgesSpec extends IntegrationSpecification {
         //      4. Play those two operations in the db out of order.
         //      5. Observe that alice is unfortunately still in the normal state.
         //
-        flock.get_metadata(alice, FOLLOWS) mustEqual flockdb.Metadata(alice, State.Normal, 1, new Time(0)).toThrift
+        flock.get_metadata(alice, FOLLOWS) must eventually (be_==(flockdb.Metadata(alice, State.Normal, 1, new Time(0)).toThrift))
 
       }
     }
 
     "add" in {
       "existing graph" in {
+        reset(config)
         Time.withCurrentTimeFrozen { time =>
           flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
           val term = new QueryTerm(alice, FOLLOWS, true)
@@ -85,11 +84,13 @@ class EdgesSpec extends IntegrationSpecification {
       }
 
       "nonexistent graph" in {
+        reset(config)
         flock.execute(Select(alice, BORKEN, bob).add.toThrift) must throwA[FlockException]
       }
     }
 
     "remove" in {
+      reset(config)
       flock.execute(Select(bob, FOLLOWS, alice).remove.toThrift)
       (!flock.contains(bob, FOLLOWS, alice) &&
         flock.count(Select(alice, FOLLOWS, Nil).toThrift) == 0 &&
@@ -97,6 +98,7 @@ class EdgesSpec extends IntegrationSpecification {
     }
 
     "archive" in {
+      reset(config)
       Time.withCurrentTimeFrozen { time =>
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
@@ -130,6 +132,7 @@ class EdgesSpec extends IntegrationSpecification {
     }
 
     "archive & unarchive concurrently" in {
+      reset(config)
       flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
@@ -152,6 +155,7 @@ class EdgesSpec extends IntegrationSpecification {
     }
 
     "toggle polarity" in {
+      reset(config)
       Time.withCurrentTimeFrozen { time =>
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
@@ -169,6 +173,7 @@ class EdgesSpec extends IntegrationSpecification {
     }
 
     "counts" in {
+      reset(config)
       flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
       flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
@@ -180,6 +185,7 @@ class EdgesSpec extends IntegrationSpecification {
 
     "select_edges" in {
       "simple query" in {
+        reset(config)
         Time.withCurrentTimeFrozen { time =>
           flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
           time.advance(1.second)
@@ -199,6 +205,7 @@ class EdgesSpec extends IntegrationSpecification {
       }
 
       "intersection" in {
+        reset(config)
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
         flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))

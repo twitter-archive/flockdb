@@ -48,10 +48,10 @@ abstract class ConfiguredSpecification extends Specification {
 }
 
 abstract class IntegrationSpecification extends ConfiguredSpecification with NameServerDatabase {
+  val f = new FlockDB(config, new W3CStats(Logger.get, Array("workaround")))
   val (manager, nameServer, flock, jobScheduler) = {
     // XXX: Ostrich has a bug which causes a NPE when you pass in an empty array to W3CStats.
     // Remove this when we upgrade ostrich to a version that contains commit 71d07d32dcb76b029bdc11c519c867d7a2431cc2
-    val f = new FlockDB(config, new W3CStats(Logger.get, Array("workaround")))
     (f.managerServer, f.nameServer, f.flockService, f.jobScheduler)
   }
 
@@ -69,22 +69,39 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
     for (graph <- (1 until 10)) {
       Seq("forward", "backward").foreach { direction =>
         val tableId = if (direction == "forward") graph else graph * -1
-        val shardId = ShardId("localhost", direction + "_" + graph)
+        val shardId1 = ShardId("localhost", direction + "_" + graph + "_a")
+        val shardId2 = ShardId("localhost", direction + "_" + graph + "_b")
         val replicatingShardId = ShardId("localhost", "replicating_" + direction + "_" + graph)
 
-        nameServer.createShard(ShardInfo(shardId,
+        nameServer.createShard(ShardInfo(shardId1,
+          "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
+        nameServer.createShard(ShardInfo(shardId2,
           "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
         nameServer.createShard(ShardInfo(replicatingShardId,
           "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        nameServer.addLink(replicatingShardId, shardId, 1)
+        nameServer.addLink(replicatingShardId, shardId1, 1)
+        nameServer.addLink(replicatingShardId, shardId2, 1)
         nameServer.setForwarding(Forwarding(tableId, 0, replicatingShardId))
 
-        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_edges")
-        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_metadata")
+        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_edges")
+        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_metadata")
+        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_edges")
+        queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_metadata")
       }
     }
 
     nameServer.reload()
+  }
+
+  def jobSchedulerMustDrain = {
+    var last = jobScheduler.size
+    while(jobScheduler.size > 0) {
+      jobScheduler.size must eventually(be_<(last))
+      last = jobScheduler.size
+    }
+    while(jobScheduler.activeThreads > 0) {
+      Thread.sleep(10)
+    }
   }
 
   def reset(config: flockdb.config.FlockDB, db: String) {

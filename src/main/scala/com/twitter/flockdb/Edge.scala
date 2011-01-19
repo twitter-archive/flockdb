@@ -20,7 +20,7 @@ import com.twitter.util.Time
 import com.twitter.flockdb.jobs.single._
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
-                state: State) {
+                state: State) extends Ordered[Edge] {
   def toJob(tableId: Int, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
     val job = state match {
       case State.Normal => Add
@@ -30,4 +30,15 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: 
     }
     job(sourceId, tableId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
   }
+
+  def compare(other: Edge) = {
+    val out = updatedAt.compare(other.updatedAt)
+    if (out == 0) {
+      state.compare(other.state)
+    } else {
+      out
+    }
+  }
+
+  def max(other: Edge) = if (this > other) this else other
 }

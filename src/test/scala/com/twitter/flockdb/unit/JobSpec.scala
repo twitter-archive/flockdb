@@ -16,20 +16,42 @@
 
 package com.twitter.flockdb.unit
 
+import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.ShardInfo
+import com.twitter.gizzard.shards.{ShardInfo, ShardException}
 import com.twitter.util.Time
+import flockdb.Direction._
+import flockdb.State._
+import flockdb.shards.ReadWriteShardAdapter
+import flockdb.shards.OptimisticLockException
+import gizzard.shards.{ReadWriteShard, FanoutResults}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
-import jobs.single.{Add, Remove}
+import jobs.single.{Add, Remove, Archive, NodePair}
 import shards.{Shard, SqlShard}
 import flockdb.Metadata
 import thrift.Edge
 
-
 class FakeLockingShard(shard: Shard) extends SqlShard(null, new ShardInfo("a", "b", "c"), 1, Nil, 0) {
   override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
+}
+
+class SimpleAdapter(shard: Shard) extends ReadWriteShardAdapter(new IdentityShard[Shard](shard))
+
+class IdentityShard[ConcreteShard <: Shard](shard: ConcreteShard)
+  extends ReadWriteShard[ConcreteShard] {
+  val children = Seq(shard)
+  val weight = 1
+  def shardInfo =  new ShardInfo("a", "b", "c")
+
+  def readAllOperation[A](method: (ConcreteShard => A)) = FanoutResults(method, shard)
+  def readOperation[A](method: (ConcreteShard => A)) = method(shard)
+
+  def writeOperation[A](method: (ConcreteShard => A)) = method(shard)
+
+  def rebuildableReadOperation[A](method: (ConcreteShard => Option[A]))(rebuild: (ConcreteShard, ConcreteShard) => Unit) =
+    method(shard)
 }
 
 class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
@@ -47,73 +69,69 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard2: Shard = null
   var shard3: Shard = null
   var shard4: Shard = null
-  var lockingShard1: Shard = null
-  var lockingShard2: Shard = null
+  var shard1Mock: Shard = null
+  var shard2Mock: Shard = null
   val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
 
-  "Add" should {
+  def before() {
     doBefore {
       forwardingManager = mock[ForwardingManager]
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
+      shard1Mock = mock[Shard]
+      shard2Mock = mock[Shard]
+      shard1 = new SimpleAdapter(shard1Mock)
+      shard2 = new SimpleAdapter(shard2Mock)
     }
+  }
 
-    "apply" in {
-      "when the add takes effect" >> {
-        Time.withCurrentTimeFrozen { time =>
-          val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-
-          expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-            one(shard1).add(bob, mary, 1, Time.now)
-            one(shard2).add(mary, bob, 1, Time.now)
-          }
-
-          job.apply()
+  def test(desc: String, jobState: State, bobBefore: State, maryBefore: State, bobAfter: State, maryAfter: State, applied: State, f: jobs.single.Single => Unit) = {
+    desc in {
+      Time.withCurrentTimeFrozen { time =>
+        val job = jobState match {
+          case Normal => Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+          case Removed => Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+          case Archived => jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
         }
-      }
+        expect {
+          allowing(forwardingManager).find(bob, FOLLOWS, Forward) willReturn shard1
+          allowing(forwardingManager).find(mary, FOLLOWS, Backward) willReturn shard2
 
-      "when the add does not take effect" >> {
-        "when the forward direction causes it to not take effect" >> {
-          Time.withCurrentTimeFrozen { time =>
-            val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+          // Before
+          one(shard1Mock).getMetadata(bob) willReturn Some(Metadata(bob, bobBefore, 1, Time.now - 1.second))
+          one(shard2Mock).getMetadata(mary) willReturn Some(Metadata(mary, maryBefore, 1, Time.now - 1.second))
 
-            expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Archived, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-              one(shard1).archive(bob, mary, 1, Time.now)
-              one(shard2).archive(mary, bob, 1, Time.now)
+          // After
+          allowing(shard1Mock).getMetadata(bob) willReturn Some(Metadata(mary, bobAfter, 1, Time.now))
+          allowing(shard2Mock).getMetadata(mary) willReturn Some(Metadata(mary, maryAfter, 1, Time.now))
+
+          // Results
+          applied match {
+            case Normal => {
+              one(shard1Mock).add(bob, mary, 1, Time.now)
+              one(shard2Mock).add(mary, bob, 1, Time.now)
             }
-
-            job.apply()
-          }
-        }
-
-        "when the backward direction causes it to not take effect" >> {
-          Time.withCurrentTimeFrozen { time =>
-            val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-
-            expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Archived, 1, Time.now))
-              one(shard1).archive(bob, mary, 1, Time.now)
-              one(shard2).archive(mary, bob, 1, Time.now)
+            case Archived => {
+              one(shard1Mock).archive(bob, mary, 1, Time.now)
+              one(shard2Mock).archive(mary, bob, 1, Time.now)
             }
-
-            job.apply()
+            case Removed => {
+              one(shard1Mock).remove(bob, mary, 1, Time.now)
+              one(shard2Mock).remove(mary, bob, 1, Time.now)
+            }
           }
         }
+        f(job)
       }
     }
+  }
+
+  "Add" should {
+    before()
+    //                         Input   Before            After             Resulting
+    //                         Job     Bob     Mary      Bob     Mary      Job
+    test("normal add",         Normal, Normal, Normal,   Normal, Normal,   Normal, _.apply)
+    test("lost lock add",      Normal, Normal, Normal,   Normal, Archived, Normal, _.apply must throwA[OptimisticLockException])
+    test("when bob archived",  Normal, Archived, Normal, Archived, Normal, Archived, _.apply)
+    test("when mary archived", Normal, Normal, Archived, Normal, Archived, Archived, _.apply)
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
@@ -129,32 +147,11 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Remove" should {
-    doBefore {
-      forwardingManager = mock[ForwardingManager]
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
-    }
+    before()
 
-    "apply" in {
-      "when the remove takes effect" >> {
-        Time.withCurrentTimeFrozen { time =>
-          val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-
-          expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-            one(shard1).remove(bob, mary, 1, Time.now)
-            one(shard2).remove(mary, bob, 1, Time.now)
-          }
-
-          job.apply()
-        }
-      }
-    }
+    //                         Input    Before            After             Resulting
+    //                         Job      Bob     Mary      Bob     Mary      Job
+    test("normal remove",      Removed, Normal, Normal,   Normal, Normal,   Removed, _.apply)
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
@@ -170,68 +167,14 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Archive" should {
-    doBefore {
-      forwardingManager = mock[ForwardingManager]
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      lockingShard1 = new FakeLockingShard(shard1)
-      lockingShard2 = new FakeLockingShard(shard2)
-    }
+    before()
 
-    "apply" in {
-      "when the archive takes effect" >> {
-        Time.withCurrentTimeFrozen { time =>
-          val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
+    //                          Input     Before             After             Resulting
+    //                          Job       Bob     Mary       Bob     Mary      Job
+    test("normal archive",      Archived, Normal, Normal,    Normal, Normal,   Archived, _.apply)
+    test("archive removed",     Archived, Normal, Removed,   Normal, Removed,  Removed, _.apply)
+    test("archive removed",     Archived, Removed, Normal,   Removed, Normal,  Removed, _.apply)
 
-          expect {
-            one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-            one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-            one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-            one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-            one(shard1).archive(bob, mary, 1, Time.now)
-            one(shard2).archive(mary, bob, 1, Time.now)
-          }
-
-          job.apply()
-        }
-      }
-
-      "when the archive does not take effect" >> {
-        "when the forward direction causes it to not take effect" >> {
-          Time.withCurrentTimeFrozen { time =>
-            val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-
-            expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Removed, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Normal, 1, Time.now))
-              one(shard1).remove(bob, mary, 1, Time.now)
-              one(shard2).remove(mary, bob, 1, Time.now)
-            }
-
-            job.apply()
-          }
-        }
-
-        "when the backward direction causes it to not take effect" >> {
-          Time.withCurrentTimeFrozen { time =>
-            val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-
-            expect {
-              one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn lockingShard1
-              one(forwardingManager).find(mary, FOLLOWS, Direction.Backward) willReturn lockingShard2
-              one(shard1).getMetadata(bob) willReturn Some(Metadata(bob, State.Normal, 1, Time.now))
-              one(shard2).getMetadata(mary) willReturn Some(Metadata(mary, State.Removed, 1, Time.now))
-              one(shard1).remove(bob, mary, 1, Time.now)
-              one(shard2).remove(mary, bob, 1, Time.now)
-            }
-
-            job.apply()
-          }
-        }
-      }
-    }
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
@@ -257,7 +200,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
+        val job = new jobs.multi.Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
         val json = job.toJson
         json mustMatch "Archive"
         json mustMatch "\"source_id\":" + bob

@@ -21,7 +21,9 @@ import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityCons
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
+import com.twitter.gizzard.shards.FanoutResults
 import com.twitter.ostrich.Stats
+import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query
@@ -90,7 +92,7 @@ CREATE TABLE IF NOT EXISTS %s (
 
 
 class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
-               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard {
+               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard with Optimism {
   val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
@@ -108,6 +110,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
     }
   }
+
+  def getMetadatas(sourceId: Long) = FanoutResults(getMetadata(_: Long), sourceId)
 
   def selectAllMetadata(cursor: Cursor, count: Int) = {
     val metadatas = new mutable.ArrayBuffer[Metadata]
@@ -336,7 +340,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  override def hashCode = tablePrefix.hashCode * 37 + queryEvaluator.hashCode
+  override def hashCode = {
+    (if (tablePrefix == null) 37 else tablePrefix.hashCode * 37) + (if(queryEvaluator == null) 1 else queryEvaluator.hashCode)
+  }
+
 
   private class MissingMetadataRow extends Exception("Missing Count Row")
 

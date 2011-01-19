@@ -127,11 +127,11 @@ class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.Iface
   def get(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.get(source_id, graph_id, destination_id).toThrift
   }
-  
+
   def get_metadata(source_id: Long, graph_id: Int) = {
     edges.getMetadata(source_id, graph_id).toThrift
   }
-  
+
   def contains_metadata(source_id: Long, graph_id: Int) = {
     edges.containsMetadata(source_id, graph_id)
   }

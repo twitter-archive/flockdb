@@ -22,11 +22,12 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 
 class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
-      extends shards.ReadWriteShardAdapter(shard) with Shard {
+      extends shards.ReadWriteShardAdapter(shard) with Shard with Optimism {
   def selectIncludingArchived(sourceId: Long, count: Int, cursor: Cursor)                            = shard.readOperation(_.selectIncludingArchived(sourceId, count, cursor))
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                       = shard.readOperation(_.intersect(sourceId, states, destinationIds))
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                  = shard.readOperation(_.intersectEdges(sourceId, states, destinationIds))
   def getMetadata(sourceId: Long)                                                                    = shard.readOperation(_.getMetadata(sourceId))
+  def getMetadatas(sourceId: Long)                                                                    = shard.readAllOperation(_.getMetadata(sourceId))
   def selectByDestinationId(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor)          = shard.readOperation(_.selectByDestinationId(sourceId, states, count, cursor))
   def selectByPosition(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor)               = shard.readOperation(_.selectByPosition(sourceId, states, count, cursor))
   def selectEdges(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor)                    = shard.readOperation(_.selectEdges(sourceId, states, count, cursor))
