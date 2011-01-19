@@ -68,7 +68,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   val copyPriority = Priority.Medium.id
   val copyFactory = new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id))
 
-  val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
+  override val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
 
   val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
@@ -132,12 +132,6 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
 
   def get(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.get(source_id, graph_id, destination_id).toThrift
-  }
-
-  def repair_shard(sourceId: thrift.ShardId, destinationId: thrift.ShardId) = {
-    scheduler.put(Priority.Medium.id, repairs(
-      ShardId(sourceId.hostname, sourceId.table_prefix),
-      ShardId(destinationId.hostname, destinationId.table_prefix)))
   }
 
   @deprecated

@@ -22,6 +22,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import flockdb.jobs.multi._
 import com.twitter.gizzard.scheduler._
+import com.twitter.flockdb.jobs.Repairable
 
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Repairable[Metadata] {
   def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {

@@ -20,9 +20,9 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.ostrich.Stats
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._
+import com.twitter.gizzard.thrift._
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.flockdb.shards.{SqlShard}
@@ -51,7 +51,10 @@ class RepairSpec extends IntegrationSpecification {
 
       shard2.add(1L, 4L, 4L, Time.now)  // only on two shard
 
-      flock.repair_shard(new thrift.ShardId(shard1id.hostname, shard1id.tablePrefix), new thrift.ShardId(shard2id.hostname, shard2id.tablePrefix))
+      manager.repair_shard(
+        new com.twitter.gizzard.thrift.ShardId(shard1id.hostname, shard1id.tablePrefix),
+        new com.twitter.gizzard.thrift.ShardId(shard2id.hostname, shard2id.tablePrefix)
+      )
       shard1.selectAll(Repair.START, Repair.COUNT)._1 must eventually(verify(s => s sameElements shard2.selectAll(Repair.START, Repair.COUNT)._1))
     }
   }

@@ -18,7 +18,8 @@ package com.twitter.flockdb
 
 import com.twitter.util.Time
 import com.twitter.flockdb.jobs.single._
-import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob, Repairable}
+import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob}
+import com.twitter.flockdb.jobs.Repairable
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
                 state: State) extends Repairable[Edge] {
