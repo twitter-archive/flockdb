@@ -18,7 +18,7 @@ package com.twitter.flockdb.unit
 
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.shards.{Busy, ShardId, ShardTimeoutException}
+import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
@@ -30,6 +30,8 @@ import flockdb.Metadata
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")
   val shard2Id = ShardId("test", "shard2")
+  val shard1Info = new ShardInfo("TestShard", "shard1", "test")
+  val shard2Info = new ShardInfo("TestShard", "shard2", "test")
   val count = 2300
 
   "Copy" should {
@@ -46,6 +48,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
       "continuing work" >> {
         expect {
+          one(nameServer).getShard(shard2Id) willReturn shard2Info
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
@@ -58,6 +61,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
       "try again on timeout" >> {
         expect {
+          one(nameServer).getShard(shard2Id) willReturn shard2Info
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
@@ -69,6 +73,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
       "finished" >> {
         expect {
+          one(nameServer).getShard(shard2Id) willReturn shard2Info
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
@@ -102,6 +107,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
       "continuing work" >> {
         val metadata = new Metadata(1, State.Normal, 2, Time.now)
         expect {
+          one(nameServer).getShard(shard2Id) willReturn shard2Info
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
@@ -115,6 +121,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
       "finished" >> {
         val metadata = new Metadata(1, State.Normal, 2, Time.now)
         expect {
+          one(nameServer).getShard(shard2Id) willReturn shard2Info
           one(nameServer).findShardById(shard1Id) willReturn shard1
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
