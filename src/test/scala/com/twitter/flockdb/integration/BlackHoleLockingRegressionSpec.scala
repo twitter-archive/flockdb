@@ -30,7 +30,7 @@ import shards.{Shard, SqlShard}
 import thrift._
 
 class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
-  override def reset(config: flockdb.config.FlockDB) {
+  override def reset(config: flockdb.config.FlockDB, name: String) {
     materialize(config.nameServer)
     nameServer.rebuildSchema()
     nameServer.reload()
@@ -63,8 +63,13 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
           queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_metadata")
         } else {
           val shardId1 = ShardId("localhost", direction + "_" + graph + "_a")
+          val shardId2 = ShardId("localhost", direction + "_" + graph + "_b")
           nameServer.createShard(ShardInfo(shardId1,
-            "com.twitter.gizzard.shards.BlackHoleShard", "", "", Busy.Normal))
+            name, "", "", Busy.Normal))
+          nameServer.createShard(ShardInfo(shardId2,
+            "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
+
+          nameServer.addLink(shardId1, shardId2, 1)
           nameServer.setForwarding(Forwarding(tableId, 0, shardId1))
         }
       }
@@ -87,8 +92,8 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
   }
 
   "select results" should {
-    "work" in {
-      reset(config)  // I don't know why this isn't working in doBefore
+    "black hole" in {
+      reset(config, "com.twitter.gizzard.shards.BlackHoleShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
         flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
@@ -97,4 +102,34 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       alicesFollowings.size must eventually(be(10))
     }
   }
+
+  "select results" should {
+    "read-only" in {
+      reset(config, "com.twitter.gizzard.shards.ReadOnlyShard")  // I don't know why this isn't working in doBefore
+
+      for(i <- 0 until 10) {
+        flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+      }
+
+      val scheduler = jobScheduler(flockdb.Priority.High.id)
+      val errors = scheduler.errorQueue
+      errors.size must eventually(be(10))
+    }
+  }
+
+  "select results" should {
+    "write-only" in {
+      reset(config, "com.twitter.gizzard.shards.WriteOnlyShard")  // I don't know why this isn't working in doBefore
+
+      for(i <- 0 until 10) {
+        flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+      }
+
+      val scheduler = jobScheduler(flockdb.Priority.High.id)
+      val errors = scheduler.errorQueue
+      errors.size must eventually(be(10))
+    }
+  }
+
 }
+

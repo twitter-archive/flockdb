@@ -22,7 +22,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
 import shards.Shard
-import gizzard.shards.ShardException
+import gizzard.shards.{ShardException, ShardRejectedOperationException}
 
 case class NodePair(sourceId: Long, destinationId: Long)
 
@@ -88,8 +88,8 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     try {
       shard.optimistically(id)(f)
     } catch {
-      case e: ShardBlackHoleException =>
-        f(State.Normal)
+      case e: ShardBlackHoleException => f(State.Normal)
+      // case e: ShardRejectedOperationException => f(State.Normal)
     }
   }
 
