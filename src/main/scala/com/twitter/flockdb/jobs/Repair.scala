@@ -73,35 +73,28 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
     if (tableIds.forall((id) => id == tableIds(0))) {
       while (listCursors.exists(lc => !lc._1.isEmpty || lc._2 == Repair.END) && listCursors.exists(lc => !lc._1.isEmpty)) {
         val tableId = tableIds(0)
-        val items = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
-        val firstItem = items(0).remove(0)
+        val lists = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
+        val firstItem = lists(0).remove(0)
         var firstEnqueued = false
-        if (items.size == 1) {
+        val similarLists = lists.slice(1, lists.size).filter(_(0).similar(firstItem) == 0)
+        if (similarLists.size != lists.size) {
+          firstEnqueued = true
           firstItem.schedule(tableId, forwardingManager, scheduler, priority)
-        } else {
-          for (list <- items.slice(1, items.size)) {
-            if (firstItem.similar(list(0)) == 0) {
-              if (firstItem == list(0)) {
-                list.remove(0)
-              } else {
-                if (!firstEnqueued) {
-                  firstEnqueued = true
-                  firstItem.schedule(tableId, forwardingManager, scheduler, priority)
-                }
-                enqueueFirst(tableId, list)
-              }
-            } else {
-              if (!firstEnqueued) {
-                firstEnqueued = true
-                firstItem.schedule(tableId, forwardingManager, scheduler, priority)
-              }
-              enqueueFirst(tableId, list)
+        }
+        for (list <- similarLists) {
+          if (firstItem == list(0)) {
+            list.remove(0)
+          } else {
+            if (!firstEnqueued) {
+              firstEnqueued = true
+              firstItem.schedule(tableId, forwardingManager, scheduler, priority)
             }
+            enqueueFirst(tableId, list)
           }
         }
       }
-      val items = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
-      scheduleNextRepair(if (items.isEmpty) None else items(0).firstOption)
+      val lists = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
+      scheduleNextRepair(if (lists.isEmpty) None else lists(0).firstOption)
     } else {
       throw new RuntimeException("tableIds didn't match")
     }
