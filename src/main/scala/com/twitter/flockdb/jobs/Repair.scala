@@ -62,11 +62,6 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
 
   def scheduleNextRepair(lowestItem: Option[R]): Unit
 
-  def enqueueFirst(tableId: Int, list:ListBuffer[R]) = {
-    val item = list.remove(0)
-    item.schedule(tableId, forwardingManager, scheduler, priority)
-  }
-
   def forwardingManager = new ForwardingManager(nameServer)
 
   def cursorAtEnd(cursor: C): Boolean
@@ -79,12 +74,11 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
     if (tableIds.forall((id) => id == tableIds(0))) {
       while (listCursors.forall(lc => !lc._1.isEmpty || cursorAtEnd(lc._2)) && listCursors.exists(lc => !lc._1.isEmpty)) {
         val tableId = tableIds(0)
-        val lists = listCursors.map(_._1).filter(!_.isEmpty)
         val firstList = smallestList(listCursors)
         val firstItem = firstList.remove(0)
         var firstEnqueued = false
-        val similarLists = lists.filter(_ != firstList).filter(_(0).similar(firstItem) == 0)
-        if (similarLists.size == 0 || similarLists.size != (lists.size - 1) ) {
+        val similarLists = listCursors.map(_._1).filter(!_.isEmpty).filter(_ != firstList).filter(_(0).similar(firstItem) == 0)
+        if (similarLists.size != (listCursors.size - 1) ) {
           firstEnqueued = true
           firstItem.schedule(tableId, forwardingManager, scheduler, priority)
         }
@@ -96,7 +90,7 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
               firstEnqueued = true
               firstItem.schedule(tableId, forwardingManager, scheduler, priority)
             }
-            enqueueFirst(tableId, list)
+            list.remove(0).schedule(tableId, forwardingManager, scheduler, priority)
           }
         }
       }
