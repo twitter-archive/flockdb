@@ -17,8 +17,11 @@
 package com.twitter.flockdb
 
 import com.twitter.util.Time
+import com.twitter.gizzard.scheduler.Repairable
+import flockdb.jobs.multi._
+import com.twitter.gizzard.scheduler._
 
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Ordered[Metadata] {
+case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Ordered[Metadata] with Repairable[Metadata] {
   def compare(other: Metadata) = {
     val out = updatedAt.compare(other.updatedAt)
     if (out == 0) {
@@ -29,4 +32,20 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) e
   }
 
   def max(other: Metadata) = if (this > other) this else other
+
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {
+    val job = state match {
+      case State.Normal => Unarchive
+      case State.Removed => RemoveAll
+      case State.Archived => Archive
+      case State.Negative => Negate
+    }
+
+    scheduler.put(priority, job(sourceId, tableId, if (tableId > 0) Direction.Forward else Direction.Backward, updatedAt, Priority.Medium, 500, forwardingManager, scheduler))
+  }
+
+  def similar(other: Metadata) = {
+    sourceId.compare(other.sourceId)
+  }
 }
+

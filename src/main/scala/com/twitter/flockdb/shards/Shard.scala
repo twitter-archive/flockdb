@@ -20,7 +20,6 @@ import scala.collection.mutable
 import com.twitter.gizzard.shards
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-import flockdb.jobs.multi._
 import com.twitter.gizzard.scheduler._
 
 trait Shard extends shards.Shard {
