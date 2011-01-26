@@ -59,15 +59,19 @@ trait Optimism extends Shard {
     try {
       log.debug("starting optimistic lock of " + shardInfo.id + " for " + sourceId)
 
-      val (beforeState, beforeEx) = getDominantState(sourceId)
+      val (beforeStateOpt, beforeEx) = getDominantState(sourceId)
+      val beforeState = beforeStateOpt.getOrElse(State.Normal)
+
+      if (beforeStateOpt.isEmpty) beforeEx.foreach(throw _)
 
       f(beforeState)
 
-      // We didn't do this immediately, because we still want to propagate writes with best effort.
+      // We didn't do this immediately if we got a result from one shard, because we still want to propagate writes with best effort.
       // We should reenqueue if the optimistic lock only covers a subset of the intended targets.
       beforeEx.foreach(throw _)
 
-      var (afterState, afterEx) = getDominantState(sourceId)
+      val (afterStateOpt, afterEx) = getDominantState(sourceId)
+      val afterState = afterStateOpt.getOrElse(State.Normal)
 
       afterEx.foreach(throw _)
 
@@ -81,7 +85,7 @@ trait Optimism extends Shard {
       log.debug("successful optimistic lock of " + shardInfo.id + " for " + sourceId)
 
     } catch {
-      case e: Throwable => {
+      case e => {
         log.debug("exception in optimistic lock of " + shardInfo.id + " for " + sourceId + ": " + e.getMessage)
         throw e
       }
@@ -90,15 +94,15 @@ trait Optimism extends Shard {
 
   def getDominantState(sourceId: Long) = {
     // The default metadata
-    var winning = Metadata(sourceId, State.Normal, 0, new Time(0))
+    var winning: Option[Metadata]   = None
     var exceptions: List[Throwable] = Nil
 
     getMetadatas(sourceId).foreach {
       case Left(ex)              => exceptions = ex :: exceptions
-      case Right(Some(metadata)) => winning    = metadata max winning
+      case Right(Some(metadata)) => winning    = winning.map(_ max metadata).orElse(Some(metadata))
       case Right(None)           => ()
     }
 
-    (winning.state, exceptions.firstOption)
+    (winning.map(_.state), exceptions.firstOption)
   }
 }
