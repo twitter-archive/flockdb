@@ -77,20 +77,13 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
     val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
     val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
     val uuid = uuidGenerator(position)
-    optimistically(forwardShard, sourceId) { left =>
-      optimistically(backwardShard, destinationId) { right =>
+
+    forwardShard.optimistically(sourceId) { left =>
+      backwardShard.optimistically(destinationId) { right =>
         write(forwardShard, backwardShard, uuid, left max right max preferredState)
       }
     }
-  }
 
-  def optimistically(shard: Shard, id: Long)(f: (State => Unit)) = {
-    try {
-      shard.optimistically(id)(f)
-    } catch {
-      case e: ShardBlackHoleException => f(State.Normal)
-      // case e: ShardRejectedOperationException => f(State.Normal)
-    }
   }
 
   def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) = {
