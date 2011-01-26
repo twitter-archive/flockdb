@@ -84,7 +84,7 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
         val firstItem = firstList.remove(0)
         var firstEnqueued = false
         val similarLists = lists.filter(_ != firstList).filter(_(0).similar(firstItem) == 0)
-        if (similarLists.size == 0 || similarLists != (lists.size - 1) ) {
+        if (similarLists.size == 0 || similarLists.size != (lists.size - 1) ) {
           firstEnqueued = true
           firstItem.schedule(tableId, forwardingManager, scheduler, priority)
         }
