@@ -51,10 +51,10 @@ class RepairSpec extends IntegrationSpecification {
 
       shard2.add(1L, 4L, 4L, Time.now)  // only on two shard
 
-      manager.repair_shard(
-        new com.twitter.gizzard.thrift.ShardId(shard1id.hostname, shard1id.tablePrefix),
-        new com.twitter.gizzard.thrift.ShardId(shard2id.hostname, shard2id.tablePrefix)
-      )
+      val list = new java.util.ArrayList[com.twitter.gizzard.thrift.ShardId]
+      list.add(new com.twitter.gizzard.thrift.ShardId(shard1id.hostname, shard1id.tablePrefix))
+      list.add(new com.twitter.gizzard.thrift.ShardId(shard2id.hostname, shard2id.tablePrefix))
+      manager.repair_shard(list)
       shard1.selectAll(Repair.START, Repair.COUNT)._1 must eventually(verify(s => s sameElements shard2.selectAll(Repair.START, Repair.COUNT)._1))
     }
   }
