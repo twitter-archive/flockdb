@@ -24,7 +24,7 @@ import flockdb.Direction._
 import flockdb.State._
 import flockdb.shards.ReadWriteShardAdapter
 import flockdb.shards.OptimisticLockException
-import gizzard.shards.{ReadWriteShard, FanoutResults}
+import gizzard.shards.{ReadWriteShard}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
@@ -45,7 +45,7 @@ class IdentityShard[ConcreteShard <: Shard](shard: ConcreteShard)
   val weight = 1
   def shardInfo =  new ShardInfo("a", "b", "c")
 
-  def readAllOperation[A](method: (ConcreteShard => A)) = FanoutResults(method, shard)
+  def readAllOperation[A](method: (ConcreteShard => A)) = Seq(try { Right(method(shard)) } catch { case e => Left(e) })
   def readOperation[A](method: (ConcreteShard => A)) = method(shard)
 
   def writeOperation[A](method: (ConcreteShard => A)) = method(shard)

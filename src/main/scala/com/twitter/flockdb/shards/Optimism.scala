@@ -53,47 +53,52 @@ class OptimisticLockException(message: String) extends ShardException(message)
  * replicas doesn't screw things up.
  */
 trait Optimism extends Shard {
-  protected case class MetadataWithEx(metadata: Metadata, ex: Option[Throwable])
-
   private val log = Logger.get(getClass.getName)
 
   def optimistically(sourceId: Long)(f: State => Unit) = {
     try {
       log.debug("starting optimistic lock of " + shardInfo.id + " for " + sourceId)
-      var before = getWinner(sourceId)
 
-      f(before.metadata.state)
+      val (beforeState, beforeEx) = getDominantState(sourceId)
+
+      f(beforeState)
 
       // We didn't do this immediately, because we still want to propagate writes with best effort.
       // We should reenqueue if the optimistic lock only covers a subset of the intended targets.
-      before.ex.foreach(throw _)
+      beforeEx.foreach(throw _)
 
-      var after = getWinner(sourceId)
-      after.ex.foreach(throw _)
+      var (afterState, afterEx) = getDominantState(sourceId)
 
-      if(before.metadata.state != after.metadata.state) {
-        val message = shardInfo.id + " lost optimistic lock for " + sourceId + ": was " + before.metadata.state +", now " + after.metadata.state
-        log.debug(message)
-        throw new OptimisticLockException(message)
+      afterEx.foreach(throw _)
+
+      if(beforeState != afterState) {
+        val msg = shardInfo.id + " lost optimistic lock for " + sourceId + ": was " + beforeState +", now " + afterState
+        log.debug(msg)
+
+        throw new OptimisticLockException(msg)
       }
+
       log.debug("successful optimistic lock of " + shardInfo.id + " for " + sourceId)
+
     } catch {
       case e: Throwable => {
         log.debug("exception in optimistic lock of " + shardInfo.id + " for " + sourceId + ": " + e.getMessage)
-        throw(e)
+        throw e
       }
     }
   }
 
-  def getWinner(sourceId: Long) = {
+  def getDominantState(sourceId: Long) = {
     // The default metadata
     var winning = Metadata(sourceId, State.Normal, 0, new Time(0))
-    val metadatas = getMetadatas(sourceId)
-    metadatas.foreach { optionMetadata =>
-      optionMetadata.foreach { metadata =>
-        winning = metadata max winning
-      }
+    var exceptions: List[Throwable] = Nil
+
+    getMetadatas(sourceId).foreach {
+      case Left(ex)              => exceptions = ex :: exceptions
+      case Right(Some(metadata)) => winning    = metadata max winning
+      case Right(None)           => ()
     }
-    MetadataWithEx(winning, metadatas.exceptions.firstOption)
+
+    (winning.state, exceptions.firstOption)
   }
 }

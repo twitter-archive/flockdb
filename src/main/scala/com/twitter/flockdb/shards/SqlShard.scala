@@ -21,7 +21,6 @@ import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityCons
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
 import com.twitter.gizzard.shards
-import com.twitter.gizzard.shards.FanoutResults
 import com.twitter.ostrich.Stats
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
@@ -110,8 +109,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
     }
   }
-
-  def getMetadatas(sourceId: Long) = FanoutResults(getMetadata(_: Long), sourceId)
 
   def selectAllMetadata(cursor: Cursor, count: Int) = {
     val metadatas = new mutable.ArrayBuffer[Metadata]
