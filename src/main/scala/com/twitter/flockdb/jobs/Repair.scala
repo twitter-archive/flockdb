@@ -69,9 +69,11 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
 
   def forwardingManager = new ForwardingManager(nameServer)
 
+  def cursorAtEnd(cursor: C): Boolean
+
   def repairListCursor(listCursors: Seq[(ListBuffer[R], C)], tableIds: Seq[Int]) = {
     if (tableIds.forall((id) => id == tableIds(0))) {
-      while (listCursors.exists(lc => !lc._1.isEmpty || lc._2 == Repair.END) && listCursors.exists(lc => !lc._1.isEmpty)) {
+      while (listCursors.exists(lc => !lc._1.isEmpty || cursorAtEnd(lc._2)) && listCursors.exists(lc => !lc._1.isEmpty)) {
         val tableId = tableIds(0)
         val lists = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
         val firstItem = lists(0).remove(0)
@@ -111,6 +113,8 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
   def generateCursor(edge: Edge) = {
     (Cursor(edge.sourceId), Cursor(edge.destinationId)) 
   }
+
+  def cursorAtEnd(c: Repair.RepairCursor) = c == Repair.END
 
   def repair(shards: Seq[Shard]) = {
     val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id)(0).tableId)
@@ -162,6 +166,8 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
       case _ => new MetadataRepair(shardIds, generateCursor(lowestMetadata.get), count, nameServer, scheduler)
     })
   }
+
+  def cursorAtEnd(c: MetadataRepair.RepairCursor) = c == MetadataRepair.END
 
   def generateCursor(metadata: Metadata) = {
     Cursor(metadata.sourceId)
