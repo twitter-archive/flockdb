@@ -297,7 +297,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def add(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Normal))
+    write(new Edge(sourceId, destinationId, position, updatedAt, 0, Normal))
   }
 
   def add(sourceId: Long, updatedAt: Time) {
@@ -305,7 +305,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def negate(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Negative))
+    write(new Edge(sourceId, destinationId, position, updatedAt, 0, Negative))
   }
 
   def negate(sourceId: Long, updatedAt: Time) {
@@ -313,7 +313,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def remove(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Removed))
+    write(new Edge(sourceId, destinationId, position, updatedAt, 0, Removed))
   }
 
   def remove(sourceId: Long, updatedAt: Time) {
@@ -321,7 +321,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time) = {
-    write(new Edge(sourceId, destinationId, position, updatedAt, 1, Archived))
+    write(new Edge(sourceId, destinationId, position, updatedAt, 0, Archived))
   }
 
   def archive(sourceId: Long, updatedAt: Time) {

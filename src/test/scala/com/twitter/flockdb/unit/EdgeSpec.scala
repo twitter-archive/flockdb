@@ -28,26 +28,25 @@ object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
   val graph = 5
   val count = 0
   val forwardingManager = mock[ForwardingManager]
-  val uuid = mock[UuidGenerator]
 
   "Edge" should {
     "normal becomes single.Add" in {
       val edge = Edge(source, dest, pos, now, count, State.Normal)
-      edge.toJob(graph, forwardingManager, uuid) mustEqual new Add(source, graph, dest, pos, now, forwardingManager, uuid)
+      edge.toJob(graph, forwardingManager) mustEqual new Add(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
 
     "removed becomes single.Remove" in {
       val edge = Edge(source, dest, pos, now, count, State.Removed)
-      edge.toJob(graph, forwardingManager, uuid) mustEqual new Remove(source, graph, dest, pos, now, forwardingManager, uuid)
+      edge.toJob(graph, forwardingManager) mustEqual new Remove(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
 
     "archived becomes single.Archive" in {
       val edge = Edge(source, dest, pos, now, count, State.Archived)
-      edge.toJob(graph, forwardingManager, uuid) mustEqual new Archive(source, graph, dest, pos, now, forwardingManager, uuid)
+      edge.toJob(graph, forwardingManager) mustEqual new Archive(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
     "negative becomes single.Negate" in {
       val edge = Edge(source, dest, pos, now, count, State.Negative)
-      edge.toJob(graph, forwardingManager, uuid) mustEqual new Negate(source, graph, dest, pos, now, forwardingManager, uuid)
+      edge.toJob(graph, forwardingManager) mustEqual new Negate(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
 
   }

@@ -22,7 +22,7 @@ import scala.collection.mutable
 import com.twitter.gizzard.{Future, GizzardServer}
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard}
+import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
 import com.twitter.ostrich.{Stats, W3CStats}
@@ -69,6 +69,8 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   val copyPriority = Priority.Medium.id
   val copyFactory = new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id))
 
+  override val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
+
   val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
@@ -91,10 +93,15 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   jobCodec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
   jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
 
+  jobCodec += ("jobs.Repair".r, new jobs.RepairParser(nameServer, jobScheduler))
+  jobCodec += ("jobs.MetadataRepair".r, new jobs.MetadataRepairParser(nameServer, jobScheduler))
+
   val flockService = {
     val future = config.readFuture("readFuture")
     val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future, config.intersectionQuery, config.aggregateJobsPageSize)
-    new FlockDBThriftAdapter(edges)
+    val scheduler = jobScheduler
+    val repairs = repairFactory
+    new FlockDBThriftAdapter(edges, scheduler, repairs)
   }
 
   lazy val flockThriftServer = {
@@ -119,7 +126,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   }
 }
 
-class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.Iface {
+class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler[JsonJob], val repairs: jobs.RepairFactory) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
