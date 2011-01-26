@@ -67,7 +67,7 @@ class NegateParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGene
 
 abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, position: Long,
                       updatedAt: Time, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
-         extends JsonJob {
+extends JsonJob {
   def toMap = {
     Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
   }
@@ -86,20 +86,33 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
 
   }
 
-  def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) = {
-    state match {
-      case State.Normal =>
-        forwardShard.add(sourceId, destinationId, uuid, updatedAt)
-        backwardShard.add(destinationId, sourceId, uuid, updatedAt)
-      case State.Removed =>
-        forwardShard.remove(sourceId, destinationId, uuid, updatedAt)
-        backwardShard.remove(destinationId, sourceId, uuid, updatedAt)
-      case State.Archived =>
-        forwardShard.archive(sourceId, destinationId, uuid, updatedAt)
-        backwardShard.archive(destinationId, sourceId, uuid, updatedAt)
-      case State.Negative =>
-        forwardShard.negate(sourceId, destinationId, uuid, updatedAt)
-        backwardShard.negate(destinationId, sourceId, uuid, updatedAt)
+  def writeToShard(shard: Shard, sourceId: Long, destinationId: Long, uuid: Long, state: State) = {
+    try {
+      state match {
+        case State.Normal =>
+          shard.add(sourceId, destinationId, uuid, updatedAt)
+        case State.Removed =>
+          shard.remove(sourceId, destinationId, uuid, updatedAt)
+        case State.Archived =>
+          shard.archive(sourceId, destinationId, uuid, updatedAt)
+        case State.Negative =>
+          shard.negate(sourceId, destinationId, uuid, updatedAt)
+      }
+
+      None
+    } catch {
+      case e => Some(e)
+    }
+  }
+
+  def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) {
+    val forwardErr  = writeToShard(forwardShard, sourceId, destinationId, uuid, state)
+    val backwardErr = writeToShard(backwardShard, destinationId, sourceId, uuid, state)
+
+    // just eat ShardBlackHoleExceptions for either way, but throw any other
+    List(forwardErr, backwardErr).flatMap(_.toList).foreach {
+      case e: ShardBlackHoleException => ()
+      case e => throw e
     }
   }
 

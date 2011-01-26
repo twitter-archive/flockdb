@@ -52,7 +52,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
           nameServer.createShard(ShardInfo(shardId2,
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
           nameServer.createShard(ShardInfo(replicatingShardId,
-            "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
+            "ReplicatingShard", "", "", Busy.Normal))
           nameServer.addLink(replicatingShardId, shardId1, 1)
           nameServer.addLink(replicatingShardId, shardId2, 1)
           nameServer.setForwarding(Forwarding(tableId, 0, replicatingShardId))
@@ -62,14 +62,16 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
           queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_edges")
           queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_metadata")
         } else {
-          val shardId1 = ShardId("localhost", direction + "_" + graph + "_a")
-          val shardId2 = ShardId("localhost", direction + "_" + graph + "_b")
-          nameServer.createShard(ShardInfo(shardId1,
-            name, "", "", Busy.Normal))
-          nameServer.createShard(ShardInfo(shardId2,
+          val shardId1 = ShardId("localhost", direction + "_" + graph + "_replicating")
+          val shardId2 = ShardId("localhost", direction + "_" + graph + "_a")
+          val shardId3 = ShardId("localhost", direction + "_" + graph + "_b")
+          nameServer.createShard(ShardInfo(shardId1, "ReplicatingShard", "", "", Busy.Normal))
+          nameServer.createShard(ShardInfo(shardId2, name, "", "", Busy.Normal))
+          nameServer.createShard(ShardInfo(shardId3,
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
 
           nameServer.addLink(shardId1, shardId2, 1)
+          nameServer.addLink(shardId2, shardId3, 1)
           nameServer.setForwarding(Forwarding(tableId, 0, shardId1))
         }
       }
