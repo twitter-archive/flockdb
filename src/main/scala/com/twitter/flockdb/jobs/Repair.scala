@@ -77,7 +77,7 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
 
   def repairListCursor(listCursors: Seq[(ListBuffer[R], C)], tableIds: Seq[Int]) = {
     if (tableIds.forall((id) => id == tableIds(0))) {
-      while (listCursors.exists(lc => !lc._1.isEmpty || cursorAtEnd(lc._2)) && listCursors.exists(lc => !lc._1.isEmpty)) {
+      while (listCursors.forall(lc => !lc._1.isEmpty || cursorAtEnd(lc._2)) && listCursors.exists(lc => !lc._1.isEmpty)) {
         val tableId = tableIds(0)
         val lists = listCursors.map(_._1).filter(!_.isEmpty)
         val firstList = smallestList(listCursors)
