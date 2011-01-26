@@ -72,7 +72,7 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
   def cursorAtEnd(cursor: C): Boolean
 
   def smallestList(listCursors: Seq[(ListBuffer[R], C)]) = {
-    listCursors.map(_._1).filter(!_.isEmpty).reduceLeft((l1, l2) => if (l1(0).similar(l2(0)) < 0) l1 else l2)
+    listCursors.map(_._1).filter(!_.isEmpty).reduceLeft((list1, list2) => if (list1(0).similar(list2(0)) < 0) list1 else list2)
   }
 
   def repairListCursor(listCursors: Seq[(ListBuffer[R], C)], tableIds: Seq[Int]) = {
