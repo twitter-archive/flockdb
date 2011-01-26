@@ -71,15 +71,20 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
 
   def cursorAtEnd(cursor: C): Boolean
 
+  def smallestList(listCursors: Seq[(ListBuffer[R], C)]) = {
+    listCursors.map(_._1).filter(!_.isEmpty).reduceLeft((l1, l2) => if (l1(0).similar(l2(0)) < 0) l1 else l2)
+  }
+
   def repairListCursor(listCursors: Seq[(ListBuffer[R], C)], tableIds: Seq[Int]) = {
     if (tableIds.forall((id) => id == tableIds(0))) {
       while (listCursors.exists(lc => !lc._1.isEmpty || cursorAtEnd(lc._2)) && listCursors.exists(lc => !lc._1.isEmpty)) {
         val tableId = tableIds(0)
-        val lists = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
-        val firstItem = lists(0).remove(0)
+        val lists = listCursors.map(_._1).filter(!_.isEmpty)
+        val firstList = smallestList(listCursors)
+        val firstItem = firstList.remove(0)
         var firstEnqueued = false
-        val similarLists = lists.slice(1, lists.size).filter(_(0).similar(firstItem) == 0)
-        if (similarLists.size != lists.size) {
+        val similarLists = lists.filter(_ != firstList).filter(_(0).similar(firstItem) == 0)
+        if (similarLists.size == 0 || similarLists != (lists.size - 1) ) {
           firstEnqueued = true
           firstItem.schedule(tableId, forwardingManager, scheduler, priority)
         }
@@ -95,8 +100,7 @@ abstract class MultiShardRepair[R <: Repairable[R], C <: Any](shardIds: Seq[Shar
           }
         }
       }
-      val lists = scala.util.Sorting.stableSort(listCursors.map(_._1).filter(!_.isEmpty), (e1:ListBuffer[R], e2:ListBuffer[R]) => e1.first.similar(e2.first) < 0)
-      scheduleNextRepair(if (lists.isEmpty) None else lists(0).firstOption)
+      scheduleNextRepair(if (listCursors.filter(!_._1.isEmpty).size == 0) None else Some(smallestList(listCursors)(0)))
     } else {
       throw new RuntimeException("tableIds didn't match")
     }
