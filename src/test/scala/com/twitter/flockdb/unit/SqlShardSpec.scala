@@ -307,8 +307,8 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.add(alice, bob, 3, now)
         shard.add(alice, carl, 5, now)
 
-        val aliceBob = new Edge(alice, bob, 3, now, 1, State.Normal).toThrift
-        val aliceCarl = new Edge(alice, carl, 5, now, 1, State.Normal).toThrift
+        val aliceBob = new Edge(alice, bob, 3, now, 0, State.Normal).toThrift
+        val aliceCarl = new Edge(alice, carl, 5, now, 0, State.Normal).toThrift
         shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl).toJavaList, 5, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob).toJavaList, Cursor.End.position, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
@@ -330,9 +330,9 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       shard.remove(darcy, alice, 3, now)
 
       shard.get(bob, alice) mustEqual None
-      shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Normal))
-      shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 2, now, 1, State.Archived))
-      shard.get(darcy, alice) mustEqual Some(new Edge(darcy, alice, 3, now, 1, State.Removed))
+      shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Normal))
+      shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 2, now, 0, State.Archived))
+      shard.get(darcy, alice) mustEqual Some(new Edge(darcy, alice, 3, now, 0, State.Removed))
     }
 
     "add" in {
@@ -340,7 +340,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the row does not already exist" >> {
           shard.get(bob, alice) mustEqual None
           shard.add(bob, alice, 1, now)
-          shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 1, State.Normal))
+          shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 0, State.Normal))
         }
 
         "when the row already exists" >> {
@@ -374,21 +374,21 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
               shard.remove(alice, bob, 1, now)
               shard.add(alice, bob, 1, now)
 
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Removed))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Removed))
             }
 
             "when the already-existing row is archived" >> {
               shard.archive(alice, bob, 1, now)
               shard.add(alice, bob, 1, now)
 
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Archived))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Archived))
             }
 
             "when the already-existing row is negative" >> {
               shard.negate(alice, bob, 1, now)
               shard.add(alice, bob, 1, now)
 
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Negative))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Negative))
             }
           }
         }
@@ -428,7 +428,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     "remove" in {
       "when the row does not exist" >> {
         shard.remove(bob, alice, 1, now)
-        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 1, State.Removed))
+        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 0, State.Removed))
       }
 
       "when the row exists" >> {
@@ -443,7 +443,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the already-existing row is newer than the row to be deleted" >> {
           shard.add(carl, darcy, 1, now)
           shard.remove(carl, darcy, 1, now - 1.second)
-          shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now, 1, State.Normal))
+          shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now, 0, State.Normal))
         }
 
       }
@@ -472,7 +472,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     "remove & add" in {
       "incremements the count when deleting then re-inserting a row" >> {
         shard.remove(carl, darcy, 1, now)
-        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now, 1, State.Removed))
+        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now, 0, State.Removed))
         shard.add(carl, darcy, 1, now + 1.second)
         shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now + 1.second, 0, State.Normal))
       }
@@ -480,7 +480,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       "when the remove is applied before the add, but its updatedAt is greater than the add" >> {
         shard.remove(carl, earl, 1, now)
         shard.add(carl, earl, 1, now - 1.second)
-        shard.get(carl, earl) mustEqual Some(new Edge(carl, earl, 1, now, 1, State.Removed))
+        shard.get(carl, earl) mustEqual Some(new Edge(carl, earl, 1, now, 0, State.Removed))
       }
 
       "when the deleting an already deleted row" >> {
@@ -494,7 +494,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     "archive" in {
       "when the row does not exist" >> {
         shard.archive(bob, alice, 1, now)
-        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 1, State.Archived))
+        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 0, State.Archived))
       }
 
       "when the row exists" >> {
@@ -509,20 +509,20 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the already-existing row is newer than the row to be archived" >> {
           shard.add(alice, bob, 1, now)
           shard.archive(alice, bob, 1, now - 1.second)
-          shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Normal))
+          shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Normal))
         }
 
         "when the already-existing row is the same age as the row to be archived" >> {
           "when the already-existing row is removed" >> {
             shard.remove(alice, bob, 1, now)
             shard.archive(alice, bob, 1, now)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Removed))
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Removed))
           }
 
           "when the already-existing row is removed" >> {
             shard.remove(alice, bob, 1, now)
             shard.archive(alice, bob, 1, now)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Removed))
+            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Removed))
           }
         }
       }
@@ -555,7 +555,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       "when the archive is applied before the add, but its updatedAt is greater than the add" >> {
         shard.archive(alice, bob, 1, now)
         shard.add(alice, bob, 1, now - 1.second)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 1, State.Archived))
+        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Archived))
       }
 
       "when the archive an already archived row" >> {
