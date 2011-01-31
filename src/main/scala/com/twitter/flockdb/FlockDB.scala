@@ -70,6 +70,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   val copyFactory = new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id))
 
   override val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
+  override val diffFactory = new jobs.DiffFactory(nameServer, jobScheduler)
 
   val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
@@ -100,8 +101,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
     val future = config.readFuture("readFuture")
     val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future, config.intersectionQuery, config.aggregateJobsPageSize)
     val scheduler = jobScheduler
-    val repairs = repairFactory
-    new FlockDBThriftAdapter(edges, scheduler, repairs)
+    new FlockDBThriftAdapter(edges, scheduler)
   }
 
   lazy val flockThriftServer = {
@@ -126,7 +126,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   }
 }
 
-class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler[JsonJob], val repairs: jobs.RepairFactory) extends thrift.FlockDB.Iface {
+class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler[JsonJob]) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }

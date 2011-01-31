@@ -67,7 +67,7 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
   def forwardingManager = new ForwardingManager(nameServer)
 
-  def schedule(tableId: Int, item: Edge) = {
+  def schedule(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
     item.schedule(tableId, forwardingManager, scheduler, priority)
   }
 
@@ -78,7 +78,7 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
       val (seq, newCursor) = shard.selectAll(cursor, count)
       val list = new ListBuffer[Edge]()
       list ++= seq
-      (list, newCursor)
+      (shard, list, newCursor)
     })
     repairListCursor(listCursors, tableIds)
   }
@@ -122,7 +122,7 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
     })
   }
 
-  def schedule(tableId: Int, item: Metadata) = {
+  def schedule(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
     item.schedule(tableId, forwardingManager, scheduler, priority)
   }
 
@@ -141,7 +141,7 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
       val (seq, newCursor) = shard.selectAllMetadata(cursor, count)
       val list = new ListBuffer[Metadata]()
       list ++= seq
-      (list, newCursor)
+      (shard, list, newCursor)
     })
     repairListCursor(listCursors, tableIds)
   }
