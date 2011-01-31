@@ -52,7 +52,7 @@ class Diff(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
   private val log = Logger.get(getClass.getName)
 
   override def schedule(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
-    log.info("DIFF -> table id:"+tableId+" shard:"+shard+ "+edge:"+item)
+    log.info("DIFF -> table id:"+tableId+" shard:"+list._1+ "+edge:"+item)
   }
 
   override def scheduleNextRepair(lowestEdge: Option[Edge]) = {
@@ -78,7 +78,7 @@ class MetadataDiff(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor, 
   private val log = Logger.get(getClass.getName)
 
   override def schedule(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
-    log.info("DIFF -> table id:"+tableId+" shard:"+shard+" metadata:"+item)
+    log.info("DIFF -> table id:"+tableId+" shard:"+list._1+" metadata:"+item)
   }
 
   override def scheduleNextRepair(lowestMetadata: Option[Metadata]) = {
