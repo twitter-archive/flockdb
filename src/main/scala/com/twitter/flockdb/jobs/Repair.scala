@@ -88,6 +88,11 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
     item.schedule(tableId, forwardingManager, scheduler, priority)
   }
 
+  def shouldSchedule(original: Edge, suspect: Edge) = {
+    original.sourceId != suspect.sourceId || original.destinationId != suspect.destinationId || original.updatedAt != suspect.updatedAt || original.state != suspect.state
+  }
+
+
   def repair(shards: Seq[Shard]) = {
     val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id)(0).tableId)
 
@@ -148,6 +153,10 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
   def forwardingManager = new ForwardingManager(nameServer)
 
   def cursorAtEnd(c: MetadataRepair.RepairCursor) = c == MetadataRepair.END
+
+  def shouldSchedule(original: Metadata, suspect: Metadata) = {
+    original.sourceId != suspect.sourceId || original.updatedAt != suspect.updatedAt || original.state != suspect.state
+  }
 
   def lowestCursor(c1: MetadataRepair.RepairCursor, c2: MetadataRepair.RepairCursor) = {
     (c1, c2) match {
