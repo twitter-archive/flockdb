@@ -51,14 +51,16 @@ class Diff(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
   private val log = Logger.get(getClass.getName)
 
+  override def label = "Diff"
+
   override def schedule(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
     log.info("DIFF -> table id:"+tableId+" shard:"+shard+ "+edge:"+item)
   }
 
-  override def scheduleNextRepair(lowestEdge: Option[Edge]) = {
-    lowestEdge match {
-      case None => None
-      case _ => scheduler.put(Repair.PRIORITY, new Diff(shardIds, generateCursor(lowestEdge.get), count, nameServer, scheduler))
+  override def scheduleNextRepair(lowestCursor: Repair.RepairCursor) = {
+    lowestCursor match {
+      case Repair.END => None
+      case _ => scheduler.put(Repair.PRIORITY, new Diff(shardIds, lowestCursor, count, nameServer, scheduler))
     }
   }
 }
@@ -77,14 +79,16 @@ class MetadataDiff(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor, 
 
   private val log = Logger.get(getClass.getName)
 
+  override def label = "MetadaDiff"
+
   override def schedule(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
     log.info("DIFF -> table id:"+tableId+" shard:"+shard+" metadata:"+item)
   }
 
-  override def scheduleNextRepair(lowestMetadata: Option[Metadata]) = {
-    scheduler.put(Repair.PRIORITY, lowestMetadata match {
-      case None => new Diff(shardIds, Repair.START, Repair.COUNT, nameServer, scheduler)
-      case _ => new MetadataDiff(shardIds, generateCursor(lowestMetadata.get), count, nameServer, scheduler)
-    })
+  override def scheduleNextRepair(lowestCursor: MetadataRepair.RepairCursor) = {
+    lowestCursor match {
+      case MetadataRepair.END => scheduler.put(Repair.PRIORITY, new Diff(shardIds, Repair.START, Repair.COUNT, nameServer, scheduler))
+      case _ => scheduler.put(Repair.PRIORITY, new MetadataDiff(shardIds, lowestCursor, count, nameServer, scheduler))
+    }
   }
 }
