@@ -97,6 +97,9 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   jobCodec += ("jobs.Repair".r, new jobs.RepairParser(nameServer, jobScheduler))
   jobCodec += ("jobs.MetadataRepair".r, new jobs.MetadataRepairParser(nameServer, jobScheduler))
 
+  jobCodec += ("jobs.Diff".r, new jobs.DiffParser(nameServer, jobScheduler))
+  jobCodec += ("jobs.MetadataDiff".r, new jobs.MetadataDiffParser(nameServer, jobScheduler))
+
   val flockService = {
     val future = config.readFuture("readFuture")
     val edges = new EdgesService(nameServer, forwardingManager, copyFactory, jobScheduler, future, config.intersectionQuery, config.aggregateJobsPageSize)

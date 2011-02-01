@@ -34,7 +34,7 @@ object Repair {
   val START = (Cursor.Start, Cursor.Start)
   val END = (Cursor.End, Cursor.End)
   val COUNT = 10000
-  val PRIORITY = Priority.Low.id
+  val PRIORITY = Priority.Medium.id
 }
 
 class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
@@ -59,17 +59,39 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
   private val log = Logger.get(getClass.getName)
 
-  def generateCursor(edge: Edge) = {
-    (Cursor(edge.sourceId), Cursor(edge.destinationId)) 
-  }
+  override def label = "Repair"
 
   def cursorAtEnd(c: Repair.RepairCursor) = c == Repair.END
+
+  def lowestCursor(c1: Repair.RepairCursor, c2: Repair.RepairCursor) = {
+    (c1, c2) match {
+      case (Repair.END, Repair.END) => c1
+      case (_, Repair.END) => c1
+      case (Repair.END, _) => c2
+      case (_, _) =>
+        c1._1.position.compare(c2._1.position) match {
+          case x if x < 0 => c1
+          case x if x > 0 => c2
+          case _ =>
+            c1._2.position.compare(c2._2.position) match {
+              case x if x < 0 => c1
+              case x if x > 0 => c2
+              case _ => c1
+            }
+        }
+    }
+  }
 
   def forwardingManager = new ForwardingManager(nameServer)
 
   def schedule(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
     item.schedule(tableId, forwardingManager, scheduler, priority)
   }
+
+  def shouldSchedule(original: Edge, suspect: Edge) = {
+    original.sourceId != suspect.sourceId || original.destinationId != suspect.destinationId || original.updatedAt != suspect.updatedAt || original.state != suspect.state
+  }
+
 
   def repair(shards: Seq[Shard]) = {
     val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id)(0).tableId)
@@ -85,10 +107,10 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
 
-  def scheduleNextRepair(lowestEdge: Option[Edge]) = {
-    lowestEdge match {
-      case None => None
-      case _ => scheduler.put(Repair.PRIORITY, new Repair(shardIds, generateCursor(lowestEdge.get), count, nameServer, scheduler))
+  def scheduleNextRepair(lowestCursor: Repair.RepairCursor) = {
+    lowestCursor match {
+      case Repair.END => None
+      case _ => scheduler.put(Repair.PRIORITY, new Repair(shardIds, lowestCursor, count, nameServer, scheduler))
     }
   }
 }
@@ -98,7 +120,7 @@ object MetadataRepair {
   val START = Cursor.Start
   val END = Cursor.End
   val COUNT = 10000
-  val PRIORITY = Priority.Low.id
+  val PRIORITY = Priority.Medium.id
 }
 
 class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
@@ -115,10 +137,12 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
 
   private val log = Logger.get(getClass.getName)
 
-  def scheduleNextRepair(lowestMetadata: Option[Metadata]) = {
-    scheduler.put(Repair.PRIORITY, lowestMetadata match {
-      case None => new Repair(shardIds, Repair.START, Repair.COUNT, nameServer, scheduler)
-      case _ => new MetadataRepair(shardIds, generateCursor(lowestMetadata.get), count, nameServer, scheduler)
+  override def label = "MetadataRepair"
+
+  def scheduleNextRepair(lowestCursor: MetadataRepair.RepairCursor) = {
+    scheduler.put(Repair.PRIORITY, lowestCursor match {
+      case MetadataRepair.END => new Repair(shardIds, Repair.START, Repair.COUNT, nameServer, scheduler)
+      case _ => new MetadataRepair(shardIds, lowestCursor, count, nameServer, scheduler)
     })
   }
 
@@ -130,8 +154,22 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
 
   def cursorAtEnd(c: MetadataRepair.RepairCursor) = c == MetadataRepair.END
 
-  def generateCursor(metadata: Metadata) = {
-    Cursor(metadata.sourceId)
+  def shouldSchedule(original: Metadata, suspect: Metadata) = {
+    original.sourceId != suspect.sourceId || original.updatedAt != suspect.updatedAt || original.state != suspect.state
+  }
+
+  def lowestCursor(c1: MetadataRepair.RepairCursor, c2: MetadataRepair.RepairCursor) = {
+    (c1, c2) match {
+      case (MetadataRepair.END, MetadataRepair.END) => c1
+      case (_, MetadataRepair.END) => c1
+      case (MetadataRepair.END, _) => c2
+      case (_, _) =>
+        c1.position.compare(c2.position) match {
+          case x if x < 0 => c1
+          case x if x > 0 => c2
+          case _ => c1
+        }
+    }
   }
 
   def repair(shards: Seq[Shard]) = {
