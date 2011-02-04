@@ -24,7 +24,7 @@ object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
   val now = new Time(124)
   val source = 1
   val dest = 2
-  val pos = 12345
+  val pos = 0
   val graph = 5
   val count = 0
   val forwardingManager = mock[ForwardingManager]
