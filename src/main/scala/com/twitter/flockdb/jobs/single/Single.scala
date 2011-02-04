@@ -69,7 +69,7 @@ abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, positio
                       updatedAt: Time, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
 extends JsonJob {
   def toMap = {
-    Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
+    Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> OrderedUuidGenerator.unapply(position), "updated_at" -> updatedAt.inSeconds)
   }
 
 
