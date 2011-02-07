@@ -84,7 +84,11 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
   def forwardingManager = new ForwardingManager(nameServer)
 
-  def schedule(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
+  def scheduleDifferent(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
+    item.schedule(tableId, forwardingManager, scheduler, priority)
+  }
+
+  def scheduleMissing(list: (Shard, ListBuffer[Edge], Repair.RepairCursor), tableId: Int, item: Edge) = {
     item.schedule(tableId, forwardingManager, scheduler, priority)
   }
 
@@ -146,8 +150,12 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
     })
   }
 
-  def schedule(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
+  def scheduleDifferent(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
     item.schedule(tableId, forwardingManager, scheduler, priority)
+  }
+
+  def scheduleMissing(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
+    if (item.state != State.Normal || item.count != 0) item.schedule(tableId, forwardingManager, scheduler, priority)
   }
 
   def forwardingManager = new ForwardingManager(nameServer)
