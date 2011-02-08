@@ -8,7 +8,7 @@ class FlockDBProject(info: ProjectInfo) extends StandardProject(info) with Subve
 
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.7.7"
 
-  val gizzard =  "com.twitter" % "gizzard" % "1.7.8-SNAPSHOT"
+  val gizzard =  "com.twitter" % "gizzard" % "1.7.8"
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
   val cglib     = "cglib" % "cglib" % "2.1_3" % "test"
   val hamcrest  = "org.hamcrest" % "hamcrest-all" % "1.1" % "test"
