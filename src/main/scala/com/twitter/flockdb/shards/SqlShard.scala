@@ -19,7 +19,7 @@ package com.twitter.flockdb.shards
 import java.util.Random
 import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
-import com.twitter.gizzard.proxy.SqlExceptionWrappingProxy
+import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
 import com.twitter.gizzard.shards
 import com.twitter.ostrich.Stats
 import com.twitter.gizzard.shards.ShardException
@@ -40,6 +40,8 @@ object QueryClass {
   val SelectModify = query.QueryClass("select_modify")
   val SelectCopy   = query.QueryClass("select_copy")
 }
+
+object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
 
 class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
   extends shards.ShardFactory[Shard] {
@@ -73,7 +75,7 @@ CREATE TABLE IF NOT EXISTS %s (
 
   def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
     val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
-    new SqlExceptionWrappingProxy(shardInfo.id).apply[Shard](new SqlShard(queryEvaluator, shardInfo, weight, children, deadlockRetries))
+    FlockExceptionWrappingProxyFactory(new SqlShard(queryEvaluator, shardInfo, weight, children, deadlockRetries))
   }
 
   def materialize(shardInfo: shards.ShardInfo) = {

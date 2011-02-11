@@ -24,7 +24,7 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.gizzard.proxy.{ExceptionHandlingProxy, LoggingProxy}
+import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory, LoggingProxy}
 import com.twitter.ostrich.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
@@ -48,8 +48,7 @@ import Direction._
 import thrift.FlockException
 
 class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
-
-  object FlockExceptionWrappingProxy extends ExceptionHandlingProxy({ e =>
+  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[flockdb.thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>
         throw e
@@ -109,7 +108,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
 
   lazy val flockThriftServer = {
     val processor = new flockdb.thrift.FlockDB.Processor(
-      FlockExceptionWrappingProxy(
+      FlockExceptionWrappingProxyFactory(
         LoggingProxy[flockdb.thrift.FlockDB.Iface](
           Stats, w3c, "FlockDB",
           flockService)))
