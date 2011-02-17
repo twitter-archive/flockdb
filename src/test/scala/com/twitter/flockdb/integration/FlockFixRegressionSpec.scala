@@ -14,14 +14,16 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.util.Time
-import com.twitter.flockdb.{SelectQuery, Metadata}
 import com.twitter.util.TimeConversions._
+import com.twitter.flockdb
+import com.twitter.flockdb.{SelectQuery, Metadata}
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}

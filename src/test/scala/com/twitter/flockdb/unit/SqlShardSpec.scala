@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import java.sql.SQLException
 import scala.collection.mutable
@@ -29,7 +30,6 @@ import conversions.Edge._
 import conversions.EdgeResults._
 import conversions.Results._
 import shards.{Shard, SqlShard, SqlShardFactory}
-import flockdb.Metadata
 import thrift.{Results, EdgeResults}
 
 class SqlShardSpec extends IntegrationSpecification with JMocker {

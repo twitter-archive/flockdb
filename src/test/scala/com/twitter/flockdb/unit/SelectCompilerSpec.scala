@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
-import scala.collection.jcl.Conversions._
 import scala.collection.mutable
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import com.twitter.flockdb
 import queries.SelectCompiler
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard

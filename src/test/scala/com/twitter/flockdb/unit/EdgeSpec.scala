@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import com.twitter.util.Time
-import com.twitter.flockdb.jobs.single._
 import org.specs.mock.{ClassMocker, JMocker}
+import jobs.single._
 
 object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
-  val now = new Time(124)
+  val now = Time.fromSeconds(124)
   val source = 1
   val dest = 2
   val pos = 0

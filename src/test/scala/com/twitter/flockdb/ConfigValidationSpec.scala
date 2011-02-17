@@ -3,6 +3,7 @@ package com.twitter.flockdb
 import org.specs.Specification
 import com.twitter.util.Eval
 import java.io.File
+import com.twitter.flockdb
 
 
 object ConfigValidationSpec extends Specification {

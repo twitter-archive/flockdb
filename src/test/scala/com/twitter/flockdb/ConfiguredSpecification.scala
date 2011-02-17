@@ -27,6 +27,7 @@ import com.twitter.ostrich.W3CStats
 import net.lag.logging.Logger
 import net.lag.configgy.Configgy
 import scala.collection.mutable
+import com.twitter.flockdb
 
 object MemoizedQueryEvaluators {
   val evaluators = mutable.Map[String,QueryEvaluatorFactory]()

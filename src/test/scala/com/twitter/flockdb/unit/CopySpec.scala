@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler._
@@ -25,7 +26,6 @@ import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.{Copy, MetadataCopy}
 import shards.{Shard}
-import flockdb.Metadata
 
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")

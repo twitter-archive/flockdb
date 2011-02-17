@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.ostrich.Stats
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
+import com.twitter.flockdb
 import thrift._
 import conversions.ExecuteOperations._
 import conversions.SelectOperation._

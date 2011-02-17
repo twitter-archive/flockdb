@@ -14,24 +14,22 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardInfo, ShardException}
+import com.twitter.gizzard.shards.{ShardInfo, ShardException, ReadWriteShard}
 import com.twitter.util.Time
-import flockdb.Direction._
-import flockdb.State._
-import flockdb.shards.ReadWriteShardAdapter
-import flockdb.shards.OptimisticLockException
-import gizzard.shards.{ReadWriteShard}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import com.twitter.flockdb
+import flockdb.Direction._
+import flockdb.State._
+import shards.{Shard, SqlShard, ReadWriteShardAdapter, OptimisticLockException}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove, Archive, NodePair}
-import shards.{Shard, SqlShard}
-import flockdb.Metadata
-import thrift.Edge
+
 
 class FakeLockingShard(shard: Shard) extends SqlShard(null, new ShardInfo("a", "b", "c"), 1, Nil, 0) {
   override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task

@@ -14,23 +14,26 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.{ShardInfo, ShardId, Busy}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.util.Time
-import com.twitter.flockdb.{SelectQuery, Metadata}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import com.twitter.flockdb
+import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}
 import shards.{Shard, SqlShard}
 import thrift._
 
+
 class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
-  override def reset(config: flockdb.config.FlockDB, name: String) {
+  override def reset(config: FlockDBConfig, name: String) {
     materialize(config.nameServer)
     nameServer.rebuildSchema()
     nameServer.reload()
