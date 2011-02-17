@@ -14,7 +14,7 @@ with SubversionPublisher with DefaultRepos {
   val hamcrest  = "org.hamcrest" % "hamcrest-all" % "1.1" % "test"
   val jmock     = "org.jmock" % "jmock" % "2.4.0" % "test"
   val objenesis = "org.objenesis" % "objenesis" % "1.1" % "test"
-  val specs     = "org.scala-tools.testing" % "specs" % "1.6.2.1" % "test"
+  val specs     = "org.scala-tools.testing" % "specs_2.8.1" % "1.6.6" % "test"
 
   override def subversionRepository = Some("http://svn.local.twitter.com/maven-public/")
 }
