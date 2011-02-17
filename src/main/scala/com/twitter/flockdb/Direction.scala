@@ -16,7 +16,7 @@
 
 package com.twitter.flockdb
 
-abstract sealed case class Direction(id: Int) {
+abstract sealed class Direction(val id: Int) {
   val opposite: Direction
 }
 

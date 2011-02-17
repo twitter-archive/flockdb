@@ -104,7 +104,7 @@ case class Archive(sourceId: Long, graphId: Int, direction: Direction, updatedAt
                    scheduler: PrioritizingJobScheduler[JsonJob])
            extends Multi(sourceId, graphId, direction, updatedAt, priority, aggregateJobPageSize, forwardingManager, scheduler) {
   protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
-    new single.Archive(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
+    new jobs.single.Archive(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.archive(sourceId, updatedAt)
 }
 
@@ -113,7 +113,7 @@ case class Unarchive(sourceId: Long, graphId: Int, direction: Direction, updated
                       scheduler: PrioritizingJobScheduler[JsonJob])
            extends Multi(sourceId, graphId, direction, updatedAt, priority, aggregateJobPageSize, forwardingManager, scheduler) {
   protected def update(sourceId: Long, graphId: Int, destinationId: Long) = {
-    new single.Add(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
+    new jobs.single.Add(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   }
   protected def updateMetadata(shard: Shard) = shard.add(sourceId, updatedAt)
 }
@@ -123,7 +123,7 @@ case class RemoveAll(sourceId: Long, graphId: Int, direction: Direction, updated
                       scheduler: PrioritizingJobScheduler[JsonJob])
            extends Multi(sourceId, graphId, direction, updatedAt, priority, aggregateJobPageSize, forwardingManager, scheduler) {
   protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
-    new single.Remove(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
+    new jobs.single.Remove(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.remove(sourceId, updatedAt)
 }
 
@@ -132,6 +132,6 @@ case class Negate(sourceId: Long, graphId: Int, direction: Direction, updatedAt:
                    scheduler: PrioritizingJobScheduler[JsonJob])
            extends Multi(sourceId, graphId, direction, updatedAt, priority, aggregateJobPageSize, forwardingManager, scheduler) {
   protected def update(sourceId: Long, graphId: Int, destinationId: Long) =
-    new single.Negate(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
+    new jobs.single.Negate(sourceId, graphId, destinationId, updatedAt.inMillis, updatedAt, null, null)
   protected def updateMetadata(shard: Shard) = shard.negate(sourceId, updatedAt)
 }

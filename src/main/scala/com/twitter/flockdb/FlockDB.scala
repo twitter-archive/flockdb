@@ -146,7 +146,7 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
     edges.containsMetadata(source_id, graph_id)
   }
 
-  @deprecated
+  @deprecated("Use `select2` instead")
   def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
     edges.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift)).toThrift
   }
@@ -168,7 +168,7 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
     }
   }
 
-  @deprecated
+  @deprecated("Use `count2` instead")
   def count(query: JList[thrift.SelectOperation]) = {
     edges.count(List(query.toSeq.map { _.fromThrift })).first
   }

@@ -104,6 +104,6 @@ trait Optimism extends Shard {
       case Right(None)           => ()
     }
 
-    (winning.map(_.state), exceptions.firstOption)
+    (winning.map(_.state), exceptions.headOption)
   }
 }

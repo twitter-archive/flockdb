@@ -26,9 +26,9 @@ class SeqQuery(s: Seq[Long]) extends Query {
   def selectWhereIn(i: Seq[Long]) = sort(seq.toList intersect i.toList).toList
   protected def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
-    val filtered = cursor match {
+    val filtered: Seq[Long] = cursor match {
       case Cursor.Start => seq
-      case Cursor.End => Nil
+      case Cursor.End => Seq()
       case _ => seq.filter(_ <= cursor.position)
     }
 

@@ -36,10 +36,10 @@ import net.lag.logging.Logger
 import State._
 
 object QueryClass {
-  val Select       = query.QueryClass.Select
-  val Execute      = query.QueryClass.Execute
-  val SelectModify = query.QueryClass("select_modify")
-  val SelectCopy   = query.QueryClass("select_copy")
+  val Select       = QuerulousQueryClass.Select
+  val Execute      = QuerulousQueryClass.Execute
+  val SelectModify = QuerulousQueryClass("select_modify")
+  val SelectCopy   = QuerulousQueryClass("select_copy")
 }
 
 object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
@@ -219,7 +219,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     select(QueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
   }
 
-  private def select(queryClass: querulous.query.QueryClass, cursorName: String, index: String, count: Int,
+  private def select(queryClass: QuerulousQueryClass, cursorName: String, index: String, count: Int,
                      cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
     var edges = new mutable.ArrayBuffer[(Long, Cursor)]
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"
@@ -229,10 +229,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     val (edgesQuery, args2) = query(cursorName, index, count + 1, cursor, order, inequality, conditions, args)
     val totalQuery = continueCursorQuery + " UNION " + edgesQuery
     queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
-      edges += (row.getLong("destination_id"), Cursor(row.getLong(cursorName)))
+      edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
     }
 
-    var page = edges.projection
+    var page = edges.view
     if (cursor < Cursor.Start) page = page.reverse
     new ResultWindow(page, count, cursor)
   }
@@ -247,10 +247,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
     val edges = new mutable.ArrayBuffer[(Edge, Cursor)]
     queryEvaluator.select(continueCursorQuery + " UNION " + edgesQuery, args1 ++ args2: _*) { row =>
-      edges += (makeEdge(row), Cursor(row.getLong("position")))
+      edges += (makeEdge(row) -> Cursor(row.getLong("position")))
     }
 
-    var page = edges.projection
+    var page = edges.view
     if (cursor < Cursor.Start) page = page.reverse
     new ResultWindow(page, count, cursor)
   }
@@ -263,7 +263,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def query(projections: String, cursorName: String, index: String, count: Int,
                     cursor: Cursor, order: String, inequality: String, conditions: String, args: Seq[Any]): (String, Seq[Any]) = {
-    val position = if (cursor == Cursor.Start) Math.MAX_LONG else cursor.magnitude.position
+    val position = if (cursor == Cursor.Start) Long.MaxValue else cursor.magnitude.position
 
     val query = "(SELECT " + projections +
       " FROM "     + tablePrefix + "_edges USE INDEX (" + index + ")" +

@@ -59,7 +59,7 @@ class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProport
 
   private def pageIntersection(smallerQuery: Query, largerQuery: Query, internalPageSize: Int, count: Int, cursor: Cursor) = {
     val results = smallerQuery.selectPageByDestinationId(internalPageSize, cursor)
-    val whereIn = largerQuery.selectWhereIn(results.projection)
+    val whereIn = largerQuery.selectWhereIn(results.view)
     new ResultWindow(Cursor.cursorZip(whereIn), results.nextCursor, results.prevCursor, count, cursor)
   }
 }

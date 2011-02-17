@@ -75,7 +75,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     }
   }
 
-  def select(query: SelectQuery): ResultWindow[Long] = select(List(query)).first
+  def select(query: SelectQuery): ResultWindow[Long] = select(List(query)).head
 
   def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
     rethrowExceptionsAsThrift {
