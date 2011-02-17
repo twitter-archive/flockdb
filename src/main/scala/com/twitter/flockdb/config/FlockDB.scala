@@ -3,8 +3,8 @@ package com.twitter.flockdb.config
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config.{Connection, QueryEvaluator}
 import com.twitter.util.TimeConversions._
-import flockdb.queries.Query
-import flockdb.queries
+import com.twitter.flockdb.queries.Query
+import com.twitter.flockdb.queries
 
 trait AdminConfig {
   def httpPort: Int
@@ -25,7 +25,7 @@ trait IntersectionQuery {
   def difference(query1: queries.Query, query2: queries.Query) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
 }
 
-trait FlockDB extends gizzard.config.GizzardServer {
+trait FlockDB extends GizzardServer {
   def server: FlockDBServer
 
   var intersectionQuery: IntersectionQuery = new IntersectionQuery { }

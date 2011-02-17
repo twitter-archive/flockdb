@@ -1,4 +1,5 @@
-package com.twitter.flockdb.shards
+package com.twitter.flockdb
+package shards
 
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.util.Time

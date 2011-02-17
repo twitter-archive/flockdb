@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
+import com.twitter.flockdb
 import Page._
 import QueryTerm._
-
 
 object EdgeQuery {
   class RichFlockEdgeQuery(query: flockdb.EdgeQuery) {

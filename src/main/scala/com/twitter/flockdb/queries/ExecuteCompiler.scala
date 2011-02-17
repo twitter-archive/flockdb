@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.queries
+package com.twitter.flockdb
+package queries
 
 import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, JsonNestedJob, PrioritizingJobScheduler}
@@ -24,7 +25,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import jobs.single
 import jobs.multi
-import flockdb.operations.{ExecuteOperations, ExecuteOperationType}
+import operations.{ExecuteOperations, ExecuteOperationType}
 
 
 class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingManager: ForwardingManager, aggregateJobPageSize: Int) {

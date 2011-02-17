@@ -17,9 +17,8 @@
 package com.twitter.flockdb
 
 import com.twitter.util.Time
-import com.twitter.gizzard.scheduler.Repairable
-import flockdb.jobs.multi._
 import com.twitter.gizzard.scheduler._
+import jobs.multi._
 
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Ordered[Metadata] with Repairable[Metadata] {
   def compare(other: Metadata) = {

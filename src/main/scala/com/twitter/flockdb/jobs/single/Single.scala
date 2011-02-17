@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.jobs.single
+package com.twitter.flockdb
+package jobs.single
 
 import com.twitter.gizzard.scheduler.{JsonJob, JsonJobParser}
-import com.twitter.gizzard.shards.ShardBlackHoleException
+import com.twitter.gizzard.shards.{ShardException, ShardBlackHoleException, ShardRejectedOperationException}
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import conversions.Numeric._
 import shards.Shard
-import gizzard.shards.{ShardException, ShardRejectedOperationException}
 
 case class NodePair(sourceId: Long, destinationId: Long)
 

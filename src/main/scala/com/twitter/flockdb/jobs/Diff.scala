@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.jobs
+package com.twitter.flockdb
+package jobs
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
@@ -27,7 +28,6 @@ import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard}
 import com.twitter.gizzard.shards.{ShardDatabaseTimeoutException, ShardTimeoutException}
 import collection.mutable.ListBuffer
 import shards.{Shard}
-import flockdb.Metadata
 
 class DiffFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
       extends RepairJobFactory[Shard] {

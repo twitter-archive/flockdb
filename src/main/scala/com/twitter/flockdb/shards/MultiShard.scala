@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.shards
+package com.twitter.flockdb
+package shards
 
 import collection.mutable
 

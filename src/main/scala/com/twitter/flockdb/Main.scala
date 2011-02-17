@@ -1,15 +1,16 @@
 package com.twitter.flockdb
 
-import com.twitter.ostrich.{W3CStats, Stats, Service, ServiceTracker, W3CReporter}
+import com.twitter.ostrich.{W3CStats, Stats, Service, ServiceTracker, W3CReporter, RuntimeEnvironment}
 import com.twitter.util.Eval
-import net.lag.configgy.{Config => CConfig, Configgy, RuntimeEnvironment}
+import net.lag.configgy.{Config => CConfig, Configgy}
 import net.lag.logging.{FileHandler, Logger}
 import org.apache.thrift.server.TServer
 import java.io.File
+import config.{FlockDB => FlockDBConfig}
 
 object Main extends Service {
   var service: FlockDB = null
-  var config: flockdb.config.FlockDB = null
+  var config: FlockDBConfig = null
 
   val w3cItems = Array(
     "second",
@@ -48,7 +49,7 @@ object Main extends Service {
 
   def main(args: Array[String]) {
     try {
-      config  = Eval[flockdb.config.FlockDB](args.map(new File(_)): _*)
+      config  = Eval[FlockDBConfig](args.map(new File(_)): _*)
       service = new FlockDB(config, w3c)
 //      Configgy.configLogging(CConfig.fromString(config.loggingConfig))
 

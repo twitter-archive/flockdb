@@ -46,9 +46,10 @@ import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
 import Direction._
 import thrift.FlockException
+import config.{FlockDB => FlockDBConfig}
 
-class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
-  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[flockdb.thrift.FlockDB.Iface]({ (flock, e) =>
+class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
+  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>
         throw e

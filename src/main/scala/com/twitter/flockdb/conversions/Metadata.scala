@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
+import com.twitter.flockdb
 
 
 object Metadata {

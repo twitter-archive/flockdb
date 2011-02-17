@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.jobs
+package com.twitter.flockdb
+package jobs
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
