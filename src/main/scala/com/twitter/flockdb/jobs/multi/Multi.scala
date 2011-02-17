@@ -33,7 +33,7 @@ abstract class MultiJobParser extends JsonJobParser {
       casted("source_id").toLong,
       casted("graph_id").toInt,
       Direction(casted("direction").toInt),
-      Time(casted("updated_at").toInt.seconds),
+      Time.fromSeconds(casted("updated_at").toInt),
       Priority(casted.get("priority").map(_.toInt).getOrElse(Priority.Low.id)))
   }
 

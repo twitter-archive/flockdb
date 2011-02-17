@@ -38,7 +38,7 @@ class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingMa
 
     for (op <- operations) {
       val term = op.term
-      val time = program.executeAt.map { x => Time(x.seconds) }.getOrElse(Time.now)
+      val time = program.executeAt.map(Time.fromSeconds).getOrElse(Time.now)
       val position = op.position.getOrElse(Time.now.inMillis)
 
       // force an exception for nonexistent graphs

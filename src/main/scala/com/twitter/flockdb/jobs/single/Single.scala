@@ -35,7 +35,7 @@ abstract class SingleJobParser extends JsonJobParser {
       casted("graph_id").toInt,
       casted("destination_id").toLong,
       casted("position").toLong,
-      Time(casted("updated_at").toInt.seconds))
+      Time.fromSeconds(casted("updated_at").toInt))
   }
 
   protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time): Single

@@ -109,7 +109,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
-      Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+      Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
 
@@ -125,7 +125,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       if (i < count) {
         val sourceId = row.getLong("source_id")
         metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
-                              Time(row.getInt("updated_at").seconds))
+                              Time.fromSeconds(row.getInt("updated_at")))
         nextCursor = Cursor(sourceId)
         i += 1
       } else {
@@ -153,7 +153,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time(0.seconds)) }
+  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time.epoch) }
 
   private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     try {
@@ -491,7 +491,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       case e: BatchUpdateException =>
         val completed = new mutable.ArrayBuffer[Edge]
         val failed = new mutable.ArrayBuffer[Edge]
-        e.getUpdateCounts().zip(edges.toArray).foreach { case (errorCode, edge) =>
+        e.getUpdateCounts.zip(edges).foreach { case (errorCode, edge) =>
           if (errorCode < 0) {
             failed += edge
           } else {
@@ -563,7 +563,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       queryEvaluator.transaction { transaction =>
         transaction.selectOne(SelectModify,
                               "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ? FOR UPDATE", sourceId) { row =>
-          f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+          f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
         } getOrElse(throw new MissingMetadataRow)
       }
     } catch {
@@ -579,7 +579,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       queryEvaluator.transaction { transaction =>
         transaction.select(SelectModify,
                            "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE", sourceIds) { row =>
-          metadataMap.put(row.getLong("source_id"), Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+          metadataMap.put(row.getLong("source_id"), Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
         }
         if (metadataMap.size < sourceIds.length)
           throw new MissingMetadataRow
@@ -619,7 +619,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         }
       } catch {
         case e: BatchUpdateException =>
-          e.getUpdateCounts().zip(metadatas.toArray).foreach { case (errorCode, metadata) =>
+          e.getUpdateCounts.zip(metadatas).foreach { case (errorCode, metadata) =>
             if (errorCode < 0)
               writeMetadata(metadata)
           }
@@ -644,6 +644,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   private def makeEdge(row: ResultSet): Edge = {
-    makeEdge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), row.getInt("count"), row.getInt("state"))
+    makeEdge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time.fromSeconds(row.getInt("updated_at")), row.getInt("count"), row.getInt("state"))
   }
 }
