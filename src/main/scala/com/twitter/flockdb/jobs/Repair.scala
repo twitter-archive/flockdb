@@ -98,7 +98,7 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
 
   def repair(shards: Seq[Shard]) = {
-    val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id).toSeq(0).tableId)
+    val tableIds = shards.map(shard => nameServer.getRootForwardings(shard.shardInfo.id).head.tableId)
 
     val listCursors = shards.map( (shard) => {
       val (seq, newCursor) = shard.selectAll(cursor, count)
@@ -181,7 +181,7 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
   }
 
   def repair(shards: Seq[Shard]) = {
-    val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id).toSeq(0).tableId)
+    val tableIds = shards.map(shard => nameServer.getRootForwardings(shard.shardInfo.id).head.tableId)
 
     val listCursors = shards.map( (shard) => {
       val (seq, newCursor) = shard.selectAllMetadata(cursor, count)
