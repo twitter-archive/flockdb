@@ -1,14 +1,15 @@
-import scala.collection.jcl
+import scala.collection.JavaConversions._
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
 import com.twitter.querulous.StatsCollector
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
+import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.Priority
 
 trait Credentials extends Connection {
-  val env = jcl.Map(System.getenv())
+  val env = System.getenv().toMap
   val username = env.get("DB_USERNAME").getOrElse("root")
   val password = env.get("DB_PASSWORD").getOrElse("")
 }
