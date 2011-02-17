@@ -19,7 +19,7 @@ package conversions
 
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-
+import com.twitter.flockdb
 
 object Edge {
   class RichFlockEdge(edge: flockdb.Edge) {
@@ -30,7 +30,7 @@ object Edge {
 
   class RichThriftEdge(edge: thrift.Edge) {
     def fromThrift = new flockdb.Edge(edge.source_id, edge.destination_id, edge.position,
-                                      Time(edge.updated_at.seconds), edge.count, State(edge.state_id))
+                                      Time.fromSeconds(edge.updated_at), edge.count, State(edge.state_id))
   }
   implicit def richThriftEdge(edge: thrift.Edge) = new RichThriftEdge(edge)
 }

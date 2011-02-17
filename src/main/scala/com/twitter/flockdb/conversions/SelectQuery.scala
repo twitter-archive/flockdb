@@ -18,6 +18,7 @@ package com.twitter.flockdb
 package conversions
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.flockdb
 import Page._
 import SelectOperation._
 
