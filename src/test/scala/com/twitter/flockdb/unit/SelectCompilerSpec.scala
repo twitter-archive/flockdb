@@ -38,7 +38,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
     val graphId = 5
     val states = new mutable.ArrayBuffer[State] {
       override def equals(that: Any) = that match {
-        case that: Seq[State] => this.toList == that.toList
+        case that: Seq[_] => this.toList == that.toList
         case that => false
       }
     }
