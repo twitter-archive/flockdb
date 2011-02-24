@@ -94,12 +94,12 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           allowing(forwardingManager).find(mary, FOLLOWS, Backward) willReturn shard2
 
           // Before
-          one(shard1Mock).getMetadata(bob) willReturn Some(Metadata(bob, bobBefore, 1, Time.now - 1.second))
-          one(shard2Mock).getMetadata(mary) willReturn Some(Metadata(mary, maryBefore, 1, Time.now - 1.second))
+          one(shard1Mock).getMetadata(bob) willReturn Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second))
+          one(shard2Mock).getMetadata(mary) willReturn Some(new Metadata(mary, maryBefore, 1, Time.now - 1.second))
 
           // After
-          allowing(shard1Mock).getMetadata(bob) willReturn Some(Metadata(mary, bobAfter, 1, Time.now))
-          allowing(shard2Mock).getMetadata(mary) willReturn Some(Metadata(mary, maryAfter, 1, Time.now))
+          allowing(shard1Mock).getMetadata(bob) willReturn Some(new Metadata(mary, bobAfter, 1, Time.now))
+          allowing(shard2Mock).getMetadata(mary) willReturn Some(new Metadata(mary, maryAfter, 1, Time.now))
 
           // Results
           applied match {

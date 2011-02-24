@@ -109,7 +109,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
-      Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
+      new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
 
@@ -124,7 +124,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
+        metadatas += new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
                               Time.fromSeconds(row.getInt("updated_at")))
         nextCursor = Cursor(sourceId)
         i += 1
@@ -384,7 +384,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                          oldEdge: Edge): Int = {
-    if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
+    if ((oldEdge.updatedAtInt == edge.updatedAtInt) && (oldEdge.state max edge.state) != edge.state) return 0
 
     val updatedRows = if (
       oldEdge.state != Archived &&  // Only update position when coming from removed or negated into normal
@@ -563,7 +563,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       queryEvaluator.transaction { transaction =>
         transaction.selectOne(SelectModify,
                               "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ? FOR UPDATE", sourceId) { row =>
-          f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
+          f(transaction, new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
         } getOrElse(throw new MissingMetadataRow)
       }
     } catch {
@@ -579,7 +579,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       queryEvaluator.transaction { transaction =>
         transaction.select(SelectModify,
                            "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE", sourceIds) { row =>
-          metadataMap.put(row.getLong("source_id"), Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
+          metadataMap.put(row.getLong("source_id"), new Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
         }
         if (metadataMap.size < sourceIds.length)
           throw new MissingMetadataRow
@@ -599,12 +599,12 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
                              metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
     } catch {
       case e: SQLIntegrityConstraintViolationException =>
-        atomically(metadata.sourceId) { (transaction, oldMetadata) =>
+        atomically(metadata.sourceId) { (transaction, oldMetadata) => {
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
                               "WHERE source_id = ? AND updated_at <= ?",
                               metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
                               metadata.updatedAt.inSeconds)
-        }
+        } }
     }
   }
 
@@ -632,7 +632,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   // FIXME: computeCount could be really expensive. :(
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     atomically(sourceId) { (transaction, metadata) =>
-      if ((updatedAt != metadata.updatedAt) || ((metadata.state max state) == state)) {
+      if ((updatedAt.inSeconds != metadata.updatedAtInt) || ((metadata.state max state) == state)) {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
           state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
       }
