@@ -384,7 +384,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                          oldEdge: Edge): Int = {
-    if ((oldEdge.updatedAtInt == edge.updatedAtInt) && (oldEdge.state max edge.state) != edge.state) return 0
+    if ((oldEdge.updatedAtSeconds == edge.updatedAtSeconds) && (oldEdge.state max edge.state) != edge.state) return 0
 
     val updatedRows = if (
       oldEdge.state != Archived &&  // Only update position when coming from removed or negated into normal
@@ -632,7 +632,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   // FIXME: computeCount could be really expensive. :(
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     atomically(sourceId) { (transaction, metadata) =>
-      if ((updatedAt.inSeconds != metadata.updatedAtInt) || ((metadata.state max state) == state)) {
+      if ((updatedAt.inSeconds != metadata.updatedAtSeconds) || ((metadata.state max state) == state)) {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
           state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
       }

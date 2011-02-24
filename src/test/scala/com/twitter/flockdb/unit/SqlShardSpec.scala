@@ -630,7 +630,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.add(alice, bob, 1, now + 1.second)
         val metadata = shard.getMetadata(alice).get
         metadata.state mustBe State.Archived
-        metadata.updatedAtInt mustEqual now.inSeconds
+        metadata.updatedAtSeconds mustEqual now.inSeconds
       }
 
       "a row change simultaneous with a metadata update does not win" >> {
