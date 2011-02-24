@@ -20,6 +20,11 @@ import com.twitter.util.Time
 import com.twitter.gizzard.scheduler._
 import jobs.multi._
 
+object Metadata {
+  def apply(sourceId: Long, state: State, count: Int, updatedAt: Time) = new Metadata(sourceId, state, count, updatedAt)
+  def apply(sourceId: Long, state: State, updatedAt: Time) = new Metadata(sourceId, state, updatedAt)
+}
+
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: Int) extends Ordered[Metadata] with Repairable[Metadata] {
 
   def this(sourceId: Long, state: State, count: Int, updatedAt: Time) =
