@@ -599,12 +599,12 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
                              metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
     } catch {
       case e: SQLIntegrityConstraintViolationException =>
-        atomically(metadata.sourceId) { (transaction, oldMetadata) => {
+        atomically(metadata.sourceId) { (transaction, oldMetadata) =>
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
                               "WHERE source_id = ? AND updated_at <= ?",
                               metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
                               metadata.updatedAt.inSeconds)
-        } }
+        }
     }
   }
 
