@@ -38,7 +38,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val cursor1 = Cursor(337L)
     val cursor2 = Cursor(555L)
     val nameServer = mock[NameServer[Shard]]
-    val scheduler = mock[JobScheduler[JsonJob]]
+    val scheduler = mock[JobScheduler]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
 
@@ -98,7 +98,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "MetadataCopy" should {
     val cursor = Cursor(1L)
     val nameServer = mock[NameServer[Shard]]
-    val scheduler = mock[JobScheduler[JsonJob]]
+    val scheduler = mock[JobScheduler]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
     val job = new MetadataCopy(shard1Id, shard2Id, cursor, count, nameServer, scheduler)

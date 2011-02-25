@@ -19,6 +19,7 @@ package com.twitter.flockdb
 import java.lang.{Long => JLong, String}
 import java.util.{ArrayList => JArrayList, List => JList}
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.{Future, GizzardServer}
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
@@ -48,7 +49,7 @@ import Direction._
 import thrift.FlockException
 import config.{FlockDB => FlockDBConfig}
 
-class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
+class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards.Shard](config) {
   object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>
@@ -129,7 +130,7 @@ class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards
   }
 }
 
-class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler[JsonJob]) extends thrift.FlockDB.Iface {
+class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
@@ -152,7 +153,7 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
   }
 
   def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {
-    edges.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }.toJavaList
+    edges.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }
   }
 
   def select_edges(queries: JList[thrift.EdgeQuery]) = {

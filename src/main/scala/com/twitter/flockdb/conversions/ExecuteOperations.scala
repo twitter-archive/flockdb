@@ -17,6 +17,7 @@
 package com.twitter.flockdb
 package conversions
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import conversions.ExecuteOperation._
 import conversions.Priority._

@@ -29,14 +29,14 @@ import com.twitter.gizzard.shards.{ShardDatabaseTimeoutException, ShardTimeoutEx
 import collection.mutable.ListBuffer
 import shards.{Shard}
 
-class DiffFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class DiffFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobFactory[Shard] {
   override def apply(shardIds: Seq[ShardId]) = {
     new MetadataDiff(shardIds, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
   }
 }
 
-class DiffParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class DiffParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairParser(nameServer, scheduler) {
   override def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
@@ -46,7 +46,7 @@ class DiffParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobSchedu
 }
 
 class Diff(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
   extends Repair(shardIds, cursor, count, nameServer, scheduler) {
 
   private val log = Logger.get(getClass.getName)
@@ -69,7 +69,7 @@ class Diff(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
   }
 }
 
-class MetadataDiffParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class MetadataDiffParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends MetadataRepairParser(nameServer, scheduler) {
   override def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor  = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
@@ -78,7 +78,7 @@ class MetadataDiffParser(nameServer: NameServer[Shard], scheduler: PrioritizingJ
 }
 
 class MetadataDiff(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
   extends MetadataRepair(shardIds, cursor, count, nameServer, scheduler) {
 
   private val log = Logger.get(getClass.getName)

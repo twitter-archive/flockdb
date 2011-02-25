@@ -18,6 +18,7 @@ package com.twitter.flockdb
 package unit
 
 import java.sql.SQLException
+import scala.collection.JavaConversions._
 import scala.collection.mutable
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._

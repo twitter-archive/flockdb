@@ -32,7 +32,7 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSe
 
   val updatedAt = Time.fromSeconds(updatedAtSeconds)
 
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int) = {
     scheduler.put(priority, toJob(tableId, forwardingManager))
   }
 

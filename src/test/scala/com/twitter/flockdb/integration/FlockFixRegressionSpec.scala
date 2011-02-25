@@ -17,6 +17,7 @@
 package com.twitter.flockdb
 package integration
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.ShardInfo
@@ -54,7 +55,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
         } else {
           flock.execute(Select(alice, FOLLOWS, i).archive.toThrift)
         }
-        Thread.sleep(2) // prevent same-millisecond collision
+        Thread.sleep(1000) // prevent same-millisecond collision
       }
 
       jobScheduler.size must eventually(be(0)) // Make sure adds get applied.  I can't wait for Time.asOf()

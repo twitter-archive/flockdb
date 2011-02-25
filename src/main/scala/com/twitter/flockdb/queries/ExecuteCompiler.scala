@@ -28,7 +28,7 @@ import jobs.multi
 import operations.{ExecuteOperations, ExecuteOperationType}
 
 
-class ExecuteCompiler(scheduler: PrioritizingJobScheduler[JsonJob], forwardingManager: ForwardingManager, aggregateJobPageSize: Int) {
+class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: ForwardingManager, aggregateJobPageSize: Int) {
   @throws(classOf[ShardException])
   def apply(program: ExecuteOperations) {
     val now = Time.now

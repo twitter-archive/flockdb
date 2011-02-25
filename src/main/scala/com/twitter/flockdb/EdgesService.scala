@@ -31,7 +31,7 @@ import net.lag.logging.Logger
 class EdgesService(val nameServer: NameServer[shards.Shard],
                    var forwardingManager: ForwardingManager,
                    val copyFactory: CopyJobFactory[shards.Shard],
-                   val schedule: PrioritizingJobScheduler[JsonJob],
+                   val schedule: PrioritizingJobScheduler,
                    future: Future,
                    intersectionQueryConfig: config.IntersectionQuery,
                    aggregateJobsPageSize: Int) {

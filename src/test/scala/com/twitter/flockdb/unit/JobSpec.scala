@@ -69,7 +69,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard4: Shard = null
   var shard1Mock: Shard = null
   var shard2Mock: Shard = null
-  val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+  val scheduler = mock[PrioritizingJobScheduler]
 
   def before() {
     doBefore {

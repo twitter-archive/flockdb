@@ -47,7 +47,7 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: 
 
   def max(other: Metadata) = if (this > other) this else other
 
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int) = {
     val job = state match {
       case State.Normal => Unarchive
       case State.Removed => RemoveAll

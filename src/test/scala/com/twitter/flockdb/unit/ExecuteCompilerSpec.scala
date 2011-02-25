@@ -49,13 +49,13 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
     val alice = 1L
     val bob = 2L
     val carl = 3L
-    var scheduler: PrioritizingJobScheduler[JsonJob] = null
+    var scheduler: PrioritizingJobScheduler = null
     var executeCompiler: ExecuteCompiler = null
     var forwardingManager: ForwardingManager = null
     val nestedJob = capturingParam[JsonNestedJob]
 
     doBefore {
-      scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+      scheduler = mock[PrioritizingJobScheduler]
       forwardingManager = mock[ForwardingManager]
       executeCompiler = new ExecuteCompiler(scheduler, forwardingManager, config.aggregateJobsPageSize)
     }

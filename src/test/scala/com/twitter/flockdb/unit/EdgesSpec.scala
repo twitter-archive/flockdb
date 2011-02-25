@@ -18,6 +18,7 @@ package com.twitter.flockdb
 package unit
 
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.Future
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver.NameServer
@@ -46,7 +47,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val uuidGenerator = mock[UuidGenerator]
     val forwardingManager = mock[ForwardingManager]
     val shard = mock[Shard]
-    val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+    val scheduler = mock[PrioritizingJobScheduler]
     val future = mock[Future]
     val copyFactory = mock[CopyJobFactory[Shard]]
     val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future, config.intersectionQuery, config.aggregateJobsPageSize), null)

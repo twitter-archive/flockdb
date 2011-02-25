@@ -37,14 +37,14 @@ object Repair {
   val PRIORITY = Priority.Medium.id
 }
 
-class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobFactory[Shard] {
   def apply(shardIds: Seq[ShardId]) = {
     new MetadataRepair(shardIds, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
   }
 }
 
-class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
@@ -54,7 +54,7 @@ class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobSche
 }
 
 class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
   extends MultiShardRepair[Shard, Edge, Repair.RepairCursor](shardIds, cursor, count, nameServer, scheduler, Repair.PRIORITY) {
 
   private val log = Logger.get(getClass.getName)
@@ -127,7 +127,7 @@ object MetadataRepair {
   val PRIORITY = Priority.Medium.id
 }
 
-class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor  = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
@@ -136,7 +136,7 @@ class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: Prioritizin
 }
 
 class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
   extends MultiShardRepair[Shard, Metadata, MetadataRepair.RepairCursor](shardIds, cursor, count, nameServer, scheduler, Repair.PRIORITY) {
 
   private val log = Logger.get(getClass.getName)

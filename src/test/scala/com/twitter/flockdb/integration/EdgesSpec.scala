@@ -17,6 +17,7 @@
 package com.twitter.flockdb
 package integration
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.ostrich.Stats
 import com.twitter.util.Time
