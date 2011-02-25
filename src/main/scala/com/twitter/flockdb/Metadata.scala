@@ -20,7 +20,22 @@ import com.twitter.util.Time
 import com.twitter.gizzard.scheduler._
 import jobs.multi._
 
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time) extends Ordered[Metadata] with Repairable[Metadata] {
+object Metadata {
+  def apply(sourceId: Long, state: State, count: Int, updatedAt: Time) = new Metadata(sourceId, state, count, updatedAt)
+  def apply(sourceId: Long, state: State, updatedAt: Time) = new Metadata(sourceId, state, updatedAt)
+}
+
+case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: Int) extends Ordered[Metadata] with Repairable[Metadata] {
+
+  def this(sourceId: Long, state: State, count: Int, updatedAt: Time) =
+      this(sourceId, state, count, updatedAt.inSeconds)
+
+  def this(sourceId: Long, state: State, updatedAt: Time) =
+      this(sourceId, state, 0, updatedAt.inSeconds)
+
+  val updatedAt = Time.fromSeconds(updatedAtSeconds)
+
+
   def compare(other: Metadata) = {
     val out = updatedAt.compare(other.updatedAt)
     if (out == 0) {

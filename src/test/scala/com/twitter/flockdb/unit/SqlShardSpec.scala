@@ -365,8 +365,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           "when the already-existing row is newer than the row to be inserted" >> {
             shard.add(alice, bob, 1, now)
             shard.add(alice, bob, 1, now - 1.second)
-
-            Time(shard.get(alice, bob).get.updatedAt) mustEqual now
+            shard.get(alice, bob).get mustEqual new Edge(alice, bob, 1, now, 0, State.Normal)
           }
 
           "when the already-existing row is the same age as the row to be inserted" >> {
@@ -631,7 +630,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.add(alice, bob, 1, now + 1.second)
         val metadata = shard.getMetadata(alice).get
         metadata.state mustBe State.Archived
-        metadata.updatedAt mustEqual now
+        metadata.updatedAtSeconds mustEqual now.inSeconds
       }
 
       "a row change simultaneous with a metadata update does not win" >> {
