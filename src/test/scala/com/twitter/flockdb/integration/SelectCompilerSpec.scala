@@ -17,6 +17,7 @@
 package com.twitter.flockdb
 package integration
 
+import scala.collection.JavaConversions._
 import scala.collection.mutable
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
@@ -53,9 +54,9 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
       reset(config)
       setup1()
       val term1 = new QueryTerm(alice, FOLLOWS, true)
-      term1.setState_ids(List[Int](State.Normal.id).toJavaList)
+      term1.setState_ids(List[Int](State.Normal.id))
       val term2 = new QueryTerm(carl, FOLLOWS, true)
-      term2.setState_ids(List[Int](State.Normal.id).toJavaList)
+      term2.setState_ids(List[Int](State.Normal.id))
       val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
       op1.setTerm(term1)
       val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
@@ -64,13 +65,13 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
         new SelectOperation(SelectOperationType.Intersection) :: Nil
 
       var result = new Results(List[Long](darcy).pack, darcy, Cursor.End.position)
-      flock.select(program.toJavaList, new Page(1, Cursor.Start.position)) mustEqual result
+      flock.select(program, new Page(1, Cursor.Start.position)) mustEqual result
 
       result = new Results(List[Long](bob).pack, Cursor.End.position, -bob)
-      flock.select(program.toJavaList, new Page(1, darcy)) mustEqual result
+      flock.select(program, new Page(1, darcy)) mustEqual result
 
       result = new Results(List[Long](darcy, bob).pack, Cursor.End.position, Cursor.End.position)
-      flock.select(program.toJavaList, new Page(2, Cursor.Start.position)) mustEqual result
+      flock.select(program, new Page(2, Cursor.Start.position)) mustEqual result
     }
 
     "one list is empty" in {
@@ -78,35 +79,35 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
       setup2()
       var result = new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
       val term1 = new QueryTerm(alice, FOLLOWS, true)
-      term1.setState_ids(List[Int](State.Normal.id).toJavaList)
+      term1.setState_ids(List[Int](State.Normal.id))
       val term2 = new QueryTerm(carl, FOLLOWS, true)
-      term2.setState_ids(List[Int](State.Normal.id).toJavaList)
+      term2.setState_ids(List[Int](State.Normal.id))
       val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
       op1.setTerm(term1)
       val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
       op2.setTerm(term2)
       var program = op1 :: op2 ::
         new SelectOperation(SelectOperationType.Intersection) :: Nil
-      flock.select(program.toJavaList, new Page(10, Cursor.Start.position)) mustEqual result
+      flock.select(program, new Page(10, Cursor.Start.position)) mustEqual result
     }
 
     "difference" in {
       reset(config)
       setup2()
       val term1 = new QueryTerm(alice, FOLLOWS, true)
-      term1.setState_ids(List[Int](State.Normal.id).toJavaList)
+      term1.setState_ids(List[Int](State.Normal.id))
       val term2 = new QueryTerm(bob, FOLLOWS, true)
-      term2.setState_ids(List[Int](State.Normal.id).toJavaList)
+      term2.setState_ids(List[Int](State.Normal.id))
       val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
       op1.setTerm(term1)
       val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
       op2.setTerm(term2)
       var program = op1 :: op2 ::
         new SelectOperation(SelectOperationType.Difference) :: Nil
-      flock.select(program.toJavaList, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
-      flock.select(program.toJavaList, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
-      flock.select(program.toJavaList, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
-      flock.select(program.toJavaList, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
+      flock.select(program, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
+      flock.select(program, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
+      flock.select(program, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
+      flock.select(program, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
     }
   }
 }

@@ -90,9 +90,9 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
 
   def alicesFollowings() = {
     val term = new QueryTerm(alice, FOLLOWS, true)
-    term.setState_ids(List[Int](State.Normal.id).toJavaList)
+    term.setState_ids(List[Int](State.Normal.id))
     val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
+    val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
     resultsList.size mustEqual 1
     resultsList(0).edges
   }

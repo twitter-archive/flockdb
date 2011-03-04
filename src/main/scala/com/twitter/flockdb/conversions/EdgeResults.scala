@@ -17,12 +17,13 @@
 package com.twitter.flockdb
 package conversions
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import conversions.Edge._
 
 object EdgeResults {
   class RichResultWindowOfEdges(resultWindow: ResultWindow[Edge]) {
-    def toEdgeResults = new thrift.EdgeResults(resultWindow.map { _.toThrift }.toJavaList,
+    def toEdgeResults = new thrift.EdgeResults(resultWindow.map { _.toThrift },
                                                resultWindow.nextCursor.position, resultWindow.prevCursor.position)
   }
   implicit def richResultWindowOfEdges(resultWindow: ResultWindow[Edge]) =

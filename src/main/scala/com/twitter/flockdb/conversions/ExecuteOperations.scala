@@ -27,7 +27,7 @@ object ExecuteOperations {
   class RichFlockExecuteOperations(executeOperations: operations.ExecuteOperations) {
     def toThrift = {
       val rv =
-        new thrift.ExecuteOperations(executeOperations.operations.map { _.toThrift }.toJavaList,
+        new thrift.ExecuteOperations(executeOperations.operations.map { _.toThrift },
                                      executeOperations.priority.toThrift)
       executeOperations.executeAt.map { x => rv.setExecute_at(x) }
       rv

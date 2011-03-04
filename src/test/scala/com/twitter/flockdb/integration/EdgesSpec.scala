@@ -70,14 +70,14 @@ class EdgesSpec extends IntegrationSpecification {
         flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         val term = new QueryTerm(alice, FOLLOWS, true)
         term.setDestination_ids(List[Long](bob).pack)
-        term.setState_ids(List[Int](State.Normal.id).toJavaList)
+        term.setState_ids(List[Int](State.Normal.id))
         val op = new SelectOperation(SelectOperationType.SimpleQuery)
         op.setTerm(term)
         val page = new Page(1, Cursor.Start.position)
-        flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_>(0))
+        flock.select(List(op), page).ids.array.size must eventually(be_>(0))
         Thread.sleep(1000)
         flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
-        flock.select(List(op).toJavaList, page).ids.array.size must eventually(be_==(0))
+        flock.select(List(op), page).ids.array.size must eventually(be_==(0))
         flock.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
       }
 
@@ -174,7 +174,7 @@ class EdgesSpec extends IntegrationSpecification {
 
       flock.count2(List(Select((), FOLLOWS, bob).toThrift,
                         Select((), FOLLOWS, carl).toThrift,
-                        Select((), FOLLOWS, darcy).toThrift).toJavaList).toIntArray.toList must eventually(be_==(List(1, 1, 1)))
+                        Select((), FOLLOWS, darcy).toThrift)).toIntArray.toList must eventually(be_==(List(1, 1, 1)))
     }
 
     "select_edges" in {
@@ -186,9 +186,9 @@ class EdgesSpec extends IntegrationSpecification {
         flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))
 
         val term = new QueryTerm(alice, FOLLOWS, true)
-        term.setState_ids(List[Int](State.Normal.id).toJavaList)
+        term.setState_ids(List[Int](State.Normal.id))
         val query = new EdgeQuery(term, new Page(10, Cursor.Start.position))
-        val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
+        val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
         resultsList.size mustEqual 1
         val results = resultsList(0)
         results.next_cursor mustEqual Cursor.End.position
@@ -204,9 +204,9 @@ class EdgesSpec extends IntegrationSpecification {
 
         val term = new QueryTerm(alice, FOLLOWS, true)
         term.setDestination_ids(List[Long](carl, darcy).pack)
-        term.setState_ids(List[Int](State.Normal.id).toJavaList)
+        term.setState_ids(List[Int](State.Normal.id))
         val query = new EdgeQuery(term, new Page(10, Cursor.Start.position))
-        val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
+        val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
         resultsList.size mustEqual 1
         val results = resultsList(0)
         results.next_cursor mustEqual Cursor.End.position

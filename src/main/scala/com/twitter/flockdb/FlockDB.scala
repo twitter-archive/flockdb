@@ -157,7 +157,7 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
   }
 
   def select_edges(queries: JList[thrift.EdgeQuery]) = {
-    edges.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }.toJavaList
+    edges.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }
   }
 
   def execute(operations: thrift.ExecuteOperations) = {

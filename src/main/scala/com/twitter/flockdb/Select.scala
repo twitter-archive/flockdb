@@ -16,6 +16,7 @@
 
 package com.twitter.flockdb
 
+import scala.collection.JavaConversions._
 import java.util.{List => JList}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
@@ -51,7 +52,7 @@ object Select {
 }
 
 trait Select {
-  def toThrift: JList[thrift.SelectOperation] = toList.toJavaList
+  def toThrift: JList[thrift.SelectOperation] = toList
   def toList: List[thrift.SelectOperation]
   def intersect(that: Select): Select = new CompoundSelect(Intersection, this, that)
 }
@@ -103,7 +104,7 @@ case class CompoundSelect(operation: SelectOperationType.Value, operand1: Select
 
 case class SimpleExecute(operation: ExecuteOperation, at: Time) extends Execute {
   def toThrift = {
-    val rv = new thrift.ExecuteOperations(toOperations.toJavaList, thrift.Priority.High)
+    val rv = new thrift.ExecuteOperations(toOperations, thrift.Priority.High)
     rv.setExecute_at(at.inSeconds)
     rv
   }
@@ -114,7 +115,7 @@ case class SimpleExecute(operation: ExecuteOperation, at: Time) extends Execute 
 
 case class CompoundExecute(operand1: Execute, operand2: Execute, at: Time, priority: Priority.Value) extends Execute {
   def toThrift = {
-    val rv = new thrift.ExecuteOperations(toOperations.toJavaList, priority.toThrift)
+    val rv = new thrift.ExecuteOperations(toOperations, priority.toThrift)
     rv.setExecute_at(at.inSeconds)
     rv
   }

@@ -27,7 +27,7 @@ object QueryTerm {
     def toThrift = {
       val thriftTerm = new thrift.QueryTerm(term.sourceId, term.graphId, term.isForward)
       term.destinationIds.map { x => thriftTerm.setDestination_ids(x.pack) }
-      thriftTerm.setState_ids(term.states.map { _.id }.toJavaList)
+      thriftTerm.setState_ids(term.states.map { _.id })
       thriftTerm
     }
   }
