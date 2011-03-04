@@ -20,9 +20,19 @@ import com.twitter.util.Time
 import com.twitter.flockdb.jobs.single._
 import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob, Repairable}
 
-case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int,
+object Edge {
+  def apply(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, state: State) = new Edge(sourceId, destinationId, position, updatedAt, count, state)
+}
+
+case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSeconds: Int, count: Int,
                 state: State) extends Ordered[Edge] with Repairable[Edge]{
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler[JsonJob], priority: Int) = {
+
+  def this(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, state: State) =
+    this(sourceId, destinationId, position, updatedAt.inSeconds, count, state)
+
+  val updatedAt = Time.fromSeconds(updatedAtSeconds)
+
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int) = {
     scheduler.put(priority, toJob(tableId, forwardingManager))
   }
 

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.operations
+package com.twitter.flockdb
+package operations
 
 
 case class ExecuteOperation(operationType: ExecuteOperationType.Value, term: QueryTerm,

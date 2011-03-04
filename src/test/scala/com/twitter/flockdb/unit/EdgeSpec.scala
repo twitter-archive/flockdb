@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import com.twitter.util.Time
-import com.twitter.flockdb.jobs.single._
 import org.specs.mock.{ClassMocker, JMocker}
+import jobs.single._
 
 object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
-  val now = new Time(124)
+  val now = Time.fromSeconds(124)
   val source = 1
   val dest = 2
   val pos = 0
@@ -31,21 +32,21 @@ object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
 
   "Edge" should {
     "normal becomes single.Add" in {
-      val edge = Edge(source, dest, pos, now, count, State.Normal)
+      val edge = new Edge(source, dest, pos, now, count, State.Normal)
       edge.toJob(graph, forwardingManager) mustEqual new Add(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
 
     "removed becomes single.Remove" in {
-      val edge = Edge(source, dest, pos, now, count, State.Removed)
+      val edge = new Edge(source, dest, pos, now, count, State.Removed)
       edge.toJob(graph, forwardingManager) mustEqual new Remove(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
 
     "archived becomes single.Archive" in {
-      val edge = Edge(source, dest, pos, now, count, State.Archived)
+      val edge = new Edge(source, dest, pos, now, count, State.Archived)
       edge.toJob(graph, forwardingManager) mustEqual new Archive(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
     "negative becomes single.Negate" in {
-      val edge = Edge(source, dest, pos, now, count, State.Negative)
+      val edge = new Edge(source, dest, pos, now, count, State.Negative)
       edge.toJob(graph, forwardingManager) mustEqual new Negate(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
     }
 

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
 import conversions.QueryTerm._
-import flockdb.operations
 
 
 object ExecuteOperation {

@@ -1,3 +1,4 @@
+
 /*
  * Copyright 2010 Twitter, Inc.
  *
@@ -14,17 +15,19 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
-
+import com.twitter.flockdb
 
 object QueryTerm {
   class RichFlockQueryTerm(term: flockdb.QueryTerm) {
     def toThrift = {
       val thriftTerm = new thrift.QueryTerm(term.sourceId, term.graphId, term.isForward)
       term.destinationIds.map { x => thriftTerm.setDestination_ids(x.pack) }
-      thriftTerm.setState_ids(term.states.map { _.id }.toJavaList)
+      thriftTerm.setState_ids(term.states.map { _.id })
       thriftTerm
     }
   }
@@ -32,14 +35,14 @@ object QueryTerm {
 
   class RichThriftQueryTerm(term: thrift.QueryTerm) {
     val destinationIds = if (term.isSetDestination_ids && term.destination_ids != null) {
-      Some(term.destination_ids.toLongArray)
+      Some(term.destination_ids.toLongArray.toSeq)
     } else {
       None
     }
     val stateIds = if (term.isSetState_ids && term.state_ids != null) {
       term.state_ids.toSeq.map { State(_) }
     } else {
-      List[State]().toArray
+      Seq[State]()
     }
     def fromThrift = new flockdb.QueryTerm(term.source_id, term.graph_id, term.is_forward,
                                          destinationIds, stateIds)

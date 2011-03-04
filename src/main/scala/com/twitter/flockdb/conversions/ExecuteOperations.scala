@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import conversions.ExecuteOperation._
 import conversions.Priority._
@@ -25,7 +27,7 @@ object ExecuteOperations {
   class RichFlockExecuteOperations(executeOperations: operations.ExecuteOperations) {
     def toThrift = {
       val rv =
-        new thrift.ExecuteOperations(executeOperations.operations.map { _.toThrift }.toJavaList,
+        new thrift.ExecuteOperations(executeOperations.operations.map { _.toThrift },
                                      executeOperations.priority.toThrift)
       executeOperations.executeAt.map { x => rv.setExecute_at(x) }
       rv

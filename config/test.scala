@@ -1,15 +1,16 @@
-import scala.collection.jcl
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
 import com.twitter.querulous.StatsCollector
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
+import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
 
 
 trait Credentials extends Connection {
-  val env = jcl.Map(System.getenv())
+  import scala.collection.JavaConversions._
+  val env = System.getenv().toMap
   val username = env.get("DB_USERNAME").getOrElse("root")
   val password = env.get("DB_PASSWORD").getOrElse("")
 }
@@ -112,7 +113,7 @@ new FlockDB {
     val schedulerType = new KestrelScheduler {
       path = "/tmp"
       keepJournal = false
-      maxMemorySize = 36000000L
+      maxMemorySize = 36.megabytes
     }
 
     threads = 2

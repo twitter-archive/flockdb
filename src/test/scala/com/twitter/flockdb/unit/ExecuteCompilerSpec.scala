@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.nameserver.InvalidShard
@@ -48,12 +49,13 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
     val alice = 1L
     val bob = 2L
     val carl = 3L
-    var scheduler: PrioritizingJobScheduler[JsonJob] = null
+    var scheduler: PrioritizingJobScheduler = null
     var executeCompiler: ExecuteCompiler = null
     var forwardingManager: ForwardingManager = null
+    val nestedJob = capturingParam[JsonNestedJob]
 
     doBefore {
-      scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+      scheduler = mock[PrioritizingJobScheduler]
       forwardingManager = mock[ForwardingManager]
       executeCompiler = new ExecuteCompiler(scheduler, forwardingManager, config.aggregateJobsPageSize)
     }
@@ -63,9 +65,10 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-          one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(alice, FOLLOWS, bob, now.inMillis, Time.now, null, null))))
+          one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
         }
         executeCompiler(program)
+        jsonMatching(List(single.Add(alice, FOLLOWS, bob, now.inMillis, Time.now, null, null)), nestedJob.captured.jobs)
       }
     }
 
@@ -74,9 +77,10 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
         val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None, None)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-          one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null))))
+          one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
         }
-      executeCompiler(program)
+        executeCompiler(program)
+        jsonMatching(List(single.Add(alice, FOLLOWS, bob, Time.now.inMillis, Time.now, null, null)), nestedJob.captured.jobs)
       }
     }
 
@@ -84,7 +88,6 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
       val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)), None)
       expect {
         one(forwardingManager).find(0, FOLLOWS, Direction.Forward) willThrow(new InvalidShard("message"))
-//        one(scheduler).apply(Priority.Low.id, new SchedulableWithTasks(List(single.Add(alice, FOLLOWS, bob, now.inMillis, now, null, null))))
       }
       executeCompiler(program) must throwA[InvalidShard]
     }
@@ -95,18 +98,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(alice, FOLLOWS, bob, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(single.Add(alice, FOLLOWS, bob, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Add(bob, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(single.Add(bob, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -115,18 +120,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -135,22 +142,24 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              single.Add(alice, FOLLOWS, bob, now.inMillis, now, null, null),
-              single.Add(alice, FOLLOWS, carl, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            single.Add(alice, FOLLOWS, bob, now.inMillis, now, null, null),
+            single.Add(alice, FOLLOWS, carl, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Add, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              single.Add(bob, FOLLOWS, alice, now.inMillis, now, null, null),
-              single.Add(carl, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            single.Add(bob, FOLLOWS, alice, now.inMillis, now, null, null),
+            single.Add(carl, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
     }
@@ -161,18 +170,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(new single.Remove(alice, FOLLOWS, bob, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(new single.Remove(alice, FOLLOWS, bob, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(new single.Remove(bob, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(new single.Remove(bob, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -181,18 +192,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -201,23 +214,24 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              new single.Remove(alice, FOLLOWS, bob, now.inMillis, now, null, null),
-              new single.Remove(alice, FOLLOWS, carl, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            new single.Remove(alice, FOLLOWS, bob, now.inMillis, now, null, null),
+            new single.Remove(alice, FOLLOWS, carl, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Remove, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              new single.Remove(bob, FOLLOWS, alice, now.inMillis, now, null, null),
-              new single.Remove(carl, FOLLOWS, alice, now.inMillis, now, null, null))
-            ))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            new single.Remove(bob, FOLLOWS, alice, now.inMillis, now, null, null),
+            new single.Remove(carl, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
     }
@@ -228,18 +242,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Archive(alice, FOLLOWS, bob, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(single.Archive(alice, FOLLOWS, bob, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Archive(bob, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(single.Archive(bob, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -248,18 +264,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Archive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.Archive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Archive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.Archive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -268,23 +286,25 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              single.Archive(alice, FOLLOWS, bob, now.inMillis, now, null, null),
-              single.Archive(alice, FOLLOWS, carl, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            single.Archive(alice, FOLLOWS, bob, now.inMillis, now, null, null),
+            single.Archive(alice, FOLLOWS, carl, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Archive, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              single.Archive(bob, FOLLOWS, alice, now.inMillis, now, null, null),
-              single.Archive(carl, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-        }
+          jsonMatching(List(
+            single.Archive(bob, FOLLOWS, alice, now.inMillis, now, null, null),
+            single.Archive(carl, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
+          }
       }
     }
 
@@ -294,18 +314,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Negate(alice, FOLLOWS, bob, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(single.Negate(alice, FOLLOWS, bob, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(single.Negate(bob, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(single.Negate(bob, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -314,18 +336,20 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Negate(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.Negate(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, None, List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(multi.Negate(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(multi.Negate(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
         }
       }
 
@@ -334,22 +358,24 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, true, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              single.Negate(alice, FOLLOWS, bob, now.inMillis, now, null, null),
-              single.Negate(alice, FOLLOWS, carl, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            single.Negate(alice, FOLLOWS, bob, now.inMillis, now, null, null),
+            single.Negate(alice, FOLLOWS, carl, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
           val program = termToProgram(ExecuteOperationType.Negate, new QueryTerm(alice, FOLLOWS, false, Some(List[Long](bob, carl)), List(State.Normal)))
           expect {
             one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-            one(scheduler).put(Priority.Low.id, new JsonNestedJob(List(
-              single.Negate(bob, FOLLOWS, alice, now.inMillis, now, null, null),
-              single.Negate(carl, FOLLOWS, alice, now.inMillis, now, null, null))))
+            one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
+          jsonMatching(List(
+            single.Negate(bob, FOLLOWS, alice, now.inMillis, now, null, null),
+            single.Negate(carl, FOLLOWS, alice, now.inMillis, now, null, null)), nestedJob.captured.jobs)
         }
       }
     }

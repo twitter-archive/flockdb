@@ -2,7 +2,8 @@ import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
 import com.twitter.querulous.StatsCollector
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
+import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.Priority
 
@@ -117,7 +118,7 @@ new FlockDB {
 
     val schedulerType = new KestrelScheduler {
       path = "/var/spool/kestrel"
-      maxMemorySize = 36000000L
+      maxMemorySize = 36.megabytes
     }
 
     errorLimit = 100

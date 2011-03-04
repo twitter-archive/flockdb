@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.Future
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver.NameServer
@@ -40,11 +42,12 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val bob = 1L
     val mary = 2L
 
+    val nestedJob = capturingParam[JsonNestedJob]
     val nameServer = mock[NameServer[Shard]]
     val uuidGenerator = mock[UuidGenerator]
     val forwardingManager = mock[ForwardingManager]
     val shard = mock[Shard]
-    val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+    val scheduler = mock[PrioritizingJobScheduler]
     val future = mock[Future]
     val copyFactory = mock[CopyJobFactory[Shard]]
     val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future, config.intersectionQuery, config.aggregateJobsPageSize), null)
@@ -54,9 +57,10 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+          one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
         flock.execute(Select(bob, FOLLOWS, mary).add.toThrift)
+        jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
 
@@ -65,9 +69,10 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+          one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
         flock.execute(Select(bob, FOLLOWS, mary).addAt(Time.now).toThrift)
+        jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
 
@@ -76,9 +81,10 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+          one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
         flock.execute(Select(bob, FOLLOWS, mary).remove.toThrift)
+        jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
 
@@ -87,9 +93,10 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
-          one(scheduler).put(Priority.High.id, new JsonNestedJob(List(job)))
+          one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
         flock.execute(Select(bob, FOLLOWS, mary).removeAt(Time.now).toThrift)
+        jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
 

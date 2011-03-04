@@ -20,6 +20,7 @@ import java.io.File
 import org.specs.Specification
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.nameserver.Forwarding
+import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.test.NameServerDatabase
 import com.twitter.util.Eval
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
@@ -27,6 +28,7 @@ import com.twitter.ostrich.W3CStats
 import net.lag.logging.Logger
 import net.lag.configgy.Configgy
 import scala.collection.mutable
+import com.twitter.flockdb
 
 object MemoizedQueryEvaluators {
   val evaluators = mutable.Map[String,QueryEvaluatorFactory]()
@@ -44,6 +46,10 @@ abstract class ConfiguredSpecification extends Specification {
         throw e
       }
     }
+  }
+
+  def jsonMatching(list1: Iterable[JsonJob], list2: Iterable[JsonJob]) = {
+    list1 must eventually(verify(l1 => { l1.map(_.toJson).sameElements(list2.map(_.toJson))}))
   }
 }
 

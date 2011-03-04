@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
+import com.twitter.flockdb
 
 
 object Metadata {
@@ -28,7 +30,7 @@ object Metadata {
   implicit def richFlockMetadata(metadata: flockdb.Metadata) = new RichFlockMetadata(metadata)
 
   class RichThriftMetadata(metadata: thrift.Metadata) {
-    def fromThrift = new flockdb.Metadata(metadata.source_id, State(metadata.state_id), metadata.count, Time(metadata.updated_at.seconds))
+    def fromThrift = new flockdb.Metadata(metadata.source_id, State(metadata.state_id), metadata.count, Time.fromSeconds(metadata.updated_at))
   }
   implicit def richThriftMetadata(metadata: thrift.Metadata) = new RichThriftMetadata(metadata)
 }

@@ -1,4 +1,5 @@
-package com.twitter.flockdb.shards
+package com.twitter.flockdb
+package shards
 
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.util.Time
@@ -103,6 +104,6 @@ trait Optimism extends Shard {
       case Right(None)           => ()
     }
 
-    (winning.map(_.state), exceptions.firstOption)
+    (winning.map(_.state), exceptions.headOption)
   }
 }

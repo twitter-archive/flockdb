@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.ostrich.Stats
@@ -25,8 +26,8 @@ import conversions.SelectOperation._
 import com.twitter.gizzard.thrift._
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.nameserver.Forwarding
-import com.twitter.flockdb.shards.{SqlShard}
-import com.twitter.flockdb.jobs._
+import shards.{SqlShard}
+import jobs._
 
 class RepairSpec extends IntegrationSpecification {
 

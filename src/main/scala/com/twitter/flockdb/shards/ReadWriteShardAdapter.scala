@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.shards
+package com.twitter.flockdb
+package shards
 
 import scala.collection.mutable
 import com.twitter.gizzard.shards
@@ -56,7 +57,7 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
       val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]
-      val lockServer = children.first.asInstanceOf[Shard]
+      val lockServer = children.head.asInstanceOf[Shard]
       val rest = children.drop(1).asInstanceOf[Seq[Shard]]
       lockServer.withLock(sourceId) { (lock, metadata) =>
         f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.future)), metadata)

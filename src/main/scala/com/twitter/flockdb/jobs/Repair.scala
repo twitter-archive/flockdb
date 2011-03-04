@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.jobs
+package com.twitter.flockdb
+package jobs
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
@@ -27,7 +28,6 @@ import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard}
 import com.twitter.gizzard.shards.{ShardDatabaseTimeoutException, ShardTimeoutException}
 import collection.mutable.ListBuffer
 import shards.{Shard}
-import flockdb.Metadata
 
 object Repair {
   type RepairCursor = (Cursor, Cursor)
@@ -37,14 +37,14 @@ object Repair {
   val PRIORITY = Priority.Medium.id
 }
 
-class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobFactory[Shard] {
   def apply(shardIds: Seq[ShardId]) = {
     new MetadataRepair(shardIds, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
   }
 }
 
-class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
@@ -54,7 +54,7 @@ class RepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobSche
 }
 
 class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
   extends MultiShardRepair[Shard, Edge, Repair.RepairCursor](shardIds, cursor, count, nameServer, scheduler, Repair.PRIORITY) {
 
   private val log = Logger.get(getClass.getName)
@@ -98,7 +98,7 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
 
   def repair(shards: Seq[Shard]) = {
-    val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id).toSeq(0).tableId)
+    val tableIds = shards.map(shard => nameServer.getRootForwardings(shard.shardInfo.id).head.tableId)
 
     val listCursors = shards.map( (shard) => {
       val (seq, newCursor) = shard.selectAll(cursor, count)
@@ -127,7 +127,7 @@ object MetadataRepair {
   val PRIORITY = Priority.Medium.id
 }
 
-class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
       extends RepairJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor  = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
@@ -136,7 +136,7 @@ class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: Prioritizin
 }
 
 class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler[JsonJob])
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
   extends MultiShardRepair[Shard, Metadata, MetadataRepair.RepairCursor](shardIds, cursor, count, nameServer, scheduler, Repair.PRIORITY) {
 
   private val log = Logger.get(getClass.getName)
@@ -181,7 +181,7 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
   }
 
   def repair(shards: Seq[Shard]) = {
-    val tableIds = shards.map((shard:Shard) => nameServer.getRootForwardings(shard.shardInfo.id).toSeq(0).tableId)
+    val tableIds = shards.map(shard => nameServer.getRootForwardings(shard.shardInfo.id).head.tableId)
 
     val listCursors = shards.map( (shard) => {
       val (seq, newCursor) = shard.selectAllMetadata(cursor, count)

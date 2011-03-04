@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.shards
+package com.twitter.flockdb
+package shards
 
 import collection.mutable
 
@@ -29,6 +30,6 @@ class MultiShard(forwardingManager: ForwardingManager, sourceIds: Seq[Long], gra
   def counts = {
     val results = new mutable.HashMap[Long, Int]
     for ((shard, ids) <- shards) shard.counts(ids, results)
-    sourceIds.map[Int] { results.getOrElse(_, 0) }
+    sourceIds.map { results.getOrElse(_, 0) }
   }
 }

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.scheduler._
@@ -25,7 +26,6 @@ import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.{Copy, MetadataCopy}
 import shards.{Shard}
-import flockdb.Metadata
 
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")
@@ -38,7 +38,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val cursor1 = Cursor(337L)
     val cursor2 = Cursor(555L)
     val nameServer = mock[NameServer[Shard]]
-    val scheduler = mock[JobScheduler[JsonJob]]
+    val scheduler = mock[JobScheduler]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
 
@@ -54,7 +54,6 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAll((cursor1, cursor2), count) willReturn (List(edge), (cursor1, Cursor(cursor2.position + 1)))
           one(shard2).writeCopies(List(edge))
-          one(scheduler).put(new Copy(shard1Id, shard2Id, (cursor1, Cursor(cursor2.position + 1)), count, nameServer, scheduler))
         }
         job.apply()
       }
@@ -98,7 +97,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "MetadataCopy" should {
     val cursor = Cursor(1L)
     val nameServer = mock[NameServer[Shard]]
-    val scheduler = mock[JobScheduler[JsonJob]]
+    val scheduler = mock[JobScheduler]
     val shard1 = mock[Shard]
     val shard2 = mock[Shard]
     val job = new MetadataCopy(shard1Id, shard2Id, cursor, count, nameServer, scheduler)
@@ -113,7 +112,6 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(nameServer).findShardById(shard2Id) willReturn shard2
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor(cursor.position + 1))
           one(shard2).writeMetadata(List(metadata))
-          one(scheduler).put(new MetadataCopy(shard1Id, shard2Id, Cursor(cursor.position + 1), count, nameServer, scheduler))
         }
         job.apply()
       }
@@ -127,7 +125,6 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
           one(shard2).writeMetadata(List(metadata))
           one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-          one(scheduler).put(new Copy(shard1Id, shard2Id, (Cursor.Start, Cursor.Start), Copy.COUNT, nameServer, scheduler))
         }
         job.apply()
       }

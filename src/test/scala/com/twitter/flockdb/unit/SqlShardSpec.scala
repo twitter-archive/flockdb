@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import java.sql.SQLException
+import scala.collection.JavaConversions._
 import scala.collection.mutable
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.thrift.conversions.Sequences._
@@ -29,7 +31,6 @@ import conversions.Edge._
 import conversions.EdgeResults._
 import conversions.Results._
 import shards.{Shard, SqlShard, SqlShardFactory}
-import flockdb.Metadata
 import thrift.{Results, EdgeResults}
 
 class SqlShardSpec extends IntegrationSpecification with JMocker {
@@ -309,18 +310,18 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
 
         val aliceBob = new Edge(alice, bob, 3, now, 0, State.Normal).toThrift
         val aliceCarl = new Edge(alice, carl, 5, now, 0, State.Normal).toThrift
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl).toJavaList, 5, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob).toJavaList, Cursor.End.position, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
-        shard.selectEdges(alice, List(State.Normal), 3, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
-        shard.selectEdges(bob, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge]().toJavaList, Cursor.End.position, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob), Cursor.End.position, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
+        shard.selectEdges(alice, List(State.Normal), 3, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
+        shard.selectEdges(bob, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge](), Cursor.End.position, Cursor.End.position)
 
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-5)).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge]().toJavaList, Cursor.End.position, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-3)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl).toJavaList, 5, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-4)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl).toJavaList, 5, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceBob).toJavaList, Cursor.End.position, -3)
-        shard.selectEdges(alice, List(State.Normal), 3, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob).toJavaList, Cursor.End.position, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-5)).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge](), Cursor.End.position, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-3)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-4)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
+        shard.selectEdges(alice, List(State.Normal), 3, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob), Cursor.End.position, Cursor.End.position)
       }
     }
 
@@ -365,8 +366,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           "when the already-existing row is newer than the row to be inserted" >> {
             shard.add(alice, bob, 1, now)
             shard.add(alice, bob, 1, now - 1.second)
-
-            Time(shard.get(alice, bob).get.updatedAt) mustEqual now
+            shard.get(alice, bob).get mustEqual new Edge(alice, bob, 1, now, 0, State.Normal)
           }
 
           "when the already-existing row is the same age as the row to be inserted" >> {
@@ -631,7 +631,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.add(alice, bob, 1, now + 1.second)
         val metadata = shard.getMetadata(alice).get
         metadata.state mustBe State.Archived
-        metadata.updatedAt mustEqual now
+        metadata.updatedAtSeconds mustEqual now.inSeconds
       }
 
       "a row change simultaneous with a metadata update does not win" >> {

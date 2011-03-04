@@ -26,5 +26,5 @@ object Cursor {
 case class Cursor(position: Long) extends Ordered[Cursor] {
   def compare(that: Cursor) = position.compare(that.position)
   def reverse = new Cursor(-position)
-  def magnitude = new Cursor(Math.abs(position))
+  def magnitude = new Cursor(math.abs(position))
 }

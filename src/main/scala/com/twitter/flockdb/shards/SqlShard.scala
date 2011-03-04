@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.shards
+package com.twitter.flockdb
+package shards
 
 import java.util.Random
 import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
@@ -26,7 +27,7 @@ import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query
-import com.twitter.querulous.query.{SqlQueryTimeoutException}
+import com.twitter.querulous.query.{QueryClass => QuerulousQueryClass, SqlQueryTimeoutException}
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
@@ -35,10 +36,10 @@ import net.lag.logging.Logger
 import State._
 
 object QueryClass {
-  val Select       = query.QueryClass.Select
-  val Execute      = query.QueryClass.Execute
-  val SelectModify = query.QueryClass("select_modify")
-  val SelectCopy   = query.QueryClass("select_copy")
+  val Select       = QuerulousQueryClass.Select
+  val Execute      = QuerulousQueryClass.Execute
+  val SelectModify = QuerulousQueryClass("select_modify")
+  val SelectCopy   = QuerulousQueryClass("select_copy")
 }
 
 object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
@@ -108,7 +109,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
     queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
-      Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds))
+      new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
 
@@ -123,8 +124,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
-        metadatas += Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
-                              Time(row.getInt("updated_at").seconds))
+        metadatas += new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
+                              Time.fromSeconds(row.getInt("updated_at")))
         nextCursor = Cursor(sourceId)
         i += 1
       } else {
@@ -152,7 +153,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time(0.seconds)) }
+  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time.epoch) }
 
   private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     try {
@@ -218,7 +219,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     select(QueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
   }
 
-  private def select(queryClass: querulous.query.QueryClass, cursorName: String, index: String, count: Int,
+  private def select(queryClass: QuerulousQueryClass, cursorName: String, index: String, count: Int,
                      cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
     var edges = new mutable.ArrayBuffer[(Long, Cursor)]
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"
@@ -228,10 +229,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     val (edgesQuery, args2) = query(cursorName, index, count + 1, cursor, order, inequality, conditions, args)
     val totalQuery = continueCursorQuery + " UNION " + edgesQuery
     queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
-      edges += (row.getLong("destination_id"), Cursor(row.getLong(cursorName)))
+      edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
     }
 
-    var page = edges.projection
+    var page = edges.view
     if (cursor < Cursor.Start) page = page.reverse
     new ResultWindow(page, count, cursor)
   }
@@ -246,10 +247,10 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
     val edges = new mutable.ArrayBuffer[(Edge, Cursor)]
     queryEvaluator.select(continueCursorQuery + " UNION " + edgesQuery, args1 ++ args2: _*) { row =>
-      edges += (makeEdge(row), Cursor(row.getLong("position")))
+      edges += (makeEdge(row) -> Cursor(row.getLong("position")))
     }
 
-    var page = edges.projection
+    var page = edges.view
     if (cursor < Cursor.Start) page = page.reverse
     new ResultWindow(page, count, cursor)
   }
@@ -262,7 +263,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def query(projections: String, cursorName: String, index: String, count: Int,
                     cursor: Cursor, order: String, inequality: String, conditions: String, args: Seq[Any]): (String, Seq[Any]) = {
-    val position = if (cursor == Cursor.Start) Math.MAX_LONG else cursor.magnitude.position
+    val position = if (cursor == Cursor.Start) Long.MaxValue else cursor.magnitude.position
 
     val query = "(SELECT " + projections +
       " FROM "     + tablePrefix + "_edges USE INDEX (" + index + ")" +
@@ -383,7 +384,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
                          oldEdge: Edge): Int = {
-    if ((oldEdge.updatedAt == edge.updatedAt) && (oldEdge.state max edge.state) != edge.state) return 0
+    if ((oldEdge.updatedAtSeconds == edge.updatedAtSeconds) && (oldEdge.state max edge.state) != edge.state) return 0
 
     val updatedRows = if (
       oldEdge.state != Archived &&  // Only update position when coming from removed or negated into normal
@@ -490,7 +491,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       case e: BatchUpdateException =>
         val completed = new mutable.ArrayBuffer[Edge]
         val failed = new mutable.ArrayBuffer[Edge]
-        e.getUpdateCounts().zip(edges.toArray).foreach { case (errorCode, edge) =>
+        e.getUpdateCounts.zip(edges).foreach { case (errorCode, edge) =>
           if (errorCode < 0) {
             failed += edge
           } else {
@@ -562,7 +563,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       queryEvaluator.transaction { transaction =>
         transaction.selectOne(SelectModify,
                               "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ? FOR UPDATE", sourceId) { row =>
-          f(transaction, Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+          f(transaction, new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
         } getOrElse(throw new MissingMetadataRow)
       }
     } catch {
@@ -578,7 +579,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       queryEvaluator.transaction { transaction =>
         transaction.select(SelectModify,
                            "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE", sourceIds) { row =>
-          metadataMap.put(row.getLong("source_id"), Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time(row.getInt("updated_at").seconds)))
+          metadataMap.put(row.getLong("source_id"), new Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
         }
         if (metadataMap.size < sourceIds.length)
           throw new MissingMetadataRow
@@ -618,7 +619,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         }
       } catch {
         case e: BatchUpdateException =>
-          e.getUpdateCounts().zip(metadatas.toArray).foreach { case (errorCode, metadata) =>
+          e.getUpdateCounts.zip(metadatas).foreach { case (errorCode, metadata) =>
             if (errorCode < 0)
               writeMetadata(metadata)
           }
@@ -631,7 +632,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   // FIXME: computeCount could be really expensive. :(
   def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
     atomically(sourceId) { (transaction, metadata) =>
-      if ((updatedAt != metadata.updatedAt) || ((metadata.state max state) == state)) {
+      if ((updatedAt.inSeconds != metadata.updatedAtSeconds) || ((metadata.state max state) == state)) {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
           state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
       }
@@ -643,6 +644,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   private def makeEdge(row: ResultSet): Edge = {
-    makeEdge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time(row.getInt("updated_at").seconds), row.getInt("count"), row.getInt("state"))
+    makeEdge(row.getLong("source_id"), row.getLong("destination_id"), row.getLong("position"), Time.fromSeconds(row.getInt("updated_at")), row.getInt("count"), row.getInt("state"))
   }
 }

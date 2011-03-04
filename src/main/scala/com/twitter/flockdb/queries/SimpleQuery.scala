@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.queries
+package com.twitter.flockdb
+package queries
 
-import scala.util.Sorting
 import net.lag.configgy.Configgy
-import flockdb.shards.Shard
+import shards.Shard
 
 class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
   val config = Configgy.config

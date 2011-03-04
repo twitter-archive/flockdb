@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.queries
+package com.twitter.flockdb
+package queries
 
 import com.twitter.util.Duration
 import com.twitter.util.TimeConversions._
@@ -49,7 +50,7 @@ class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportio
 
   private def pageDifference(internalPageSize: Int, count: Int, cursor: Cursor) = {
     val results = query1.selectPageByDestinationId(internalPageSize, cursor)
-    val rejects = query2.selectWhereIn(results.projection)
+    val rejects = query2.selectWhereIn(results.view)
     results -- rejects
   }
 }

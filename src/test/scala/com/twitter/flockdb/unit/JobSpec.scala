@@ -14,24 +14,22 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardInfo, ShardException}
+import com.twitter.gizzard.shards.{ShardInfo, ShardException, ReadWriteShard}
 import com.twitter.util.Time
-import flockdb.Direction._
-import flockdb.State._
-import flockdb.shards.ReadWriteShardAdapter
-import flockdb.shards.OptimisticLockException
-import gizzard.shards.{ReadWriteShard}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import com.twitter.flockdb
+import flockdb.Direction._
+import flockdb.State._
+import shards.{Shard, SqlShard, ReadWriteShardAdapter, OptimisticLockException}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove, Archive, NodePair}
-import shards.{Shard, SqlShard}
-import flockdb.Metadata
-import thrift.Edge
+
 
 class FakeLockingShard(shard: Shard) extends SqlShard(null, new ShardInfo("a", "b", "c"), 1, Nil, 0) {
   override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
@@ -71,7 +69,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   var shard4: Shard = null
   var shard1Mock: Shard = null
   var shard2Mock: Shard = null
-  val scheduler = mock[PrioritizingJobScheduler[JsonJob]]
+  val scheduler = mock[PrioritizingJobScheduler]
 
   def before() {
     doBefore {
@@ -96,12 +94,12 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           allowing(forwardingManager).find(mary, FOLLOWS, Backward) willReturn shard2
 
           // Before
-          one(shard1Mock).getMetadata(bob) willReturn Some(Metadata(bob, bobBefore, 1, Time.now - 1.second))
-          one(shard2Mock).getMetadata(mary) willReturn Some(Metadata(mary, maryBefore, 1, Time.now - 1.second))
+          one(shard1Mock).getMetadata(bob) willReturn Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second))
+          one(shard2Mock).getMetadata(mary) willReturn Some(new Metadata(mary, maryBefore, 1, Time.now - 1.second))
 
           // After
-          allowing(shard1Mock).getMetadata(bob) willReturn Some(Metadata(mary, bobAfter, 1, Time.now))
-          allowing(shard2Mock).getMetadata(mary) willReturn Some(Metadata(mary, maryAfter, 1, Time.now))
+          allowing(shard1Mock).getMetadata(bob) willReturn Some(new Metadata(mary, bobAfter, 1, Time.now))
+          allowing(shard2Mock).getMetadata(mary) willReturn Some(new Metadata(mary, maryAfter, 1, Time.now))
 
           // Results
           applied match {

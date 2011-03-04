@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.queries
+package com.twitter.flockdb
+package queries
 
-import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import flockdb.shards.Shard
+import shards.Shard
 
 class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) extends Query {
   def sizeEstimate() = destinationIds.size

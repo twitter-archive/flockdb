@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.jobs
+package com.twitter.flockdb
+package jobs
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
@@ -33,14 +34,14 @@ object Copy {
   val COUNT = 10000
 }
 
-class CopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+class CopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler)
       extends CopyJobFactory[Shard] {
   def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
     new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
                      nameServer, scheduler)
 }
 
-class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler)
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
@@ -50,7 +51,7 @@ class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob]
 }
 
 class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.CopyCursor,
-           count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+           count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler)
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
@@ -72,7 +73,7 @@ object MetadataCopy {
   val END = Cursor.End
 }
 
-class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler)
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
     val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
@@ -81,7 +82,7 @@ class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler[
 }
 
 class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.CopyCursor,
-                   count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler[JsonJob])
+                   count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler)
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)

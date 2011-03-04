@@ -14,23 +14,27 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.{ShardInfo, ShardId, Busy}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.util.Time
-import com.twitter.flockdb.{SelectQuery, Metadata}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import com.twitter.flockdb
+import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}
 import shards.{Shard, SqlShard}
 import thrift._
 
+
 class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
-  override def reset(config: flockdb.config.FlockDB, name: String) {
+  override def reset(config: FlockDBConfig, name: String) {
     materialize(config.nameServer)
     nameServer.rebuildSchema()
     nameServer.reload()
@@ -86,9 +90,9 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
 
   def alicesFollowings() = {
     val term = new QueryTerm(alice, FOLLOWS, true)
-    term.setState_ids(List[Int](State.Normal.id).toJavaList)
+    term.setState_ids(List[Int](State.Normal.id))
     val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
+    val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
     resultsList.size mustEqual 1
     resultsList(0).edges
   }

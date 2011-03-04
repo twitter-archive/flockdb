@@ -19,6 +19,7 @@ package com.twitter.flockdb
 import java.lang.{Long => JLong, String}
 import java.util.{ArrayList => JArrayList, List => JList}
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.{Future, GizzardServer}
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
@@ -46,9 +47,10 @@ import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
 import Direction._
 import thrift.FlockException
+import config.{FlockDB => FlockDBConfig}
 
-class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServer[shards.Shard, JsonJob](config) {
-  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[flockdb.thrift.FlockDB.Iface]({ (flock, e) =>
+class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards.Shard](config) {
+  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>
         throw e
@@ -107,9 +109,9 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   }
 
   lazy val flockThriftServer = {
-    val processor = new flockdb.thrift.FlockDB.Processor(
+    val processor = new thrift.FlockDB.Processor(
       FlockExceptionWrappingProxyFactory(
-        LoggingProxy[flockdb.thrift.FlockDB.Iface](
+        LoggingProxy[thrift.FlockDB.Iface](
           Stats, w3c, "FlockDB",
           flockService)))
 
@@ -128,7 +130,7 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
   }
 }
 
-class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler[JsonJob]) extends thrift.FlockDB.Iface {
+class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler) extends thrift.FlockDB.Iface {
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }
@@ -145,17 +147,17 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
     edges.containsMetadata(source_id, graph_id)
   }
 
-  @deprecated
+  @deprecated("Use `select2` instead")
   def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
     edges.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift)).toThrift
   }
 
   def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {
-    edges.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }.toJavaList
+    edges.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }
   }
 
   def select_edges(queries: JList[thrift.EdgeQuery]) = {
-    edges.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }.toJavaList
+    edges.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }
   }
 
   def execute(operations: thrift.ExecuteOperations) = {
@@ -167,7 +169,7 @@ class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJ
     }
   }
 
-  @deprecated
+  @deprecated("Use `count2` instead")
   def count(query: JList[thrift.SelectOperation]) = {
     edges.count(List(query.toSeq.map { _.fromThrift })).first
   }

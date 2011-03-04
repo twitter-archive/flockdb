@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.queries
+package com.twitter.flockdb
+package queries
 
 import scala.util.Sorting
 

@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
@@ -39,7 +41,7 @@ object IntersectionSpec extends IntegrationSpecification {
     flock.select(List[SelectOperation](
       op1,
       op2,
-      new SelectOperation(SelectOperationType.Intersection)).toJavaList, page)
+      new SelectOperation(SelectOperationType.Intersection)), page)
   }
 
   def intersectAlot = {

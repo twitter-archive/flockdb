@@ -28,7 +28,7 @@ case class ResultWindowRow[T](id: T, cursor: Cursor) extends Ordered[ResultWindo
 class ResultWindowRows[T](data: Seq[ResultWindowRow[T]]) extends Seq[ResultWindowRow[T]] {
   def length = data.length
   def apply(i: Int) = data(i)
-  def elements = data.elements
+  def iterator = data.iterator
 }
 
 class ResultWindow[T](val data: ResultWindowRows[T], val inNextCursor: Cursor, val inPrevCursor: Cursor, val count: Int, val cursor: Cursor) extends Seq[T] {
@@ -83,14 +83,14 @@ class ResultWindow[T](val data: ResultWindowRows[T], val inNextCursor: Cursor, v
 
   def length = page.length
   def apply(i: Int) = page(i).id
-  def elements = page.projection.map(_.id).elements
+  def iterator = page.view.map(_.id).iterator
   def continueCursor = if (cursor < Cursor.Start) prevCursor else nextCursor
-  override def firstOption = page.firstOption.map { _.id }
+  override def headOption = page.headOption.map { _.id }
 
-  override def toString = (elements.toList, nextCursor, prevCursor, count, cursor).toString
+  override def toString = (iterator.toList, nextCursor, prevCursor, count, cursor).toString
 
   override def equals(that: Any) = that match {
-    case that: ResultWindow[_] => elements.toList == that.elements.toList && nextCursor == that.nextCursor && prevCursor == that.prevCursor && cursor == that.cursor
+    case that: ResultWindow[_] => iterator.toList == that.iterator.toList && nextCursor == that.nextCursor && prevCursor == that.prevCursor && cursor == that.cursor
     case _ => false
   }
 }

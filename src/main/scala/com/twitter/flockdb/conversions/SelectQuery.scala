@@ -14,16 +14,19 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.conversions
+package com.twitter.flockdb
+package conversions
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.flockdb
 import Page._
 import SelectOperation._
 
 
 object SelectQuery {
   class RichFlockSelectQuery(query: flockdb.SelectQuery) {
-    def toThrift = new thrift.SelectQuery(query.operations.map { _.toThrift }.toJavaList,
+    def toThrift = new thrift.SelectQuery(query.operations.map { _.toThrift },
                                           query.page.toThrift)
   }
   implicit def richFlockSelectQuery(query: flockdb.SelectQuery) = new RichFlockSelectQuery(query)

@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.unit
+package com.twitter.flockdb
+package unit
 
-import scala.collection.jcl.Conversions._
 import scala.collection.mutable
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
+import com.twitter.flockdb
 import queries.SelectCompiler
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard
@@ -37,7 +38,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
     val graphId = 5
     val states = new mutable.ArrayBuffer[State] {
       override def equals(that: Any) = that match {
-        case that: Seq[State] => this.toList == that.toList
+        case that: Seq[_] => this.toList == that.toList
         case that => false
       }
     }

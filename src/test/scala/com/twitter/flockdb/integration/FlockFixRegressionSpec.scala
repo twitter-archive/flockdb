@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb.integration
+package com.twitter.flockdb
+package integration
 
+import scala.collection.JavaConversions._
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.util.Time
-import com.twitter.flockdb.{SelectQuery, Metadata}
 import com.twitter.util.TimeConversions._
+import com.twitter.flockdb
+import com.twitter.flockdb.{SelectQuery, Metadata}
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}
@@ -35,9 +38,9 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
 
   def alicesFollowings() = {
     val term = new QueryTerm(alice, FOLLOWS, true)
-    term.setState_ids(List[Int](State.Normal.id).toJavaList)
+    term.setState_ids(List[Int](State.Normal.id))
     val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flock.select_edges(List[EdgeQuery](query).toJavaList).toList
+    val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
     resultsList.size mustEqual 1
     resultsList(0).edges
   }
@@ -52,7 +55,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
         } else {
           flock.execute(Select(alice, FOLLOWS, i).archive.toThrift)
         }
-        Thread.sleep(2) // prevent same-millisecond collision
+        Thread.sleep(1000) // prevent same-millisecond collision
       }
 
       jobScheduler.size must eventually(be(0)) // Make sure adds get applied.  I can't wait for Time.asOf()
