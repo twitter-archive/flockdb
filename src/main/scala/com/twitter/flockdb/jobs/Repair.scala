@@ -115,10 +115,10 @@ class Repair(shardIds: Seq[ShardId], cursor: Repair.RepairCursor, count: Int,
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
 
-  def scheduleNextRepair(lowestCursor: Repair.RepairCursor) = {
+  def nextRepair(lowestCursor: Repair.RepairCursor) = {
     lowestCursor match {
       case Repair.END => None
-      case _ => scheduler.put(Repair.PRIORITY, new Repair(shardIds, lowestCursor, count, nameServer, scheduler))
+      case _ => Some(new Repair(shardIds, lowestCursor, count, nameServer, scheduler))
     }
   }
 }
@@ -147,8 +147,8 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
 
   override def label = "MetadataRepair"
 
-  def scheduleNextRepair(lowestCursor: MetadataRepair.RepairCursor) = {
-    scheduler.put(Repair.PRIORITY, lowestCursor match {
+  def nextRepair(lowestCursor: MetadataRepair.RepairCursor) = {
+    Some(lowestCursor match {
       case MetadataRepair.END => new Repair(shardIds, Repair.START, Repair.COUNT, nameServer, scheduler)
       case _ => new MetadataRepair(shardIds, lowestCursor, count, nameServer, scheduler)
     })
