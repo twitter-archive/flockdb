@@ -106,24 +106,27 @@ class FlockDB(config: flockdb.config.FlockDB, w3c: W3CStats) extends GizzardServ
     new FlockDBThriftAdapter(edges, scheduler)
   }
 
-  lazy val flockThriftServer = {
-    val processor = new flockdb.thrift.FlockDB.Processor(
-      FlockExceptionWrappingProxyFactory(
-        LoggingProxy[flockdb.thrift.FlockDB.Iface](
-          Stats, w3c, "FlockDB",
-          flockService)))
+  private lazy val processor = new flockdb.thrift.FlockDB.Processor(
+    FlockExceptionWrappingProxyFactory(
+      LoggingProxy[flockdb.thrift.FlockDB.Iface](
+        Stats, w3c, "FlockDB",
+        flockService)))
 
-    config.server(processor)
-  }
+  lazy val flockThriftServer = config.server(processor)
+  lazy val migrationFlockThriftServer = config.migrationServer.map(_(processor))
 
   def start() {
     startGizzard()
     val runnable = new Runnable { def run() { flockThriftServer.serve() } }
     new Thread(runnable, "FlockDBServerThread").start()
+
+    val migrationRunnable = migrationFlockThriftServer.map { server => new Runnable { def run() { server.serve() } } }
+    migrationRunnable.map { runnable => new Thread(runnable, "FlockDBMigrationServerThread").start() }
   }
 
   def shutdown(quiesce: Boolean) {
     flockThriftServer.stop()
+    migrationFlockThriftServer.foreach { _.stop() }
     shutdownGizzard(quiesce)
   }
 }

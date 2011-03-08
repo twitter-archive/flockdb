@@ -27,6 +27,7 @@ trait IntersectionQuery {
 
 trait FlockDB extends gizzard.config.GizzardServer {
   def server: FlockDBServer
+  var migrationServer: Option[FlockDBServer] = None
 
   var intersectionQuery: IntersectionQuery = new IntersectionQuery { }
   var aggregateJobsPageSize         = 500
