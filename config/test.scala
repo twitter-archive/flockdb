@@ -99,7 +99,10 @@ new FlockDB {
       QueryClass.Select       -> QueryTimeout(100.millis),
       QueryClass.SelectModify -> QueryTimeout(5.seconds),
       QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
-      QueryClass.Execute      -> QueryTimeout(5.seconds)
+      QueryClass.Execute      -> QueryTimeout(5.seconds),
+      QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
+      QueryClass.SelectMetadata             -> QueryTimeout(100.millis),
+      QueryClass.SelectMetadataIntersection -> QueryTimeout(100.millis)
     )
   }
 

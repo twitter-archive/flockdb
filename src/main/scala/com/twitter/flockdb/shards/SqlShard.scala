@@ -40,6 +40,9 @@ object QueryClass {
   val Execute      = QuerulousQueryClass.Execute
   val SelectModify = QuerulousQueryClass("select_modify")
   val SelectCopy   = QuerulousQueryClass("select_copy")
+  val SelectIntersection         = QuerulousQueryClass("select_intersection")
+  val SelectMetadata             = QuerulousQueryClass("select_metadata")
+  val SelectMetadataIntersection = QuerulousQueryClass("select_metadata_intersection")
 }
 
 object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
@@ -108,7 +111,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
-    queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    queryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
@@ -137,7 +140,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
-    queryEvaluator.selectOne("SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    queryEvaluator.selectOne(SelectMetadata, "SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       states.foldLeft(0) { (result, state) =>
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
@@ -148,7 +151,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int]) {
-    queryEvaluator.select("SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
+    queryEvaluator.select(SelectMetadataIntersection, "SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
       results(row.getLong("source_id")) = row.getInt("count")
     }
   }
@@ -283,7 +286,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select("SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      queryEvaluator.select(SelectIntersection, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         row.getLong("destination_id")
       }
@@ -292,7 +295,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      queryEvaluator.select(SelectIntersection, "SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         makeEdge(row)
       }
