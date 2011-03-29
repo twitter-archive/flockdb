@@ -1,7 +1,7 @@
 package com.twitter.flockdb
 
 import com.twitter.ostrich.stats.{W3CStats, Stats}
-import com.twitter.ostrich.admin.{ServiceTracker, RuntimeEnvironment, Service}
+import com.twitter.ostrich.admin.{ServiceTracker, Service}
 import com.twitter.logging.{FileHandler, Logger}
 import com.twitter.util.Eval
 import org.apache.thrift.server.TServer
@@ -45,7 +45,7 @@ object Main extends Service {
     "arguments"
   )
 
-  lazy val w3c = new W3CStats(Logger.get("w3c"), w3cItems)
+  lazy val w3c = new W3CStats(Logger.get("w3c"), w3cItems, false)
 
   def main(args: Array[String]) {
     try {
@@ -67,10 +67,7 @@ object Main extends Service {
 
   def start() {
     ServiceTracker.register(this)
-    adminConfig.setInt("admin_http_port", config.adminConfig.httpPort)
-    adminConfig.setInt("admin_text_port", config.adminConfig.textPort)
-    ServiceTracker.startAdmin(adminConfig, new RuntimeEnvironment(this.getClass))
-
+    config.adminConfig()
     service.start()
   }
 
@@ -80,7 +77,7 @@ object Main extends Service {
     ServiceTracker.stopAdmin()
   }
 
-  def quiesce() {
+  override def quiesce() {
     if (service ne null) service.shutdown(true)
     service = null
     ServiceTracker.stopAdmin()

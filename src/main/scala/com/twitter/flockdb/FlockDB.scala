@@ -60,8 +60,8 @@ class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards
   })
 
   val stats = new StatsCollector {
-    def incr(name: String, count: Int) = w3c.incr(name, count)
-    def time[A](name: String)(f: => A): A = w3c.time(name)(f)
+    def incr(name: String, count: Int) = Stats.incr(name, count)
+    def time[A](name: String)(f: => A): A = Stats.time(name)(f)
   }
 
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)

@@ -1,15 +1,12 @@
 package com.twitter.flockdb.config
 
 import com.twitter.gizzard.config._
+import com.twitter.ostrich.admin.config.AdminServiceConfig
 import com.twitter.querulous.config.{Connection, QueryEvaluator}
 import com.twitter.util.TimeConversions._
 import com.twitter.flockdb.queries.Query
 import com.twitter.flockdb.queries
 
-trait AdminConfig {
-  def httpPort: Int
-  def textPort: Int
-}
 
 trait FlockDBServer extends TServer {
   var name = "flockdb_edges"
@@ -38,5 +35,5 @@ trait FlockDB extends GizzardServer {
   def replicationFuture: Future
   def readFuture: Future
 
-  def adminConfig: AdminConfig
+  def adminConfig: AdminServiceConfig
 }
