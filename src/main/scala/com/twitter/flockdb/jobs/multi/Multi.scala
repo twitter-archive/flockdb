@@ -19,10 +19,9 @@ package jobs.multi
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardBlackHoleException
-import com.twitter.ostrich.Stats
+import com.twitter.ostrich.stats.Stats
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-import net.lag.configgy.Configgy
 import conversions.Numeric._
 import shards.Shard
 
@@ -68,8 +67,6 @@ abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updated
                priority: Priority.Value, aggregateJobPageSize: Int, forwardingManager: ForwardingManager,
                scheduler: PrioritizingJobScheduler)
          extends JsonJob {
-  private val config = Configgy.config
-
   def toMap = Map("source_id" -> sourceId, "updated_at" -> updatedAt.inSeconds, "graph_id" -> graphId, "direction" -> direction.id, "priority" -> priority.id)
 
   def apply() {

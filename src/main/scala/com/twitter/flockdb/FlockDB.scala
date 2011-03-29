@@ -26,7 +26,8 @@ import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory, LoggingProxy}
-import com.twitter.ostrich.{Stats, W3CStats}
+import com.twitter.logging.Logger
+import com.twitter.ostrich.stats.{Stats, W3CStats}
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
@@ -40,8 +41,6 @@ import com.twitter.flockdb.conversions.Page._
 import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
 import com.twitter.flockdb.conversions.SelectOperation._
-import net.lag.configgy.{Config, ConfigMap}
-import net.lag.logging.Logger
 import queries._
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}

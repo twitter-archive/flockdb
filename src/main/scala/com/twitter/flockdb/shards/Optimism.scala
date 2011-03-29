@@ -3,7 +3,7 @@ package shards
 
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.util.Time
-import net.lag.logging.Logger
+import com.twitter.logging.Logger
 
 class OptimisticLockException(message: String) extends ShardException(message)
 

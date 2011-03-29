@@ -22,7 +22,7 @@ import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityCons
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
 import com.twitter.gizzard.shards
-import com.twitter.ostrich.Stats
+import com.twitter.ostrich.stats.Stats
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
@@ -31,8 +31,6 @@ import com.twitter.querulous.query.{QueryClass => QuerulousQueryClass, SqlQueryT
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
-import net.lag.configgy.ConfigMap
-import net.lag.logging.Logger
 import State._
 
 object QueryClass {
@@ -98,7 +96,6 @@ CREATE TABLE IF NOT EXISTS %s (
 
 class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
                val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard with Optimism {
-  val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
 
@@ -512,7 +509,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def writeCopies(edges: Seq[Edge]) {
     if (!edges.isEmpty) {
-      Stats.addTiming("x-copy-burst", edges.size)
+      Stats.addMetric("x-copy-burst", edges.size)
 
       var sourceIdsSet = Set[Long]()
       edges.foreach { edge => sourceIdsSet += edge.sourceId }

@@ -23,10 +23,10 @@ import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeout
   ShardOfflineException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import operations.{ExecuteOperations, SelectOperation}
-import com.twitter.ostrich.Stats
+import com.twitter.ostrich.stats.Stats
+import com.twitter.logging.Logger
 import queries._
 import thrift.FlockException
-import net.lag.logging.Logger
 
 class EdgesService(val nameServer: NameServer[shards.Shard],
                    var forwardingManager: ForwardingManager,

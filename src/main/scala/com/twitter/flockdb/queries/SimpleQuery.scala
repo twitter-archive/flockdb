@@ -17,12 +17,9 @@
 package com.twitter.flockdb
 package queries
 
-import net.lag.configgy.Configgy
 import shards.Shard
 
 class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
-  val config = Configgy.config
-
   def sizeEstimate() = shard.count(sourceId, states)
 
   def selectWhereIn(page: Seq[Long]) = shard.intersect(sourceId, states, page)

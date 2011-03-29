@@ -1,9 +1,9 @@
 package com.twitter.flockdb
 
-import com.twitter.ostrich.{W3CStats, Stats, Service, ServiceTracker, W3CReporter, RuntimeEnvironment}
+import com.twitter.ostrich.stats.{W3CStats, Stats}
+import com.twitter.ostrich.admin.{ServiceTracker, RuntimeEnvironment, Service}
+import com.twitter.logging.{FileHandler, Logger}
 import com.twitter.util.Eval
-import net.lag.configgy.{Config => CConfig, Configgy}
-import net.lag.logging.{FileHandler, Logger}
 import org.apache.thrift.server.TServer
 import java.io.File
 import config.{FlockDB => FlockDBConfig}
@@ -51,7 +51,6 @@ object Main extends Service {
     try {
       config  = Eval[FlockDBConfig](args.map(new File(_)): _*)
       service = new FlockDB(config, w3c)
-//      Configgy.configLogging(CConfig.fromString(config.loggingConfig))
 
       start()
 
@@ -68,7 +67,6 @@ object Main extends Service {
 
   def start() {
     ServiceTracker.register(this)
-    val adminConfig = new CConfig
     adminConfig.setInt("admin_http_port", config.adminConfig.httpPort)
     adminConfig.setInt("admin_text_port", config.adminConfig.textPort)
     ServiceTracker.startAdmin(adminConfig, new RuntimeEnvironment(this.getClass))
