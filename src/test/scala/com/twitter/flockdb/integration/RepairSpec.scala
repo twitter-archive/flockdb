@@ -18,7 +18,6 @@ package com.twitter.flockdb
 package integration
 
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.ostrich.Stats
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import conversions.ExecuteOperations._
