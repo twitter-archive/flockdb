@@ -6,6 +6,9 @@ import com.twitter.conversions.time._
 import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.Priority
+import com.twitter.ostrich.admin.config.AdminServiceConfig
+import com.twitter.logging.Level
+import com.twitter.logging.config._
 
 trait Credentials extends Connection {
   val username = "root"
@@ -137,44 +140,46 @@ new FlockDB {
     Priority.Low.id     -> new ProductionScheduler("edges_slow") { threads = 2 }
   )
 
-  val adminConfig = new AdminConfig {
-    val textPort = 9991
-    val httpPort = 9990
+  val adminConfig = new AdminServiceConfig {
+    httpPort = Some(9990)
   }
 
-  logging = new LogConfigString("""
-log {
-  filename = "/var/log/flock/production.log"
-  level = "info"
-  roll = "hourly"
-  throttle_period_msec = 60000
-  throttle_rate = 10
-  truncate_stack_traces = 100
-
-  w3c {
-    node = "w3c"
-    use_parents = false
-    filename = "/var/log/flock/w3c.log"
-    level = "info"
-    roll = "hourly"
-  }
-
-  stats {
-    node = "stats"
-    use_parents = false
-    level = "info"
-    scribe_category = "flock-stats"
-    scribe_server = "localhost"
-    scribe_max_packet_size = 100
-  }
-
-  bad_jobs {
-    node = "bad_jobs"
-    use_parents = false
-    filename = "/var/log/flock/bad_jobs.log"
-    level = "info"
-    roll = "never"
-  }
-}
-  """)
+  loggers = List(
+    new LoggerConfig {
+      level = Some(Level.INFO)
+      handlers = List(
+        new ThrottledHandlerConfig {
+          duration = 60.seconds
+          maxToDisplay = 10
+          handler = new FileHandlerConfig {
+            filename = "/var/log/flock/production.log"
+            roll = Policy.Hourly
+          }
+        })
+    },
+    new LoggerConfig {
+      node = "w3c"
+      level = Some(Level.INFO)
+      useParents = false
+      handlers = List(new FileHandlerConfig {
+        filename = "/var/log/flock/w3c.log"
+        roll = Policy.Hourly
+      })
+    },
+    new LoggerConfig {
+      node = "stats"
+      useParents = false
+      level = Some(Level.INFO)
+      handlers = List(new ScribeHandlerConfig {
+        category = "flock-stats"
+      })
+    },
+    new LoggerConfig {
+      node = "bad_jobs"
+      useParents = false
+      handlers = List(new FileHandlerConfig {
+        roll = Policy.Never
+        filename = "/var/log/flock/bad_jobs.log"
+      })
+    })
 }
