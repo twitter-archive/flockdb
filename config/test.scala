@@ -6,6 +6,9 @@ import com.twitter.conversions.time._
 import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
+import com.twitter.ostrich.admin.config.AdminServiceConfig
+import com.twitter.logging.Level
+import com.twitter.logging.config.LoggerConfig
 
 
 trait Credentials extends Connection {
@@ -137,16 +140,11 @@ new FlockDB {
 
   // Admin/Logging
 
-  val adminConfig = new AdminConfig {
-    val textPort = 9991
-    val httpPort = 9990
+  val adminConfig = new AdminServiceConfig {
+    httpPort = Some(9990)
   }
 
-  logging = new LogConfigString("""
-level = "fatal"
-console = true
-throttle_period_msec = 60000
-throttle_rate = 10
-""")
-
+  loggers = List(new LoggerConfig {
+    level = Some(Level.FATAL)
+  })
 }
