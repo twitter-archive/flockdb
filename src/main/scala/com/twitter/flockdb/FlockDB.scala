@@ -110,9 +110,7 @@ class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards
   lazy val flockThriftServer = {
     val processor = new thrift.FlockDB.Processor(
       FlockExceptionWrappingProxyFactory(
-        LoggingProxy[thrift.FlockDB.Iface](
-          Stats, w3c, "FlockDB",
-          flockService)))
+        loggingProxy("FlockDB", flockService)))
 
     config.server(processor)
   }
