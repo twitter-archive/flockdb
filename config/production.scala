@@ -177,6 +177,7 @@ new FlockDB {
     new LoggerConfig {
       node = "bad_jobs"
       useParents = false
+      level = Some(Level.INFO)
       handlers = List(new FileHandlerConfig {
         roll = Policy.Never
         filename = "/var/log/flock/bad_jobs.log"
