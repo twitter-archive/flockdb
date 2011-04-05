@@ -227,9 +227,13 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
     val (continueCursorQuery, args1) = query(cursorName, index, 1, cursor, opposite(order), opposite(inequality), conditions, args)
     val (edgesQuery, args2) = query(cursorName, index, count + 1, cursor, order, inequality, conditions, args)
-    val totalQuery = continueCursorQuery + " UNION ALL " + edgesQuery
-    queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
-      edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
+    queryEvaluator.transaction { transaction =>
+      transaction.select(queryClass, continueCursorQuery, args1: _*) { row =>
+        edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
+      }
+      transaction.select(queryClass, edgesQuery, args2: _*) { row =>
+        edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
+      }
     }
 
     var page = edges.view
@@ -246,8 +250,13 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     val (continueCursorQuery, args2) = query("*", "position", "PRIMARY", 1, cursor, opposite(order), opposite(inequality), conditions, args)
 
     val edges = new mutable.ArrayBuffer[(Edge, Cursor)]
-    queryEvaluator.select(continueCursorQuery + " UNION ALL " + edgesQuery, args1 ++ args2: _*) { row =>
-      edges += (makeEdge(row) -> Cursor(row.getLong("position")))
+    queryEvaluator.transaction { transaction =>
+      transaction.select(continueCursorQuery, args1: _*) { row =>
+        edges += (makeEdge(row) -> Cursor(row.getLong("position")))
+      }
+      transaction.select(edgesQuery, args2: _*) { row =>
+        edges += (makeEdge(row) -> Cursor(row.getLong("position")))
+      }
     }
 
     var page = edges.view
