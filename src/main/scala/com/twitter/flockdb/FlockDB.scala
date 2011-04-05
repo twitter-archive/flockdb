@@ -25,9 +25,9 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory, LoggingProxy}
+import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory}
 import com.twitter.logging.Logger
-import com.twitter.ostrich.stats.{Stats, W3CStats}
+import com.twitter.ostrich.stats.Stats
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
@@ -48,7 +48,7 @@ import Direction._
 import thrift.FlockException
 import config.{FlockDB => FlockDBConfig}
 
-class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards.Shard](config) {
+class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config) {
   object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>

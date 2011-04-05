@@ -158,15 +158,6 @@ new FlockDB {
         })
     },
     new LoggerConfig {
-      node = "w3c"
-      level = Some(Level.INFO)
-      useParents = false
-      handlers = List(new FileHandlerConfig {
-        filename = "/var/log/flock/w3c.log"
-        roll = Policy.Hourly
-      })
-    },
-    new LoggerConfig {
       node = "stats"
       useParents = false
       level = Some(Level.INFO)
