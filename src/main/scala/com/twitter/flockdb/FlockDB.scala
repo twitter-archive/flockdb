@@ -54,7 +54,7 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
       case _: thrift.FlockException =>
         throw e
       case _ =>
-        log.error(e, "Error in FlockDB: " + e)
+        exceptionLog.error(e, "Error in FlockDB.")
         throw new thrift.FlockException(e.toString)
     }
   })
