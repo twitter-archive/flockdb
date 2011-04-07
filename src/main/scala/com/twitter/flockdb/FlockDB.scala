@@ -27,7 +27,7 @@ import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, 
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory}
 import com.twitter.logging.Logger
-import com.twitter.ostrich.stats.Stats
+import com.twitter.gizzard.Stats
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
@@ -60,8 +60,8 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
   })
 
   val stats = new StatsCollector {
-    def incr(name: String, count: Int) = Stats.incr(name, count)
-    def time[A](name: String)(f: => A): A = Stats.time(name)(f)
+    def incr(name: String, count: Int) = Stats.transaction.incr(name, count)
+    def time[A](name: String)(f: => A): A = Stats.transaction.time(name)(f)
   }
 
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)

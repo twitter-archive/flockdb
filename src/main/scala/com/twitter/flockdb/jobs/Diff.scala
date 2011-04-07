@@ -20,7 +20,6 @@ package jobs
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
-import com.twitter.ostrich.stats.Stats
 import com.twitter.util.TimeConversions._
 import com.twitter.logging.Logger
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard}

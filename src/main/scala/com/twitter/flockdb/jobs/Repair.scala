@@ -23,7 +23,6 @@ import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard}
 import com.twitter.gizzard.shards.{ShardDatabaseTimeoutException, ShardTimeoutException}
 import com.twitter.logging.Logger
-import com.twitter.ostrich.stats.Stats
 import com.twitter.util.TimeConversions._
 import collection.mutable.ListBuffer
 import conversions.Numeric._

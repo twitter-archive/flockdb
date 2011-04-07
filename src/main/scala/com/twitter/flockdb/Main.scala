@@ -1,6 +1,5 @@
 package com.twitter.flockdb
 
-import com.twitter.ostrich.stats.Stats
 import com.twitter.ostrich.admin.{ServiceTracker, Service}
 import com.twitter.logging.{FileHandler, Logger}
 import com.twitter.util.Eval

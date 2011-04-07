@@ -22,7 +22,7 @@ import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityCons
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
 import com.twitter.gizzard.shards
-import com.twitter.ostrich.stats.Stats
+import com.twitter.gizzard.Stats
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
@@ -518,7 +518,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def writeCopies(edges: Seq[Edge]) {
     if (!edges.isEmpty) {
-      Stats.addMetric("x-copy-burst", edges.size)
+      Stats.internal.addMetric("copy-burst", edges.size)
 
       var sourceIdsSet = Set[Long]()
       edges.foreach { edge => sourceIdsSet += edge.sourceId }
@@ -543,7 +543,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         }
 
         if (result.failed.size > 0) {
-          Stats.incr("x-copy-fallback")
+          Stats.internal.incr("copy-fallback")
           var currentSourceId = -1L
           var countDelta = 0
           result.failed.foreach { edge =>

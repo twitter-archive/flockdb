@@ -19,7 +19,6 @@ package jobs.multi
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardBlackHoleException
-import com.twitter.ostrich.stats.Stats
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
@@ -70,7 +69,6 @@ abstract class Multi(sourceId: Long, graphId: Int, direction: Direction, updated
   def toMap = Map("source_id" -> sourceId, "updated_at" -> updatedAt.inSeconds, "graph_id" -> graphId, "direction" -> direction.id, "priority" -> priority.id)
 
   def apply() {
-    Stats.incr("multijobs-" + getClass.getName.split("\\.").last)
     var cursor = Cursor.Start
     val forwardShard = forwardingManager.find(sourceId, graphId, direction)
     try {

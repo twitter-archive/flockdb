@@ -20,7 +20,7 @@ package jobs
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
-import com.twitter.ostrich.stats.Stats
+import com.twitter.gizzard.Stats
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
 import shards.Shard
@@ -56,7 +56,7 @@ class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Un
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.bulkUnsafeInsertEdges(items)
-    Stats.incr("edges-copy", items.size)
+    Stats.internal.incr("edges-copy", items.size)
     if (newCursor == UnsafeCopy.END) {
       None
     } else {
@@ -88,7 +88,7 @@ class MetadataUnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId,
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
     destinationShard.bulkUnsafeInsertMetadata(items)
-    Stats.incr("edges-copy", items.size)
+    Stats.internal.incr("edges-copy", items.size)
     if (newCursor == MetadataUnsafeCopy.END)
       Some(new UnsafeCopy(sourceShardId, destinationShardId, UnsafeCopy.START, UnsafeCopy.COUNT,
                           nameServer, scheduler))

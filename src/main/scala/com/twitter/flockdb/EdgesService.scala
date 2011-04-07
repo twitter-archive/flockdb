@@ -16,14 +16,13 @@
 
 package com.twitter.flockdb
 
-import com.twitter.gizzard.Future
+import com.twitter.gizzard.{Stats, Future}
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
   ShardOfflineException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import operations.{ExecuteOperations, SelectOperation}
-import com.twitter.ostrich.stats.Stats
 import com.twitter.logging.Logger
 import queries._
 import thrift.FlockException
@@ -122,7 +121,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   }
 
   private def countAndRethrow(e: Throwable) = {
-    Stats.incr("exceptions-" + e.getClass.getName.split("\\.").last)
+    Stats.internal.incr("exceptions-" + e.getClass.getName.split("\\.").last)
     throw(new FlockException(e.getMessage))
   }
 
@@ -137,7 +136,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
         log.error(e, "NonexistentShard: %s", e)
         throw(new FlockException(e.getMessage))
       case e: FlockException =>
-        Stats.incr(e.getClass.getName)
+        Stats.internal.incr(e.getClass.getName)
         throw(e)
       case e: ShardTimeoutException =>
         countAndRethrow(e)
@@ -146,7 +145,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
       case e: ShardOfflineException =>
         countAndRethrow(e)
       case e: Throwable =>
-        Stats.incr("exceptions-unknown")
+        Stats.internal.incr("exceptions-unknown")
         log.error(e, "Unhandled error in EdgesService: %s", e)
         throw(new FlockException(e.toString))
     }
