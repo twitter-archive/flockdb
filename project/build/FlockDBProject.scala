@@ -3,7 +3,9 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardLibraryProject(info)
-with SubversionPublisher with DefaultRepos {
+with CompileThriftJava
+with DefaultRepos
+with SubversionPublisher {
 
   override def filterScalaJars = false
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.8.1"
