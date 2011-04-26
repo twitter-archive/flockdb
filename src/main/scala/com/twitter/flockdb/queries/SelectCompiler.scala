@@ -18,7 +18,7 @@ package com.twitter.flockdb
 package queries
 
 import scala.collection.mutable
-import com.twitter.gizzard.Future
+import com.twitter.gizzard.{Stats, Future}
 import operations.{SelectOperation, SelectOperationType}
 import thrift.FlockException
 
@@ -55,6 +55,8 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
         throw new InvalidQueryException("Unknown operation " + n)
     }
     if (stack.size != 1) throw new InvalidQueryException("Left " + stack.size + " items on the stack instead of 1")
-    stack.pop
+    val rv = stack.pop
+    Stats.transaction.record("Query Plan: "+rv.toString)
+    rv
   }
 }

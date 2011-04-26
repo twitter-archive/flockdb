@@ -62,4 +62,7 @@ class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProport
     val whereIn = largerQuery.selectWhereIn(results.view)
     new ResultWindow(Cursor.cursorZip(whereIn), results.nextCursor, results.prevCursor, count, cursor)
   }
+
+  override def toString =
+    "<IntersectionQuery query1="+query1.toString+" query2="+query2.toString+">"
 }

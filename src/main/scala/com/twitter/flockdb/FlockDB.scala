@@ -41,6 +41,7 @@ import com.twitter.flockdb.conversions.Page._
 import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
 import com.twitter.flockdb.conversions.SelectOperation._
+import com.twitter.util.Duration
 import queries._
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
@@ -60,8 +61,14 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
   })
 
   val stats = new StatsCollector {
-    def incr(name: String, count: Int) = Stats.transaction.incr(name, count)
-    def time[A](name: String)(f: => A): A = Stats.transaction.time(name)(f)
+    def incr(name: String, count: Int) = Stats.global.incr(name, count)
+    def time[A](name: String)(f: => A): A = {
+      val (rv, duration) = Duration.inMilliseconds(f)
+      Stats.global.addMetric(name, duration.inMillis.toInt)
+      Stats.transaction.record(name + ": " + duration.inMillis.toInt)
+//      Stats.transaction.addMetric(name, duration.inMillis.toInt)
+      rv
+    }
   }
 
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)

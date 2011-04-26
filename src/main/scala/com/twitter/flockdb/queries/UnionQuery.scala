@@ -37,4 +37,7 @@ class UnionQuery(query1: Query, query2: Query) extends Query {
   private def merge(page1: Seq[Long], page2: Seq[Long]): Seq[Long] = {
     Sorting.stableSort((Set(page1: _*) ++ Set(page2: _*)).toSeq)
   }
+
+  override def toString =
+    "<UnionQuery query1="+query1.toString+" query2="+query2.toString+">"
 }

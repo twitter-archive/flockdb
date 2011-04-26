@@ -36,6 +36,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
                    aggregateJobsPageSize: Int) {
 
   private val log = Logger.get(getClass.getName)
+  private val exceptionLog = Logger.get("exception")
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
   private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
 
@@ -146,7 +147,8 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
         countAndRethrow(e)
       case e: Throwable =>
         Stats.internal.incr("exceptions-unknown")
-        log.error(e, "Unhandled error in EdgesService: %s", e)
+        exceptionLog.error(e, "Unhandled error in EdgesService", e)
+        log.error("Unhandled error in EdgesService: " + e.toString)
         throw(new FlockException(e.toString))
     }
   }

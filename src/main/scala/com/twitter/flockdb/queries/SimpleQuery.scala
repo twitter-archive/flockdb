@@ -20,6 +20,8 @@ package queries
 import shards.Shard
 
 class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
+//  stats.transaction.addTrace("SimpleQuery", Map("shard" -> shard, "sourceId" -> sourceId, "states" -> states))
+
   def sizeEstimate() = shard.count(sourceId, states)
 
   def selectWhereIn(page: Seq[Long]) = shard.intersect(sourceId, states, page)
@@ -31,4 +33,7 @@ class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Quer
   def selectPage(count: Int, cursor: Cursor) = {
     shard.selectByPosition(sourceId, states, count, cursor)
   }
+
+  override def toString =
+    "<SimpleQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+") shard="+shard+">"
 }

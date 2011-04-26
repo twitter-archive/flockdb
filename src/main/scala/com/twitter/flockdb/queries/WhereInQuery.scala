@@ -33,4 +33,7 @@ class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destination
   }
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
+
+  override def toString =
+    "<WhereInQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+") shard="+shard+" destIds=("+destinationIds.mkString(",")+")>"
 }
