@@ -18,8 +18,8 @@ trait IntersectionQuery {
   var averageIntersectionProportion = 0.1
   var intersectionPageSizeMax       = 4000
 
-  def intersect(query1: queries.Query, query2: queries.Query) = new queries.IntersectionQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
-  def difference(query1: queries.Query, query2: queries.Query) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
+  def intersect(query1: Query, query2: Query) = new queries.IntersectionQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
+  def difference(query1: Query, query2: Query) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
 }
 
 trait FlockDB extends GizzardServer {

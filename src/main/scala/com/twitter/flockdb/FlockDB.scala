@@ -65,7 +65,7 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
     def time[A](name: String)(f: => A): A = {
       val (rv, duration) = Duration.inMilliseconds(f)
       Stats.global.addMetric(name, duration.inMillis.toInt)
-      Stats.transaction.record(name + ": " + duration.inMillis.toInt)
+//      Stats.transaction.record(name + ": " + duration.inMillis.toInt)
 //      Stats.transaction.addMetric(name, duration.inMillis.toInt)
       rv
     }
@@ -79,7 +79,8 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
   override val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
   override val diffFactory = new jobs.DiffFactory(nameServer, jobScheduler)
 
-  val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
+  val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(
+    stats, { f => new TransactionStatsCollectingDatabaseFactory(f) }, { f => new TransactionStatsCollectingQueryFactory(f) })
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
   shardRepo += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))

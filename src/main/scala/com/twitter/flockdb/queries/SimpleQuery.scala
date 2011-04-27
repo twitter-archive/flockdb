@@ -18,22 +18,29 @@ package com.twitter.flockdb
 package queries
 
 import shards.Shard
+import com.twitter.gizzard.Stats
 
 class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
-//  stats.transaction.addTrace("SimpleQuery", Map("shard" -> shard, "sourceId" -> sourceId, "states" -> states))
+  def sizeEstimate() = {
+    Stats.transaction.record("Selecting counts from "+shard)
+    shard.count(sourceId, states)
+  }
 
-  def sizeEstimate() = shard.count(sourceId, states)
-
-  def selectWhereIn(page: Seq[Long]) = shard.intersect(sourceId, states, page)
+  def selectWhereIn(page: Seq[Long]) = {
+    Stats.transaction.record("Intersecting "+page.size+" ids from "+shard)
+    shard.intersect(sourceId, states, page)
+  }
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+    Stats.transaction.record("Selecting "+count+" destinationIds from "+shard)
     shard.selectByDestinationId(sourceId, states, count, cursor)
   }
 
   def selectPage(count: Int, cursor: Cursor) = {
+    Stats.transaction.record("Selecting "+count+" edges from "+shard)
     shard.selectByPosition(sourceId, states, count, cursor)
   }
 
   override def toString =
-    "<SimpleQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+") shard="+shard+">"
+    "<SimpleQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+")>"
 }
