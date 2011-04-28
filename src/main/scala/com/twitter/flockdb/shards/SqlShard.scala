@@ -36,6 +36,7 @@ import State._
 object QueryClass {
   val Select       = QuerulousQueryClass.Select
   val Execute      = QuerulousQueryClass.Execute
+  val SelectSmall  = QuerulousQueryClass("select_small")
   val SelectModify = QuerulousQueryClass("select_modify")
   val SelectCopy   = QuerulousQueryClass("select_copy")
   val SelectIntersection         = QuerulousQueryClass("select_intersection")
@@ -283,7 +284,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select(SelectIntersection, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      val queryClass = if (destinationIds.size == 1) SelectSmall else SelectIntersection
+      queryEvaluator.select(queryClass, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         row.getLong("destination_id")
       }
@@ -292,6 +294,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
+      val queryClass = if (destinationIds.size == 1) SelectSmall else SelectIntersection
       queryEvaluator.select(SelectIntersection, "SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         makeEdge(row)

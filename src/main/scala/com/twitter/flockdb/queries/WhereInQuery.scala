@@ -35,9 +35,7 @@ class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destination
     Stats.transaction.record("Selecting "+count+" edges from an intersection of "+destinationIds.size+" ids")
     val results = shard.intersect(sourceId, states, destinationIds)
     Stats.transaction.record("Selected "+results.size+" rows.")
-    val (rv, duration) = Duration.inMilliseconds { new ResultWindow(results.map(result => (result, Cursor(result))), count, cursor) }
-    Stats.transaction.record("Built result window in: "+duration.inMillis)
-    rv
+    new ResultWindow(results.map(result => (result, Cursor(result))), count, cursor)
   }
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)

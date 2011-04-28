@@ -60,6 +60,7 @@ class ProductionNameServerReplica(host: String) extends Mysql {
       QueryClass.Execute -> QueryTimeout(1.second),
       QueryClass.SelectCopy -> QueryTimeout(15.seconds),
       QueryClass.SelectModify -> QueryTimeout(3.seconds),
+      QueryClass.SelectSmall                -> QueryTimeout(1.second),
       QueryClass.SelectIntersection         -> QueryTimeout(1.second),
       QueryClass.SelectMetadata             -> QueryTimeout(1.second),
       QueryClass.SelectMetadataIntersection -> QueryTimeout(1.second)
