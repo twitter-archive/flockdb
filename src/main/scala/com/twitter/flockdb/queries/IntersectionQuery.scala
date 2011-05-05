@@ -20,6 +20,7 @@ package queries
 import com.twitter.util.Duration
 import com.twitter.util.TimeConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.gizzard.Stats
 
 class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends Query {
   val count1 = query1.sizeEstimate
@@ -55,7 +56,9 @@ class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProport
     }
   }
 
-  def selectWhereIn(page: Seq[Long]) = largerQuery.selectWhereIn(smallerQuery.selectWhereIn(page))
+  def selectWhereIn(page: Seq[Long]) = {
+    largerQuery.selectWhereIn(smallerQuery.selectWhereIn(page))
+  }
 
   private def pageIntersection(smallerQuery: Query, largerQuery: Query, internalPageSize: Int, count: Int, cursor: Cursor) = {
     val results = smallerQuery.selectPageByDestinationId(internalPageSize, cursor)

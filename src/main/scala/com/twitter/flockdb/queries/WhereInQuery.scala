@@ -23,6 +23,7 @@ import com.twitter.gizzard.Stats
 import shards.Shard
 
 class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) extends Query {
+
   def sizeEstimate() = destinationIds.size
 
   def selectWhereIn(page: Seq[Long]) = {

@@ -65,8 +65,6 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
     def time[A](name: String)(f: => A): A = {
       val (rv, duration) = Duration.inMilliseconds(f)
       Stats.global.addMetric(name, duration.inMillis.toInt)
-//      Stats.transaction.record(name + ": " + duration.inMillis.toInt)
-//      Stats.transaction.addMetric(name, duration.inMillis.toInt)
       rv
     }
   }
@@ -118,7 +116,7 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
   lazy val flockThriftServer = {
     val processor = new thrift.FlockDB.Processor(
       FlockExceptionWrappingProxyFactory(
-        loggingProxy("FlockDB", flockService)))
+        loggingProxy("flockdb", flockService)))
 
     config.server(processor)
   }

@@ -38,12 +38,12 @@ object Main extends Service {
   def shutdown() {
     if (service ne null) service.shutdown()
     service = null
-    ServiceTracker.stopAdmin()
+    ServiceTracker.shutdown()
   }
 
   override def quiesce() {
     if (service ne null) service.shutdown(true)
     service = null
-    ServiceTracker.stopAdmin()
+    ServiceTracker.shutdown()
   }
 }

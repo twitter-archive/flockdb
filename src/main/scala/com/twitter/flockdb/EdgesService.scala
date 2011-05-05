@@ -47,12 +47,14 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "contains-metadata"
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).isDefined
     }
   }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "contains"
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).map { edge =>
         edge.state == State.Normal || edge.state == State.Negative
       }.getOrElse(false)
@@ -61,6 +63,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def get(sourceId: Long, graphId: Int, destinationId: Long): Edge = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "get"
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).getOrElse {
         throw new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId))
       }
@@ -69,6 +72,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def getMetadata(sourceId: Long, graphId: Int): Metadata = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "get-metadata"
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).getOrElse {
         throw new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))
       }
