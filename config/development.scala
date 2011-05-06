@@ -35,6 +35,13 @@ class ProductionQueryEvaluator extends QueryEvaluator {
     poolSize = 10
     queueSize = 10000
   }
+  
+  query.timeouts = Map(
+    QueryClass.Select -> QueryTimeout(1.second),
+    QueryClass.Execute -> QueryTimeout(1.second),
+    QueryClass.SelectCopy -> QueryTimeout(15.seconds),
+    QueryClass.SelectModify -> QueryTimeout(3.seconds)
+  )
 }
 
 class ProductionNameServerReplica(host: String) extends Mysql {
@@ -53,13 +60,6 @@ class ProductionNameServerReplica(host: String) extends Mysql {
     database.timeout.foreach { t =>
       t.open = 1.second
     }
-
-    query.timeouts = Map(
-      QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second),
-      QueryClass.SelectCopy -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify -> QueryTimeout(3.seconds)
-    )
   }
 }
 
