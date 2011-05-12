@@ -19,19 +19,9 @@ class ProductionQueryEvaluator extends QueryEvaluator {
   }
 
   database.memoize = true
-  database.pool = new ApachePoolingDatabase {
-    sizeMin = 40
-    sizeMax = 40
-    maxWait = 100.millis
-    minEvictableIdle = 60.seconds
-    testIdle = 1.second
-    testOnBorrow = false
-  }
-
-  database.timeout = new TimingOutDatabase {
-    open = 50.millis
-    poolSize = 10
-    queueSize = 10000
+  database.pool = new ThrottledPoolingDatabase {
+    size = 40
+    openTimeout = 100.millis
   }
 }
 
@@ -42,14 +32,9 @@ class ProductionNameServerReplica(host: String) extends Mysql {
   }
 
   queryEvaluator = new ProductionQueryEvaluator {
-    database.pool.foreach { p =>
-      p.sizeMin = 1
-      p.sizeMax = 1
-      p.maxWait = 1.second
-    }
-
-    database.timeout.foreach { t =>
-      t.open = 1.second
+    database.pool = new ThrottledPoolingDatabase {
+      size = 1
+      openTimeout = 1.second
     }
 
     query.timeouts = Map(
@@ -106,10 +91,9 @@ new FlockDB {
   val edgesQueryEvaluator = new ProductionQueryEvaluator
 
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
-    database.pool.foreach { p =>
-      p.sizeMin = 1
-      p.sizeMax = 1
-      p.maxWait = 1.second
+    database.pool = new ThrottledPoolingDatabase {
+      size = 1
+      openTimeout = 1.second
     }
   }
 

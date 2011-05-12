@@ -10,7 +10,7 @@ with SubversionPublisher {
   override def filterScalaJars = false
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.8.1"
 
-  val gizzard =  "com.twitter" % "gizzard" % "2.1.6"
+  val gizzard =  "com.twitter" % "gizzard" % "2.2.0"
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
   val cglib     = "cglib" % "cglib" % "2.1_3" % "test"
   val hamcrest  = "org.hamcrest" % "hamcrest-all" % "1.1" % "test"
