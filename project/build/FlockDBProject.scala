@@ -3,14 +3,16 @@ import Process._
 import com.twitter.sbt._
 
 class FlockDBProject(info: ProjectInfo) extends StandardLibraryProject(info)
-with SubversionPublisher with DefaultRepos {
+with CompileThriftJava
+with DefaultRepos
+with SubversionPublisher {
 
   override def filterScalaJars = false
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.8.1"
 
-  val gizzard =  "com.twitter" % "gizzard" % "2.1.7-json-SNAPSHOT"
+  val gizzard   = "com.twitter" % "gizzard" % "2.2.5-json-SNAPSHOT"
   val asm       = "asm" % "asm" %  "1.5.3" % "test"
-  val cglib     = "cglib" % "cglib" % "2.1_3" % "test"
+  val cglib     = "cglib" % "cglib" % "2.2" % "test"
   val hamcrest  = "org.hamcrest" % "hamcrest-all" % "1.1" % "test"
   val jmock     = "org.jmock" % "jmock" % "2.4.0" % "test"
   val objenesis = "org.objenesis" % "objenesis" % "1.1" % "test"
