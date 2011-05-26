@@ -55,8 +55,8 @@ made-up graphs, by asking it to show you the forwarding table. First, set up a d
 in your `.gizzmorc` to make the rest of the demo easier:
 
     $ cat ~/.gizzmorc
-    host: localhost
-    port: 7917
+    hosts: localhost
+    port: 7920
 
 Then:
 
@@ -280,7 +280,7 @@ What shard is user 123456 on?
 Hm, but localhost has been behaving strangely lately. Let's move that shard to 127.0.0.1, which is
 really lightly loaded. First, create the new shard:
 
-    $ gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" 127.0.0.1 edges_99_0008_new com.twitter.flockdb.SqlShard
+    $ gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" com.twitter.flockdb.SqlShard 127.0.0.1/edges_99_0008_new
     127.0.0.1/edges_99_0008_new
 
 Then, setup a migration:
