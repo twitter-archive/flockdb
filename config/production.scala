@@ -124,38 +124,36 @@ new FlockDB {
   }
 
   logging = new LogConfigString("""
-log {
-  filename = "/var/log/flock/production.log"
+filename = "/var/log/flock/production.log"
+level = "info"
+roll = "hourly"
+throttle_period_msec = 60000
+throttle_rate = 10
+truncate_stack_traces = 100
+
+w3c {
+  node = "w3c"
+  use_parents = false
+  filename = "/var/log/flock/w3c.log"
   level = "info"
   roll = "hourly"
-  throttle_period_msec = 60000
-  throttle_rate = 10
-  truncate_stack_traces = 100
+}
 
-  w3c {
-    node = "w3c"
-    use_parents = false
-    filename = "/var/log/flock/w3c.log"
-    level = "info"
-    roll = "hourly"
-  }
+stats {
+  node = "stats"
+  use_parents = false
+  level = "info"
+  scribe_category = "flock-stats"
+  scribe_server = "localhost"
+  scribe_max_packet_size = 100
+}
 
-  stats {
-    node = "stats"
-    use_parents = false
-    level = "info"
-    scribe_category = "flock-stats"
-    scribe_server = "localhost"
-    scribe_max_packet_size = 100
-  }
-
-  bad_jobs {
-    node = "bad_jobs"
-    use_parents = false
-    filename = "/var/log/flock/bad_jobs.log"
-    level = "info"
-    roll = "never"
-  }
+bad_jobs {
+  node = "bad_jobs"
+  use_parents = false
+  filename = "/var/log/flock/bad_jobs.log"
+  level = "info"
+  roll = "never"
 }
   """)
 }
