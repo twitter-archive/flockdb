@@ -10,15 +10,18 @@ object ConfigValidationSpec extends Specification {
   "Configuration Validation" should {
     "production.scala" >> {
       val config = Eval[flockdb.config.FlockDB](new File("config/production.scala"))
+      config.logging()
       config mustNot beNull
     }
     "development.scala" >> {
       val config = Eval[flockdb.config.FlockDB](new File("config/development.scala"))
+      config.logging()
       config mustNot beNull
     }
 
     "test.scala" >> {
       val config = Eval[flockdb.config.FlockDB](new File("config/test.scala"))
+      config.logging()
       config mustNot beNull
     }
   }
