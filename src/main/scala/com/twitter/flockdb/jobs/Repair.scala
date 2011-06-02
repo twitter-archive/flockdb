@@ -37,10 +37,10 @@ object Repair {
   val PRIORITY = Priority.Medium.id
 }
 
-class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
+class RepairFactory(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler, uuidGenerator: UuidGenerator)
       extends RepairJobFactory[Shard] {
   def apply(shardIds: Seq[ShardId]) = {
-    new MetadataRepair(shardIds, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler)
+    new MetadataRepair(shardIds, MetadataRepair.START, MetadataRepair.COUNT, nameServer, scheduler, uuidGenerator)
   }
 }
 
@@ -131,16 +131,16 @@ object MetadataRepair {
   val PRIORITY = Priority.Medium.id
 }
 
-class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
+class MetadataRepairParser(nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler, uuidGenerator: UuidGenerator)
       extends RepairJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], shardIds: Seq[ShardId], count: Int) = {
     val cursor  = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
-    new MetadataRepair(shardIds, cursor, count, nameServer, scheduler)
+    new MetadataRepair(shardIds, cursor, count, nameServer, scheduler, uuidGenerator)
   }
 }
 
 class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor, count: Int,
-    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler)
+    nameServer: NameServer[Shard], scheduler: PrioritizingJobScheduler, uuidGenerator: UuidGenerator)
   extends MultiShardRepair[Shard, Metadata, MetadataRepair.RepairCursor](shardIds, cursor, count, nameServer, scheduler, Repair.PRIORITY) {
 
   private val log = Logger.get(getClass.getName)
@@ -150,16 +150,16 @@ class MetadataRepair(shardIds: Seq[ShardId], cursor: MetadataRepair.RepairCursor
   def nextRepair(lowestCursor: MetadataRepair.RepairCursor) = {
     Some(lowestCursor match {
       case MetadataRepair.END => new Repair(shardIds, Repair.START, Repair.COUNT, nameServer, scheduler)
-      case _ => new MetadataRepair(shardIds, lowestCursor, count, nameServer, scheduler)
+      case _ => new MetadataRepair(shardIds, lowestCursor, count, nameServer, scheduler, uuidGenerator)
     })
   }
 
   def scheduleDifferent(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
-    item.schedule(tableId, forwardingManager, scheduler, priority)
+    item.schedule(tableId, forwardingManager, scheduler, priority, uuidGenerator)
   }
 
   def scheduleMissing(list: (Shard, ListBuffer[Metadata], MetadataRepair.RepairCursor), tableId: Int, item: Metadata) = {
-    if (item.state != State.Normal || item.count != 0) item.schedule(tableId, forwardingManager, scheduler, priority)
+    if (item.state != State.Normal || item.count != 0) item.schedule(tableId, forwardingManager, scheduler, priority, uuidGenerator)
   }
 
   def scheduleBulk(otherShards: Seq[Shard], items: Seq[Metadata]) = {

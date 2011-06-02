@@ -170,8 +170,8 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     //                          Input     Before             After             Resulting
     //                          Job       Bob     Mary       Bob     Mary      Job
     test("normal archive",      Archived, Normal, Normal,    Normal, Normal,   Archived, _.apply)
-    test("archive removed",     Archived, Normal, Removed,   Normal, Removed,  Removed, _.apply)
-    test("archive removed",     Archived, Removed, Normal,   Removed, Normal,  Removed, _.apply)
+    test("NOT archive removed", Archived, Normal, Removed,   Normal, Removed,  Removed, _.apply)
+    test("NOT archive removed", Archived, Removed, Normal,   Removed, Normal,  Removed, _.apply)
 
 
     "toJson" in {
@@ -198,7 +198,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new jobs.multi.Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
+        val job = new jobs.multi.Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler, IdentityUuidGenerator)
         val json = job.toJson
         json mustMatch "Archive"
         json mustMatch "\"source_id\":" + bob
@@ -220,7 +220,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
+        val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler, IdentityUuidGenerator)
         val json = job.toJson
         json mustMatch "Unarchive"
         json mustMatch "\"source_id\":" + bob
@@ -242,7 +242,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
+        val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler, IdentityUuidGenerator)
         val json = job.toJson
         json mustMatch "RemoveAll"
         json mustMatch "\"source_id\":" + bob

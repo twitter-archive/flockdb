@@ -47,7 +47,7 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: 
 
   def max(other: Metadata) = if (this > other) this else other
 
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int) = {
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int, uuidGenerator: UuidGenerator) = {
     val job = state match {
       case State.Normal => Unarchive
       case State.Removed => RemoveAll
@@ -55,7 +55,8 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: 
       case State.Negative => Negate
     }
 
-    scheduler.put(priority, job(sourceId, tableId, if (tableId > 0) Direction.Forward else Direction.Backward, updatedAt, Priority.Medium, 500, forwardingManager, scheduler))
+    scheduler.put(
+      priority, job(sourceId, tableId, if (tableId > 0) Direction.Forward else Direction.Backward, updatedAt, Priority.Medium, 500, forwardingManager, scheduler, uuidGenerator))
   }
 
   def similar(other: Metadata) = {

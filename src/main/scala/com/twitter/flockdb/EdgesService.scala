@@ -34,11 +34,12 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
                    val schedule: PrioritizingJobScheduler,
                    future: Future,
                    intersectionQueryConfig: config.IntersectionQuery,
-                   aggregateJobsPageSize: Int) {
+                   aggregateJobsPageSize: Int,
+                   uuidGenerator: UuidGenerator) {
 
   private val log = Logger.get(getClass.getName)
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
-  private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
+  private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize, uuidGenerator)
 
   def shutdown() {
     schedule.shutdown()
