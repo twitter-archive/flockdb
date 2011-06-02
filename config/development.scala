@@ -7,6 +7,9 @@ import com.twitter.conversions.time._
 import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.Priority
+import com.twitter.ostrich.admin.config.AdminServiceConfig
+import com.twitter.logging.Level
+import com.twitter.logging.config._
 
 trait Credentials extends Connection {
   val env = System.getenv().toMap
@@ -43,7 +46,11 @@ class ProductionNameServerReplica(host: String) extends Mysql {
       QueryClass.Select -> QueryTimeout(1.second),
       QueryClass.Execute -> QueryTimeout(1.second),
       QueryClass.SelectCopy -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify -> QueryTimeout(3.seconds)
+      QueryClass.SelectModify -> QueryTimeout(3.seconds),
+      QueryClass.SelectSingle               -> QueryTimeout(1.second),
+      QueryClass.SelectIntersection         -> QueryTimeout(1.second),
+      QueryClass.SelectMetadata             -> QueryTimeout(1.second),
+      QueryClass.SelectMetadataIntersection -> QueryTimeout(1.second)
     )
   }
 }
@@ -119,20 +126,21 @@ new FlockDB {
     Priority.Low.id     -> new DevelopmentScheduler("edges_slow") { threads = 2 }
   )
 
-  val adminConfig = new AdminConfig {
-    val textPort = 9991
-    val httpPort = 9990
+  val adminConfig = new AdminServiceConfig {
+    httpPort = Some(9990)
   }
 
-  logging = new LogConfigString("""
-log {
-  filename = "development.log"
-  level = "info"
-  roll = "hourly"
-  throttle_period_msec = 60000
-  throttle_rate = 10
-  truncate_stack_traces = 100
-
-}
-  """)
+  loggers = List(new LoggerConfig {
+    level = Some(Level.INFO)
+    handlers = List(
+      new ThrottledHandlerConfig {
+        duration = 60.seconds
+        maxToDisplay = 10
+        handler = new FileHandlerConfig {
+          filename = "development.log"
+          roll = Policy.Hourly
+        }
+      }
+    )
+  })
 }

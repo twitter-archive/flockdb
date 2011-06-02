@@ -18,7 +18,7 @@ package com.twitter.flockdb
 package queries
 
 import scala.collection.mutable
-import com.twitter.gizzard.Future
+import com.twitter.gizzard.{Stats, Future}
 import operations.{SelectOperation, SelectOperationType}
 import thrift.FlockException
 
@@ -29,11 +29,14 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
   def apply(program: Seq[SelectOperation]): Query = {
     val stack = new mutable.Stack[Query]
 
+    var complexity = 0
+    var multiState = false
     for (op <- program) op.operationType match {
       case SelectOperationType.SimpleQuery =>
         val term = op.term.get
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
+        if (states.size > 1) multiState = true
         val query = if (term.destinationIds.isDefined) {
           new WhereInQuery(shard, term.sourceId, states, term.destinationIds.get)
         } else {
@@ -42,12 +45,15 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
         stack.push(query)
       case SelectOperationType.Intersection =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
+        complexity += 1
         stack.push(intersectionConfig.intersect(stack.pop, stack.pop))
       case SelectOperationType.Union =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
+        complexity += 1
         stack.push(new UnionQuery(stack.pop, stack.pop))
       case SelectOperationType.Difference =>
         if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
+        complexity += 1
         val rightSide = stack.pop
         val leftSide = stack.pop
         stack.push(intersectionConfig.difference(leftSide, rightSide))
@@ -55,6 +61,13 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
         throw new InvalidQueryException("Unknown operation " + n)
     }
     if (stack.size != 1) throw new InvalidQueryException("Left " + stack.size + " items on the stack instead of 1")
-    stack.pop
+    val rv = stack.pop
+    Stats.transaction.record("Query Plan: "+rv.toString)
+
+    val name = if (complexity > 0) "select-complex-"+complexity else {
+      "select-simple" + (if (multiState) "-multistate" else "")
+    }
+    Stats.transaction.name = name
+    rv
   }
 }

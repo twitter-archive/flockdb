@@ -16,17 +16,16 @@
 
 package com.twitter.flockdb
 
-import com.twitter.gizzard.Future
+import com.twitter.gizzard.{Stats, Future}
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
   ShardOfflineException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import operations.{ExecuteOperations, SelectOperation}
-import com.twitter.ostrich.Stats
+import com.twitter.logging.Logger
 import queries._
 import thrift.FlockException
-import net.lag.logging.Logger
 
 class EdgesService(val nameServer: NameServer[shards.Shard],
                    var forwardingManager: ForwardingManager,
@@ -37,6 +36,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
                    aggregateJobsPageSize: Int) {
 
   private val log = Logger.get(getClass.getName)
+  private val exceptionLog = Logger.get("exception")
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
   private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
 
@@ -47,12 +47,14 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "contains-metadata"
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).isDefined
     }
   }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "contains"
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).map { edge =>
         edge.state == State.Normal || edge.state == State.Negative
       }.getOrElse(false)
@@ -61,6 +63,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def get(sourceId: Long, graphId: Int, destinationId: Long): Edge = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "get"
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).getOrElse {
         throw new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId))
       }
@@ -69,6 +72,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
 
   def getMetadata(sourceId: Long, graphId: Int): Metadata = {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "get-metadata"
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).getOrElse {
         throw new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))
       }
@@ -122,7 +126,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   }
 
   private def countAndRethrow(e: Throwable) = {
-    Stats.incr("exceptions-" + e.getClass.getName.split("\\.").last)
+    Stats.internal.incr("exceptions-" + e.getClass.getName.split("\\.").last)
     throw(new FlockException(e.getMessage))
   }
 
@@ -137,7 +141,7 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
         log.error(e, "NonexistentShard: %s", e)
         throw(new FlockException(e.getMessage))
       case e: FlockException =>
-        Stats.incr(e.getClass.getName)
+        Stats.internal.incr(e.getClass.getName)
         throw(e)
       case e: ShardTimeoutException =>
         countAndRethrow(e)
@@ -146,8 +150,9 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
       case e: ShardOfflineException =>
         countAndRethrow(e)
       case e: Throwable =>
-        Stats.incr("exceptions-unknown")
-        log.error(e, "Unhandled error in EdgesService: %s", e)
+        Stats.internal.incr("exceptions-unknown")
+        exceptionLog.error(e, "Unhandled error in EdgesService", e)
+        log.error("Unhandled error in EdgesService: " + e.toString)
         throw(new FlockException(e.toString))
     }
   }

@@ -53,4 +53,7 @@ class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportio
     val rejects = query2.selectWhereIn(results.view)
     results -- rejects
   }
+
+  override def toString =
+    "<DifferenceQuery query1="+query1.toString+" query2="+query2.toString+">"
 }

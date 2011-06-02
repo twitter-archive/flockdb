@@ -20,7 +20,7 @@ package jobs
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardId
 import com.twitter.gizzard.nameserver.NameServer
-import com.twitter.ostrich.Stats
+import com.twitter.gizzard.Stats
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
 import shards.Shard
@@ -56,7 +56,7 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cop
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.writeCopies(items)
-    Stats.incr("edges-copy", items.size)
+    Stats.internal.incr("edges-copy", items.size)
     if (newCursor == Copy.END) {
       None
     } else {
@@ -87,7 +87,7 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
   def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
     destinationShard.writeMetadata(items)
-    Stats.incr("edges-copy", items.size)
+    Stats.internal.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
       Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))
     else

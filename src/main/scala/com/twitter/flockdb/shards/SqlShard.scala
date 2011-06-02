@@ -22,7 +22,7 @@ import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityCons
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
 import com.twitter.gizzard.shards
-import com.twitter.ostrich.Stats
+import com.twitter.gizzard.Stats
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
@@ -31,15 +31,17 @@ import com.twitter.querulous.query.{QueryClass => QuerulousQueryClass, SqlQueryT
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
-import net.lag.configgy.ConfigMap
-import net.lag.logging.Logger
 import State._
 
 object QueryClass {
   val Select       = QuerulousQueryClass.Select
   val Execute      = QuerulousQueryClass.Execute
+  val SelectSingle = QuerulousQueryClass("select_single")
   val SelectModify = QuerulousQueryClass("select_modify")
   val SelectCopy   = QuerulousQueryClass("select_copy")
+  val SelectIntersection         = QuerulousQueryClass("select_intersection")
+  val SelectMetadata             = QuerulousQueryClass("select_metadata")
+  val SelectMetadataIntersection = QuerulousQueryClass("select_metadata_intersection")
 }
 
 object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
@@ -95,7 +97,6 @@ CREATE TABLE IF NOT EXISTS %s (
 
 class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
                val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard with Optimism {
-  val log = Logger.get(getClass.getName)
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
 
@@ -108,7 +109,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
-    queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    queryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
@@ -137,7 +138,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
-    queryEvaluator.selectOne("SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    queryEvaluator.selectOne(SelectMetadata, "SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       states.foldLeft(0) { (result, state) =>
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
@@ -148,7 +149,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int]) {
-    queryEvaluator.select("SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
+    queryEvaluator.select(SelectMetadataIntersection, "SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
       results(row.getLong("source_id")) = row.getInt("count")
     }
   }
@@ -227,13 +228,9 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
     val (continueCursorQuery, args1) = query(cursorName, index, 1, cursor, opposite(order), opposite(inequality), conditions, args)
     val (edgesQuery, args2) = query(cursorName, index, count + 1, cursor, order, inequality, conditions, args)
-    queryEvaluator.transaction { transaction =>
-      transaction.select(queryClass, continueCursorQuery, args1: _*) { row =>
-        edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
-      }
-      transaction.select(queryClass, edgesQuery, args2: _*) { row =>
-        edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
-      }
+    val totalQuery = continueCursorQuery + " UNION ALL " + edgesQuery
+    queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
+      edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
     }
 
     var page = edges.view
@@ -250,13 +247,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     val (continueCursorQuery, args2) = query("*", "position", "PRIMARY", 1, cursor, opposite(order), opposite(inequality), conditions, args)
 
     val edges = new mutable.ArrayBuffer[(Edge, Cursor)]
-    queryEvaluator.transaction { transaction =>
-      transaction.select(continueCursorQuery, args1: _*) { row =>
-        edges += (makeEdge(row) -> Cursor(row.getLong("position")))
-      }
-      transaction.select(edgesQuery, args2: _*) { row =>
-        edges += (makeEdge(row) -> Cursor(row.getLong("position")))
-      }
+    queryEvaluator.select(continueCursorQuery + " UNION ALL " + edgesQuery, args1 ++ args2: _*) { row =>
+      edges += (makeEdge(row) -> Cursor(row.getLong("position")))
     }
 
     var page = edges.view
@@ -292,7 +284,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select("SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      val queryClass = if (destinationIds.size == 1) SelectSingle else SelectIntersection
+      queryEvaluator.select(queryClass, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         row.getLong("destination_id")
       }
@@ -301,7 +294,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      queryEvaluator.select("SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      val queryClass = if (destinationIds.size == 1) SelectSingle else SelectIntersection
+      queryEvaluator.select(SelectIntersection, "SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         makeEdge(row)
       }
@@ -518,7 +512,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def writeCopies(edges: Seq[Edge]) {
     if (!edges.isEmpty) {
-      Stats.addTiming("x-copy-burst", edges.size)
+      Stats.internal.addMetric("copy-burst", edges.size)
 
       var sourceIdsSet = Set[Long]()
       edges.foreach { edge => sourceIdsSet += edge.sourceId }
@@ -543,7 +537,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
         }
 
         if (result.failed.size > 0) {
-          Stats.incr("x-copy-fallback")
+          Stats.internal.incr("copy-fallback")
           var currentSourceId = -1L
           var countDelta = 0
           result.failed.foreach { edge =>

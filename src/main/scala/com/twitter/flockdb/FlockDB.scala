@@ -25,8 +25,9 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.nameserver
 import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory, LoggingProxy}
-import com.twitter.ostrich.{Stats, W3CStats}
+import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory}
+import com.twitter.logging.Logger
+import com.twitter.gizzard.Stats
 import com.twitter.querulous.StatsCollector
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
@@ -40,8 +41,7 @@ import com.twitter.flockdb.conversions.Page._
 import com.twitter.flockdb.conversions.Results._
 import com.twitter.flockdb.conversions.SelectQuery._
 import com.twitter.flockdb.conversions.SelectOperation._
-import net.lag.configgy.{Config, ConfigMap}
-import net.lag.logging.Logger
+import com.twitter.util.Duration
 import queries._
 import jobs.multi.{RemoveAll, Archive, Unarchive}
 import jobs.single.{Add, Remove}
@@ -49,20 +49,24 @@ import Direction._
 import thrift.FlockException
 import config.{FlockDB => FlockDBConfig}
 
-class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards.Shard](config) {
+class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config) {
   object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>
         throw e
       case _ =>
-        log.error(e, "Error in FlockDB: " + e)
+        exceptionLog.error(e, "Error in FlockDB.")
         throw new thrift.FlockException(e.toString)
     }
   })
 
   val stats = new StatsCollector {
-    def incr(name: String, count: Int) = w3c.incr(name, count)
-    def time[A](name: String)(f: => A): A = w3c.time(name)(f)
+    def incr(name: String, count: Int) = Stats.global.incr(name, count)
+    def time[A](name: String)(f: => A): A = {
+      val (rv, duration) = Duration.inMilliseconds(f)
+      Stats.global.addMetric(name, duration.inMillis.toInt)
+      rv
+    }
   }
 
   val readWriteShardAdapter = new shards.ReadWriteShardAdapter(_)
@@ -73,7 +77,8 @@ class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards
   override val repairFactory = new jobs.RepairFactory(nameServer, jobScheduler)
   override val diffFactory = new jobs.DiffFactory(nameServer, jobScheduler)
 
-  val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(stats)
+  val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(
+    stats, { f => new TransactionStatsCollectingDatabaseFactory(f) }, { f => new TransactionStatsCollectingQueryFactory(f) })
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
   shardRepo += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
@@ -108,12 +113,13 @@ class FlockDB(config: FlockDBConfig, w3c: W3CStats) extends GizzardServer[shards
     new FlockDBThriftAdapter(edges, scheduler)
   }
 
+  private val loggingProxy = makeLoggingProxy[thrift.FlockDB.Iface]()
+  lazy val loggingFlockService = loggingProxy(flockService)
+
   lazy val flockThriftServer = {
     val processor = new thrift.FlockDB.Processor(
       FlockExceptionWrappingProxyFactory(
-        LoggingProxy[thrift.FlockDB.Iface](
-          Stats, w3c, "FlockDB",
-          flockService)))
+        loggingFlockService))
 
     config.server(processor)
   }

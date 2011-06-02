@@ -17,20 +17,30 @@
 package com.twitter.flockdb
 package queries
 
+import com.twitter.util.Duration
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.gizzard.Stats
 import shards.Shard
 
 class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) extends Query {
+
   def sizeEstimate() = destinationIds.size
 
   def selectWhereIn(page: Seq[Long]) = {
-    shard.intersect(sourceId, states, (Set(destinationIds: _*) intersect Set(page: _*)).toSeq)
+    val intersection = (Set(destinationIds: _*) intersect Set(page: _*)).toSeq
+    Stats.transaction.record("Intersecting "+intersection.size+" ids from "+shard)
+    shard.intersect(sourceId, states, intersection)
   }
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+    Stats.transaction.record("Selecting "+count+" edges from an intersection of "+destinationIds.size+" ids")
     val results = shard.intersect(sourceId, states, destinationIds)
+    Stats.transaction.record("Selected "+results.size+" rows.")
     new ResultWindow(results.map(result => (result, Cursor(result))), count, cursor)
   }
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
+
+  override def toString =
+    "<WhereInQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+") destIds=("+destinationIds.mkString(",")+")>"
 }
