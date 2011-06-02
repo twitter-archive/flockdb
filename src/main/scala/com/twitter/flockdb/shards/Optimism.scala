@@ -58,8 +58,6 @@ trait Optimism extends Shard {
 
   def optimistically(sourceId: Long)(f: State => Unit) = {
     try {
-      log.debug("starting optimistic lock of " + shardInfo.id + " for " + sourceId)
-
       val (beforeStateOpt, beforeEx) = getDominantState(sourceId)
       val beforeState = beforeStateOpt.getOrElse(State.Normal)
 
@@ -78,13 +76,8 @@ trait Optimism extends Shard {
 
       if(beforeState != afterState) {
         val msg = shardInfo.id + " lost optimistic lock for " + sourceId + ": was " + beforeState +", now " + afterState
-        log.debug(msg)
-
         throw new OptimisticLockException(msg)
       }
-
-      log.debug("successful optimistic lock of " + shardInfo.id + " for " + sourceId)
-
     } catch {
       case e => {
         log.debug("exception in optimistic lock of " + shardInfo.id + " for " + sourceId + ": " + e.getMessage)
