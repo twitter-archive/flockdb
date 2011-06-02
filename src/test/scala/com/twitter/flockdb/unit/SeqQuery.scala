@@ -37,6 +37,6 @@ class SeqQuery(s: Seq[Long]) extends Query {
 
   private def sort(s: Seq[Long]) = Sorting.stableSort(s, (x: Long, y: Long) => y < x)
 
-  override def toString = 
+  override def toString =
     "<SeqQuery ids=("+s.mkString(",")+")>"
 }
