@@ -13,7 +13,8 @@ object Main extends Service {
 
   def main(args: Array[String]) {
     try {
-      config  = Eval[FlockDBConfig](args.map(new File(_)): _*)
+      val eval = new Eval
+      config  = eval[FlockDBConfig](args.map(new File(_)): _*)
       service = new FlockDB(config)
 
       start()

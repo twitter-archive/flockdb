@@ -99,6 +99,7 @@ new FlockDB {
   }
 
   val edgesQueryEvaluator = new ProductionQueryEvaluator
+  val lowLatencyQueryEvaluator = new ProductionQueryEvaluator
 
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
     database.pool = new ThrottledPoolingDatabase {

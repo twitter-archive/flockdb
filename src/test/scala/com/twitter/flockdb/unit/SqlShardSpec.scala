@@ -46,7 +46,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
 
     val queryEvaluatorFactory = config.edgesQueryEvaluator()
     val queryEvaluator = queryEvaluatorFactory(config.databaseConnection)
-    val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
+    val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
     val shardInfo = ShardInfo(ShardId("localhost", "table_001"), "com.twitter.flockdb.SqlShard",
       "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
     var shard: Shard = null
@@ -60,10 +60,10 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     }
 
     "create" in {
-      val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
+      val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
       val createShardInfo = ShardInfo(ShardId("localhost", "create_test"), "com.twitter.flockdb.SqlShard",
         "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
-      val createShard = new SqlShard(queryEvaluator, createShardInfo, 1, Nil, 0)
+      val createShard = new SqlShard(queryEvaluator, queryEvaluator, createShardInfo, 1, Nil, 0)
 
       "when the database doesn't exist" >> {
         createShardFactory.materialize(createShardInfo)
@@ -700,7 +700,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         }
 
         "retries edges that failed a bulk-insert" in {
-          val stubShard = new SqlShard(queryEvaluator, shardInfo, 0, Nil, 0) {
+          val stubShard = new SqlShard(queryEvaluator, queryEvaluator, shardInfo, 0, Nil, 0) {
             override def writeBurst(transaction: Transaction, edges: Seq[Edge]) = {
               val completed = new mutable.ArrayBuffer[Edge]
               val failed = new mutable.ArrayBuffer[Edge]

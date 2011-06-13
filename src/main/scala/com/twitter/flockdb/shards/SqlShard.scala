@@ -46,7 +46,7 @@ object QueryClass {
 
 object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
 
-class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
+class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, lowLatencyQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
   extends shards.ShardFactory[Shard] {
 
   val deadlockRetries = 3
@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS %s (
 
   def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
     val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
-    FlockExceptionWrappingProxyFactory(new SqlShard(queryEvaluator, shardInfo, weight, children, deadlockRetries))
+    val lowLatencyQueryEvaluator = lowLatencyQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
+    FlockExceptionWrappingProxyFactory(new SqlShard(queryEvaluator, lowLatencyQueryEvaluator, shardInfo, weight, children, deadlockRetries))
   }
 
   def materialize(shardInfo: shards.ShardInfo) = {
@@ -95,7 +96,7 @@ CREATE TABLE IF NOT EXISTS %s (
 }
 
 
-class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
+class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
                val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard with Optimism {
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
@@ -284,8 +285,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      val queryClass = if (destinationIds.size == 1) SelectSingle else SelectIntersection
-      queryEvaluator.select(queryClass, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      val (evaluator, queryClass) = if (destinationIds.size == 1) (lowLatencyQueryEvaluator, SelectSingle) else (queryEvaluator, SelectIntersection)
+      evaluator.select(queryClass, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         row.getLong("destination_id")
       }
@@ -294,8 +295,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      val queryClass = if (destinationIds.size == 1) SelectSingle else SelectIntersection
-      queryEvaluator.select(SelectIntersection, "SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
+      val (evaluator, queryClass) = if (destinationIds.size == 1) (lowLatencyQueryEvaluator, SelectSingle) else (queryEvaluator, SelectIntersection)
+      evaluator.select(queryClass, "SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         makeEdge(row)
       }
@@ -557,7 +558,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
 
   def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
     atomically(sourceId) { (transaction, metadata) =>
-      f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
+      f(new SqlShard(transaction, transaction, shardInfo, weight, children, deadlockRetries), metadata)
     }
   }
 

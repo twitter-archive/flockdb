@@ -29,7 +29,9 @@ trait FlockDB extends GizzardServer {
   var aggregateJobsPageSize         = 500
 
   def databaseConnection: Connection
+
   def edgesQueryEvaluator: QueryEvaluator
+  def lowLatencyQueryEvaluator: QueryEvaluator
   def materializingQueryEvaluator: QueryEvaluator
 
   def replicationFuture: Future

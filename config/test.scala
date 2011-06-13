@@ -43,6 +43,17 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     open = 1.second
   }
 
+  query.timeouts = Map(
+    QueryClass.Select       -> QueryTimeout(100.millis),
+    QueryClass.SelectModify -> QueryTimeout(5.seconds),
+    QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
+    QueryClass.Execute      -> QueryTimeout(5.seconds),
+    QueryClass.SelectSingle -> QueryTimeout(100.millis),
+    QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
+    QueryClass.SelectMetadata             -> QueryTimeout(100.millis),
+    QueryClass.SelectMetadataIntersection -> QueryTimeout(100.millis)
+  )
+
   override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {
     MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats, dbStatsFactory, queryStatsFactory) } )
   }
@@ -99,19 +110,8 @@ new FlockDB {
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
-  val edgesQueryEvaluator = new TestQueryEvaluator("edges") {
-    query.timeouts = Map(
-      QueryClass.Select       -> QueryTimeout(100.millis),
-      QueryClass.SelectModify -> QueryTimeout(5.seconds),
-      QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
-      QueryClass.Execute      -> QueryTimeout(5.seconds),
-      QueryClass.SelectSingle -> QueryTimeout(100.millis),
-      QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
-      QueryClass.SelectMetadata             -> QueryTimeout(100.millis),
-      QueryClass.SelectMetadataIntersection -> QueryTimeout(100.millis)
-    )
-  }
-
+  val edgesQueryEvaluator = new TestQueryEvaluator("edges")
+  val lowLatencyQueryEvaluator = edgesQueryEvaluator
   val materializingQueryEvaluator = edgesQueryEvaluator
 
   // schedulers

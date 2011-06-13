@@ -79,12 +79,14 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
 
   val dbQueryEvaluatorFactory = config.edgesQueryEvaluator(
     stats, { f => new TransactionStatsCollectingDatabaseFactory(f) }, { f => new TransactionStatsCollectingQueryFactory(f) })
+  val lowLatencyQueryEvaluatorFactory = config.lowLatencyQueryEvaluator(
+    stats, { f => new TransactionStatsCollectingDatabaseFactory(f) }, { f => new TransactionStatsCollectingQueryFactory(f) })
   val materializingQueryEvaluatorFactory = config.materializingQueryEvaluator(stats)
 
-  shardRepo += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
+  shardRepo += ("com.twitter.flockdb.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, lowLatencyQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
   // for backward compat:
   shardRepo.setupPackage("com.twitter.service.flock.edges")
-  shardRepo += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
+  shardRepo += ("com.twitter.service.flock.edges.SqlShard" -> new shards.SqlShardFactory(dbQueryEvaluatorFactory, lowLatencyQueryEvaluatorFactory, materializingQueryEvaluatorFactory, config.databaseConnection))
 
   val forwardingManager = new ForwardingManager(nameServer)
 
