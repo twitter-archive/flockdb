@@ -30,6 +30,7 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     val stack = new mutable.Stack[Query]
 
     var complexity = 0
+    var single = false
     var multiState = false
     for (op <- program) op.operationType match {
       case SelectOperationType.SimpleQuery =>
@@ -38,6 +39,7 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
         if (states.size > 1) multiState = true
         val query = if (term.destinationIds.isDefined) {
+          if (term.destinationIds.get.size == 1) single = true
           new WhereInQuery(shard, term.sourceId, states, term.destinationIds.get)
         } else {
           new SimpleQuery(shard, term.sourceId, states)
@@ -65,7 +67,9 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     Stats.transaction.record("Query Plan: "+rv.toString)
 
     val name = if (complexity > 0) "select-complex-"+complexity else {
-      "select-simple" + (if (multiState) "-multistate" else "")
+      "select-" +
+        (if (single) "single" else "simple") +
+        (if (multiState) "-multistate" else "")
     }
     Stats.transaction.name = name
     rv
