@@ -104,7 +104,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
   import QueryClass._
 
   def get(sourceId: Long, destinationId: Long) = {
-    queryEvaluator.selectOne("SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
+    lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? AND destination_id = ?", sourceId, destinationId) { row =>
       makeEdge(row)
     }
   }

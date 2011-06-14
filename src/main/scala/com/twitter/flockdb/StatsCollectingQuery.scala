@@ -3,7 +3,7 @@ package com.twitter.flockdb
 import com.twitter.gizzard.Stats
 import com.twitter.querulous.database.{Database, DatabaseFactory}
 import com.twitter.querulous.query.{Query, QueryFactory, QueryClass, QueryProxy}
-import com.twitter.util.Duration
+import com.twitter.util.{Time, Duration}
 import java.sql.Connection
 
 class TransactionStatsCollectingQueryFactory(queryFactory: QueryFactory)
@@ -17,9 +17,19 @@ class TransactionStatsCollectingQueryFactory(queryFactory: QueryFactory)
 class TransactionStatsCollectingQuery(query: Query, queryClass: QueryClass, queryString: String) extends QueryProxy(query) {
   override def delegate[A](f: => A) = {
     Stats.transaction.record("Executing "+queryClass.name+" query: "+queryString)
-    val (rv, duration) = Duration.inMilliseconds { f }
-    Stats.transaction.record("Query duration: "+duration.inMillis)
-    rv
+    val start = Time.now
+    try {
+      val rv = f
+      val duration = Time.now - start
+      Stats.transaction.record("Query duration: "+duration.inMillis)
+      rv
+    } catch {
+      case e =>
+        Stats.transaction.record("Failure executing query: "+e)
+        val duration = Time.now - start
+        Stats.transaction.record("Query duration: "+duration.inMillis)
+        throw e
+    }
   }
 }
 
@@ -32,14 +42,35 @@ class TransactionStatsCollectingDatabaseFactory(databaseFactory: DatabaseFactory
 class TransactionStatsCollectingDatabase(database: Database, dbhosts: List[String]) extends Database {
   override def open(): Connection = {
     Stats.transaction.record("Opening a connection to: "+dbhosts.mkString(","))
-    val (rv, duration) = Duration.inMilliseconds { database.open() }
-    Stats.transaction.record("Open duration: "+duration.inMillis)
-    rv
+    val start = Time.now
+    try {
+      val rv = database.open()
+      val duration = Time.now-start
+      Stats.transaction.record("Open duration: "+duration.inMillis)
+      rv
+    } catch {
+      case e =>
+        Stats.transaction.record("Failure opening a connection: "+e)
+        val duration = Time.now-start
+        Stats.transaction.record("Open duration: "+duration.inMillis)
+        throw e
+    }
   }
 
   override def close(connection: Connection) = {
     Stats.transaction.record("Closing connection to: "+dbhosts.mkString(","))
-    val (rv, duration) = Duration.inMilliseconds { database.close(connection) }
-    Stats.transaction.record("Close duration: "+duration.inMillis)
+    val start = Time.now
+    try {
+      val rv = database.close(connection)
+      val duration = Time.now - start
+      Stats.transaction.record("Close duration: "+duration.inMillis)
+      rv
+    } catch {
+      case e =>
+        Stats.transaction.record("Failure closing a connection: "+e)
+        val duration = Time.now-start
+        Stats.transaction.record("Close duration: "+duration.inMillis)
+        throw e
+    }
   }
 }
