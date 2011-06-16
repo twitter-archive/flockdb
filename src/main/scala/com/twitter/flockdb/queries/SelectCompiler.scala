@@ -26,51 +26,62 @@ import thrift.FlockException
 class InvalidQueryException(reason: String) extends FlockException(reason)
 
 class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: config.IntersectionQuery) {
-  def apply(program: Seq[SelectOperation]): Query = {
-    val stack = new mutable.Stack[Query]
 
-    var complexity = 0
-    var single = false
-    var multiState = false
+  private def validateProgram(acc: (Int,Int), op: SelectOperation) = op.operationType match {
+    case SelectOperationType.SimpleQuery  => (acc._1 + 1, acc._2)
+    case SelectOperationType.Intersection =>
+      if (acc._1 < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
+      (acc._1 - 1, acc._2 + 1)
+    case SelectOperationType.Union        =>
+      if (acc._1 < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
+      (acc._1 - 1, acc._2 + 1)
+    case SelectOperationType.Difference   =>
+      if (acc._1 < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
+      (acc._1 - 1, acc._2 + 1)
+    case n =>         throw new InvalidQueryException("Unknown operation " + n)
+  }
+
+  def apply(program: Seq[SelectOperation]): Query = {
+
+    // program is a list representation of a compound query in reverse polish (postfix) notation
+    // with one literal (SimpleQuery) and three binary operators (Intersection, Union, Difference)
+    // left fold over list to ensure that a valid parsing exists
+    val (items, complexity) = program.foldLeft(0,0)(validateProgram)
+    if (items != 1) throw new InvalidQueryException("Left " + items + " items on the stack instaed of 1")
+
+    var stack = new mutable.Stack[Query]
     for (op <- program) op.operationType match {
       case SelectOperationType.SimpleQuery =>
         val term = op.term.get
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
-        if (states.size > 1) multiState = true
         val query = if (term.destinationIds.isDefined) {
-          if (term.destinationIds.get.size == 1) single = true
           new WhereInQuery(shard, term.sourceId, states, term.destinationIds.get)
         } else {
           new SimpleQuery(shard, term.sourceId, states)
         }
         stack.push(query)
       case SelectOperationType.Intersection =>
-        if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
-        complexity += 1
         stack.push(intersectionConfig.intersect(stack.pop, stack.pop))
       case SelectOperationType.Union =>
-        if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
-        complexity += 1
         stack.push(new UnionQuery(stack.pop, stack.pop))
       case SelectOperationType.Difference =>
-        if (stack.size < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
-        complexity += 1
         val rightSide = stack.pop
         val leftSide = stack.pop
         stack.push(intersectionConfig.difference(leftSide, rightSide))
-      case n =>
-        throw new InvalidQueryException("Unknown operation " + n)
     }
-    if (stack.size != 1) throw new InvalidQueryException("Left " + stack.size + " items on the stack instead of 1")
     val rv = stack.pop
-    Stats.transaction.record("Query Plan: "+rv.toString)
 
-    val name = if (complexity > 0) "select-complex-"+complexity else {
+    // complexity == 0 indicates only a single literal (no binary operators) -- program is length 1
+    val name = if (complexity > 0) {
+      "select-complex-"+complexity
+    } else {
       "select-" +
-        (if (single) "single" else "simple") +
-        (if (multiState) "-multistate" else "")
+      (if (program.head.term.get.destinationIds.isDefined && rv.sizeEstimate() == 1) "single" else "simple") +
+      (if (program.head.term.get.states.size > 1) "-multistate" else "")
     }
+
+    Stats.transaction.record("Query Plan: "+rv.toString)
     Stats.transaction.name = name
     rv
   }

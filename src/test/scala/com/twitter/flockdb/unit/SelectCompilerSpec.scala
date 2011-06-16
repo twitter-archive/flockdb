@@ -22,7 +22,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
-import queries.SelectCompiler
+import queries.{SelectCompiler, InvalidQueryException}
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard
 import thrift.{Page, Results}
@@ -63,6 +63,26 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
         query.sizeEstimate mustEqual 23
       }
     }
+
+    "should throw" in {
+      "on an empty query" in {
+         val program = Nil
+         selectCompiler(program) must throwA[InvalidQueryException]
+      }
+
+      "on a malformed binary operation query" in {
+        val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
+          new SelectOperation(SelectOperationType.Intersection, None) :: Nil
+        selectCompiler(program) must throwA[InvalidQueryException]
+      }
+
+      "on a malformed dual-literal query" in {
+        val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
+          new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) :: Nil
+        selectCompiler(program) must throwA[InvalidQueryException]
+      }
+    }
+
 
     "execute a simple list query" in {
       expect {
