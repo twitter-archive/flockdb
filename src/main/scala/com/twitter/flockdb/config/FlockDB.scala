@@ -4,7 +4,7 @@ import com.twitter.gizzard.config._
 import com.twitter.ostrich.admin.config.AdminServiceConfig
 import com.twitter.querulous.config.{Connection, QueryEvaluator}
 import com.twitter.util.TimeConversions._
-import com.twitter.flockdb.queries.Query
+import com.twitter.flockdb.queries.QueryTree
 import com.twitter.flockdb.queries
 
 
@@ -18,8 +18,8 @@ trait IntersectionQuery {
   var averageIntersectionProportion = 0.1
   var intersectionPageSizeMax       = 4000
 
-  def intersect(query1: Query, query2: Query) = new queries.IntersectionQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
-  def difference(query1: Query, query2: Query) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
+  def intersect(query1: QueryTree, query2: QueryTree) = new queries.IntersectionQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
+  def difference(query1: QueryTree, query2: QueryTree) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
 }
 
 trait FlockDB extends GizzardServer {

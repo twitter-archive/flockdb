@@ -49,7 +49,7 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     val items = program.foldLeft(0)(validateProgram)
     if (items != 1) throw new InvalidQueryException("Left " + items + " items on the stack instaed of 1")
 
-    var stack = new mutable.Stack[Query]
+    var stack = new mutable.Stack[QueryTree]
     for (op <- program) op.operationType match {
       case SelectOperationType.SimpleQuery =>
         val term = op.term.get

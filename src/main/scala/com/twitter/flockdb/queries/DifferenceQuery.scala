@@ -21,12 +21,12 @@ import com.twitter.util.Duration
 import com.twitter.util.TimeConversions._
 
 
-class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
+class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
   def sizeEstimate = query1.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time({
     val guessedPageSize = (count + count * averageIntersectionProportion).toInt
     val internalPageSize = guessedPageSize min intersectionPageSizeMax
     val timeout = intersectionTimeout.inMillis
@@ -40,13 +40,13 @@ class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportio
       resultWindow = resultWindow ++ pageDifference(internalPageSize, count, resultWindow.continueCursor)
     }
     resultWindow
-  }
+  })
 
-  def selectWhereIn(page: Seq[Long]) = {
+  def selectWhereIn(page: Seq[Long]) = time({
     val results = query1.selectWhereIn(page)
     val rejects = Set(query2.selectWhereIn(results): _*)
     results.filter { item => !rejects.contains(item) }
-  }
+  })
 
   private def pageDifference(internalPageSize: Int, count: Int, cursor: Cursor) = {
     val results = query1.selectPageByDestinationId(internalPageSize, cursor)
@@ -55,5 +55,5 @@ class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportio
   }
 
   override def toString =
-    "<DifferenceQuery query1="+query1.toString+" query2="+query2.toString+">"
+    "<DifferenceQuery query1="+query1.toString+" query2="+query2.toString+duration.map(" time="+_.inMillis).mkString+">"
 }

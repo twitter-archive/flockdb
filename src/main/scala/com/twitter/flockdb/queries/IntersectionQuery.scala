@@ -22,7 +22,7 @@ import com.twitter.util.TimeConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.Stats
 
-class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
+class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
   val count1 = query1.sizeEstimate
   val count2 = query2.sizeEstimate
 
@@ -36,7 +36,7 @@ class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProport
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time({
     if (count1 == 0 || count2 == 0) {
       new ResultWindow(List[(Long,Cursor)](), count, cursor)
     } else {
@@ -54,11 +54,11 @@ class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProport
       }
       resultWindow
     }
-  }
+  })
 
-  def selectWhereIn(page: Seq[Long]) = {
+  def selectWhereIn(page: Seq[Long]) = time({
     largerQuery.selectWhereIn(smallerQuery.selectWhereIn(page))
-  }
+  })
 
   private def pageIntersection(smallerQuery: Query, largerQuery: Query, internalPageSize: Int, count: Int, cursor: Cursor) = {
     val results = smallerQuery.selectPageByDestinationId(internalPageSize, cursor)
@@ -67,5 +67,5 @@ class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProport
   }
 
   override def toString =
-    "<IntersectionQuery query1="+query1.toString+" query2="+query2.toString+">"
+    "<IntersectionQuery query1="+query1.toString+" query2="+query2.toString+duration.map(" time="+_.inMillis).mkString+">"
 }

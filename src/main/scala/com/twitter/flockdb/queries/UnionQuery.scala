@@ -19,19 +19,19 @@ package queries
 
 import scala.util.Sorting
 
-class UnionQuery(query1: Query, query2: Query) extends ComplexQueryNode(query1, query2) {
+class UnionQuery(query1: QueryTree, query2: QueryTree) extends ComplexQueryNode(query1, query2) {
   def sizeEstimate() = query1.sizeEstimate max query2.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time({
     val result1 = query1.selectPageByDestinationId(count, cursor)
     val result2 = query2.selectPageByDestinationId(count, cursor)
     result1.merge(result2)
-  }
+  })
 
   def selectWhereIn(page: Seq[Long]) = {
-    merge(query1.selectWhereIn(page), query2.selectWhereIn(page))
+    time(merge(query1.selectWhereIn(page), query2.selectWhereIn(page)))
   }
 
   private def merge(page1: Seq[Long], page2: Seq[Long]): Seq[Long] = {
@@ -39,5 +39,5 @@ class UnionQuery(query1: Query, query2: Query) extends ComplexQueryNode(query1, 
   }
 
   override def toString =
-    "<UnionQuery query1="+query1.toString+" query2="+query2.toString+">"
+    "<UnionQuery query1="+query1.toString+" query2="+query2.toString+duration.map(" time="+_.inMillis).mkString+">"
 }

@@ -85,7 +85,10 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
     rethrowExceptionsAsThrift {
       queries.parallel(future).map { query =>
         try {
-          selectCompiler(query.operations).select(query.page)
+          val queryTree = selectCompiler(query.operations)
+          val rv = queryTree.select(query.page)
+          Stats.transaction.record(queryTree.toString)
+          rv
         } catch {
           case e: ShardBlackHoleException =>
             throw new FlockException("Shard is blackholed: " + e)
@@ -120,7 +123,10 @@ class EdgesService(val nameServer: NameServer[shards.Shard],
   def count(queries: Seq[Seq[SelectOperation]]): Seq[Int] = {
     rethrowExceptionsAsThrift {
       queries.parallel(future).map { query =>
-        selectCompiler(query).sizeEstimate
+        val queryTree = selectCompiler(query)
+        val rv = queryTree.sizeEstimate
+        Stats.transaction.record(queryTree.toString)
+        rv
       }
     }
   }

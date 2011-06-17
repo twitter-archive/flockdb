@@ -22,6 +22,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
+import com.twitter.flockdb.{Page => FlockPage}
 import queries.{SelectCompiler, InvalidQueryException}
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard
@@ -139,6 +140,19 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       val query = selectCompiler(program)
       query.getClass.getName mustMatch "DifferenceQuery"
       query.sizeEstimate mustEqual 10
+    }
+
+
+    "time a simple list query" in {
+      expect {
+        one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
+        one(shard).intersect(sourceId, List(State.Normal), List[Long](12, 13)) willReturn List[Long](12,13)
+      }
+      val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, Some(List[Long](12, 13)), List(State.Normal)))) :: Nil
+      val queryTree = selectCompiler(program)
+      queryTree.toString mustEqual "<WhereInQuery sourceId="+sourceId+" states=(Normal) destIds=(12,13)>"
+      val rv = queryTree.select(FlockPage(0,Cursor(0)))
+      queryTree.toString mustEqual "<WhereInQuery sourceId="+sourceId+" states=(Normal) destIds=(12,13) time=0>"
     }
   }
 }

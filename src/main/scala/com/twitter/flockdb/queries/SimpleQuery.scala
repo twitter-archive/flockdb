@@ -23,24 +23,25 @@ import com.twitter.gizzard.Stats
 class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends SimpleQueryNode {
   def sizeEstimate() = {
     Stats.transaction.record("Selecting counts from "+shard)
-    shard.count(sourceId, states)
+    time(shard.count(sourceId, states))
   }
 
   def selectWhereIn(page: Seq[Long]) = {
     Stats.transaction.record("Intersecting "+page.size+" ids from "+shard)
-    shard.intersect(sourceId, states, page)
+    time(shard.intersect(sourceId, states, page))
   }
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
     Stats.transaction.record("Selecting "+count+" destinationIds from "+shard)
-    shard.selectByDestinationId(sourceId, states, count, cursor)
+    time(shard.selectByDestinationId(sourceId, states, count, cursor))
   }
 
   def selectPage(count: Int, cursor: Cursor) = {
     Stats.transaction.record("Selecting "+count+" edges from "+shard)
-    shard.selectByPosition(sourceId, states, count, cursor)
+    time(shard.selectByPosition(sourceId, states, count, cursor))
   }
 
-  override def toString =
-    "<SimpleQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+")>"
+  override def toString = {
+    "<SimpleQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+")"+duration.map(" time="+_.inMillis).mkString+">"
+  }
 }
