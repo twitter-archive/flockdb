@@ -19,7 +19,7 @@ package queries
 
 import scala.util.Sorting
 
-class UnionQuery(query1: Query, query2: Query) extends Query {
+class UnionQuery(query1: Query, query2: Query) extends ComplexQueryNode(query1, query2) {
   def sizeEstimate() = query1.sizeEstimate max query2.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)

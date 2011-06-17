@@ -21,7 +21,7 @@ import com.twitter.util.Duration
 import com.twitter.util.TimeConversions._
 
 
-class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends Query {
+class DifferenceQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
   def sizeEstimate = query1.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)

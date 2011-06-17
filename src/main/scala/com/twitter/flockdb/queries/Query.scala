@@ -17,14 +17,26 @@
 package com.twitter.flockdb
 package queries
 
-import com.twitter.gizzard.Stats
-
-
-trait Query {
+sealed abstract class Query {
   def sizeEstimate(): Int
   def selectWhereIn(page: Seq[Long]): Seq[Long]
   def select(page: Page) = selectPage(page.count, page.cursor)
   def selectPageByDestinationId(count: Int, cursor: Cursor): ResultWindow[Long]
 
   protected def selectPage(count: Int, cursor: Cursor): ResultWindow[Long]
+
+  def getComplexity(): Int
+  def getDepth(): Int
+}
+
+abstract case class ComplexQueryNode(left: Query, right: Query) extends Query {
+  val complexity = (left.getComplexity() + right.getComplexity()) + 1
+  val depth = (left.getDepth() max right.getDepth) + 1 
+  def getComplexity(): Int = complexity
+  def getDepth(): Int = depth
+}
+
+abstract case class SimpleQueryNode() extends Query {
+  def getComplexity(): Int = 0
+  def getDepth(): Int = 0
 }

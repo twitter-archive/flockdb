@@ -27,18 +27,18 @@ class InvalidQueryException(reason: String) extends FlockException(reason)
 
 class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: config.IntersectionQuery) {
 
-  private def validateProgram(acc: (Int,Int), op: SelectOperation) = op.operationType match {
-    case SelectOperationType.SimpleQuery  => (acc._1 + 1, acc._2)
+  private def validateProgram(acc: Int, op: SelectOperation) = op.operationType match {
+    case SelectOperationType.SimpleQuery  => acc + 1
     case SelectOperationType.Intersection =>
-      if (acc._1 < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
-      (acc._1 - 1, acc._2 + 1)
+      if (acc < 2) throw new InvalidQueryException("Need two sub-queries to do an intersection")
+      acc - 1
     case SelectOperationType.Union        =>
-      if (acc._1 < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
-      (acc._1 - 1, acc._2 + 1)
+      if (acc < 2) throw new InvalidQueryException("Need two sub-queries to do a union")
+      acc - 1
     case SelectOperationType.Difference   =>
-      if (acc._1 < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
-      (acc._1 - 1, acc._2 + 1)
-    case n =>         throw new InvalidQueryException("Unknown operation " + n)
+      if (acc < 2) throw new InvalidQueryException("Need two sub-queries to do a difference")
+      acc - 1
+    case n =>      throw new InvalidQueryException("Unknown operation " + n)
   }
 
   def apply(program: Seq[SelectOperation]): Query = {
@@ -46,7 +46,7 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     // program is a list representation of a compound query in reverse polish (postfix) notation
     // with one literal (SimpleQuery) and three binary operators (Intersection, Union, Difference)
     // left fold over list to ensure that a valid parsing exists
-    val (items, complexity) = program.foldLeft(0,0)(validateProgram)
+    val items = program.foldLeft(0)(validateProgram)
     if (items != 1) throw new InvalidQueryException("Left " + items + " items on the stack instaed of 1")
 
     var stack = new mutable.Stack[Query]
@@ -73,12 +73,14 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     val rv = stack.pop
 
     // complexity == 0 indicates only a single literal (no binary operators) -- program is length 1
+    val complexity = rv.getComplexity()
     val name = if (complexity > 0) {
       "select-complex-"+complexity
     } else {
-      "select-" +
-      (if (program.head.term.get.destinationIds.isDefined && rv.sizeEstimate() == 1) "single" else "simple") +
-      (if (program.head.term.get.states.size > 1) "-multistate" else "")
+      "select-" + (rv match {
+        case query: WhereInQuery => if (query.sizeEstimate() == 1) "single" else "simple"
+        case query: SimpleQuery  => if (program.head.term.get.states.size > 1) "-multistate" else ""
+      })
     }
 
     Stats.transaction.record("Query Plan: "+rv.toString)

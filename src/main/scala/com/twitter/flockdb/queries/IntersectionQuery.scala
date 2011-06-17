@@ -22,7 +22,7 @@ import com.twitter.util.TimeConversions._
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.Stats
 
-class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends Query {
+class IntersectionQuery(query1: Query, query2: Query, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
   val count1 = query1.sizeEstimate
   val count2 = query2.sizeEstimate
 

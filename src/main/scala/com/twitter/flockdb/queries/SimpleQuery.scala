@@ -20,7 +20,7 @@ package queries
 import shards.Shard
 import com.twitter.gizzard.Stats
 
-class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
+class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends SimpleQueryNode {
   def sizeEstimate() = {
     Stats.transaction.record("Selecting counts from "+shard)
     shard.count(sourceId, states)
