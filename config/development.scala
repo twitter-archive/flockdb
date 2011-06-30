@@ -25,6 +25,13 @@ class ProductionQueryEvaluator extends QueryEvaluator {
     size = 40
     openTimeout = 100.millis
   }
+  
+  query.timeouts = Map(
+    QueryClass.Select -> QueryTimeout(1.second),
+    QueryClass.Execute -> QueryTimeout(1.second),
+    QueryClass.SelectCopy -> QueryTimeout(15.seconds),
+    QueryClass.SelectModify -> QueryTimeout(3.seconds)
+  )
 }
 
 class ProductionNameServerReplica(host: String) extends Mysql {
@@ -38,13 +45,6 @@ class ProductionNameServerReplica(host: String) extends Mysql {
       size = 1
       openTimeout = 1.second
     }
-
-    query.timeouts = Map(
-      QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second),
-      QueryClass.SelectCopy -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify -> QueryTimeout(3.seconds)
-    )
   }
 }
 
