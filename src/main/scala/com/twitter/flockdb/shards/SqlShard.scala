@@ -515,7 +515,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
 
   def writeCopies(edges: Seq[Edge]) {
     if (!edges.isEmpty) {
-      Stats.internal.addMetric("copy-burst", edges.size)
+      Stats.addMetric("copy-burst", edges.size)
 
       var sourceIdsSet = Set[Long]()
       edges.foreach { edge => sourceIdsSet += edge.sourceId }
@@ -540,7 +540,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
         }
 
         if (result.failed.size > 0) {
-          Stats.internal.incr("copy-fallback")
+          Stats.incr("copy-fallback")
           var currentSourceId = -1L
           var countDelta = 0
           result.failed.foreach { edge =>

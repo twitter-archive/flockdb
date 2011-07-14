@@ -61,10 +61,10 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer[shards.Shard](config)
   })
 
   val stats = new StatsCollector {
-    def incr(name: String, count: Int) = Stats.global.incr(name, count)
+    def incr(name: String, count: Int) = Stats.incr(name, count)
     def time[A](name: String)(f: => A): A = {
       val (rv, duration) = Duration.inMilliseconds(f)
-      Stats.global.addMetric(name, duration.inMillis.toInt)
+      Stats.addMetric(name, duration.inMillis.toInt)
       rv
     }
   }
