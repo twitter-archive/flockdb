@@ -50,8 +50,8 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     QueryClass.Execute      -> QueryTimeout(5.seconds),
     QueryClass.SelectSingle -> QueryTimeout(100.millis),
     QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
-    QueryClass.SelectMetadata             -> QueryTimeout(100.millis),
-    QueryClass.SelectMetadataIntersection -> QueryTimeout(100.millis)
+    QueryClass.SelectIntersectionSmall    -> QueryTimeout(100.millis),
+    QueryClass.SelectMetadata             -> QueryTimeout(100.millis)
   )
 
   override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {

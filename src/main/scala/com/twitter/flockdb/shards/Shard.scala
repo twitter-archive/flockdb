@@ -35,7 +35,6 @@ trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def optimistically(sourceId: Long)(f: State => Unit)
 
   @throws(classOf[shards.ShardException]) def count(sourceId: Long, states: Seq[State]): Int
-  @throws(classOf[shards.ShardException]) def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int])
 
   @throws(classOf[shards.ShardException]) def selectAll(cursor: (Cursor, Cursor), count: Int): (Seq[Edge], (Cursor, Cursor))
   @throws(classOf[shards.ShardException]) def selectAllMetadata(cursor: Cursor, count: Int): (Seq[Metadata], Cursor)

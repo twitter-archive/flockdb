@@ -93,15 +93,6 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.count(carl, List(State.Normal)) mustEqual 1
         }
 
-        "multiple counts" >> {
-          val results = new mutable.HashMap[Long, Int]
-          shard.add(alice, bob, 1, now)
-          shard.add(alice, carl, 2, now)
-          shard.add(carl, alice, 1, now)
-          shard.counts(List(alice, carl), results)
-          results mustEqual Map(alice -> 2, carl -> 1)
-        }
-
         "when the user does not exist yet" >> {
           shard.count(bob, List(State.Normal)) mustEqual 0
         }

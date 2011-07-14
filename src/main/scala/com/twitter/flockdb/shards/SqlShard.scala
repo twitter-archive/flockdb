@@ -40,8 +40,8 @@ object QueryClass {
   val SelectModify = QuerulousQueryClass("select_modify")
   val SelectCopy   = QuerulousQueryClass("select_copy")
   val SelectIntersection         = QuerulousQueryClass("select_intersection")
+  val SelectIntersectionSmall    = QuerulousQueryClass("select_intersection_small")
   val SelectMetadata             = QuerulousQueryClass("select_metadata")
-  val SelectMetadataIntersection = QuerulousQueryClass("select_metadata_intersection")
 }
 
 object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
@@ -110,7 +110,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
   }
 
   def getMetadata(sourceId: Long): Option[Metadata] = {
-    queryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    lowLatencyQueryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
@@ -139,19 +139,13 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
   }
 
   def count(sourceId: Long, states: Seq[State]): Int = {
-    queryEvaluator.selectOne(SelectMetadata, "SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+    lowLatencyQueryEvaluator.selectOne(SelectMetadata, "SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       states.foldLeft(0) { (result, state) =>
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
     } getOrElse {
       populateMetadata(sourceId, Normal)
       count(sourceId, states)
-    }
-  }
-
-  def counts(sourceIds: Seq[Long], results: mutable.Map[Long, Int]) {
-    queryEvaluator.select(SelectMetadataIntersection, "SELECT source_id, `count` FROM " + tablePrefix + "_metadata WHERE source_id IN (?)", sourceIds) { row =>
-      results(row.getLong("source_id")) = row.getInt("count")
     }
   }
 
@@ -285,7 +279,11 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      val (evaluator, queryClass) = if (destinationIds.size == 1) (lowLatencyQueryEvaluator, SelectSingle) else (queryEvaluator, SelectIntersection)
+      val (evaluator, queryClass) = destinationIds.size match {
+        case s if s == 1 => (lowLatencyQueryEvaluator, SelectSingle)
+        case s if s <= 50 => (lowLatencyQueryEvaluator, SelectIntersectionSmall)
+        case s => (queryEvaluator, SelectIntersection)
+      }
       evaluator.select(queryClass, "SELECT destination_id FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         row.getLong("destination_id")
@@ -295,7 +293,11 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
     if (destinationIds.size == 0) Nil else {
-      val (evaluator, queryClass) = if (destinationIds.size == 1) (lowLatencyQueryEvaluator, SelectSingle) else (queryEvaluator, SelectIntersection)
+      val (evaluator, queryClass) = destinationIds.size match {
+        case s if s == 1 => (lowLatencyQueryEvaluator, SelectSingle)
+        case s if s <= 50 => (lowLatencyQueryEvaluator, SelectIntersectionSmall)
+        case s => (queryEvaluator, SelectIntersection)
+      }
       evaluator.select(queryClass, "SELECT * FROM " + tablePrefix + "_edges USE INDEX (unique_source_id_destination_id) WHERE source_id = ? AND state IN (?) AND destination_id IN (?) ORDER BY destination_id DESC",
         sourceId, states.map(_.id), destinationIds) { row =>
         makeEdge(row)

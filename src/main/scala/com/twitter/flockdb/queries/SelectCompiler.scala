@@ -77,8 +77,8 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     val name = if (complexity > 0) {
       "select-complex-"+complexity
     } else {
-      "select-" + (rv match {
-        case query: WhereInQuery => if (query.sizeEstimate() == 1) "single" else "simple"
+      "select" + (rv match {
+        case query: WhereInQuery => if (query.sizeEstimate() == 1) "-single" else "-simple"
         case query: SimpleQuery  => if (program.head.term.get.states.size > 1) "-multistate" else ""
       })
     }
