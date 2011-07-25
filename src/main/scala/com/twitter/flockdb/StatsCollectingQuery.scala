@@ -1,7 +1,7 @@
 package com.twitter.flockdb
 
 import com.twitter.gizzard.Stats
-import com.twitter.querulous.database.{Database, DatabaseFactory}
+import com.twitter.querulous.database.{Database, DatabaseFactory, DatabaseProxy}
 import com.twitter.querulous.query.{Query, QueryFactory, QueryClass, QueryProxy}
 import com.twitter.util.{Time, Duration}
 import java.sql.Connection
@@ -39,7 +39,7 @@ class TransactionStatsCollectingDatabaseFactory(databaseFactory: DatabaseFactory
   }
 }
 
-class TransactionStatsCollectingDatabase(database: Database, dbhosts: List[String]) extends Database {
+class TransactionStatsCollectingDatabase(val database: Database, dbhosts: List[String]) extends DatabaseProxy {
   override def open(): Connection = {
     Stats.transaction.record("Opening a connection to: "+dbhosts.mkString(","))
     val start = Time.now
