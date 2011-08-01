@@ -41,9 +41,7 @@ class ProductionNameServerReplica(host: String) extends Mysql {
 
     query.timeouts = Map(
       QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second),
-      QueryClass.SelectCopy -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify -> QueryTimeout(3.seconds)
+      QueryClass.Execute -> QueryTimeout(1.second)
     )
   }
 }
@@ -91,7 +89,14 @@ new FlockDB {
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
-  val edgesQueryEvaluator = new ProductionQueryEvaluator
+  val edgesQueryEvaluator = new ProductionQueryEvaluator {
+    query.timeouts = Map(
+      QueryClass.Select       -> QueryTimeout(1.second),
+      QueryClass.Execute      -> QueryTimeout(1.second),
+      QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
+      QueryClass.SelectModify -> QueryTimeout(3.seconds)
+    )
+  }
 
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
     database.pool = new ThrottledPoolingDatabase {
