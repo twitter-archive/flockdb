@@ -31,7 +31,6 @@ trait Shard extends shards.Shard {
     Seq(try { Right(getMetadata(sourceId)) } catch { case e => Left(e) })
   }
 
-  @throws(classOf[shards.ShardException]) def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A): A
   @throws(classOf[shards.ShardException]) def optimistically(sourceId: Long)(f: State => Unit)
 
   @throws(classOf[shards.ShardException]) def count(sourceId: Long, states: Seq[State]): Int

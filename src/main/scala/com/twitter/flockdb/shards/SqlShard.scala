@@ -561,12 +561,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
     }
   }
 
-  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
-    atomically(sourceId) { (transaction, metadata) =>
-      f(new SqlShard(transaction, shardInfo, weight, children, deadlockRetries), metadata)
-    }
-  }
-
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
     try {
       queryEvaluator.transaction { transaction =>
