@@ -18,12 +18,12 @@ package com.twitter.flockdb
 package jobs
 
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.shards.ShardId
+import com.twitter.gizzard.shards.{ShardId, RoutingNode}
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.Stats
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
-import shards.Shard
+import shards.{Shard, ReadWriteShardAdapter}
 
 
 object Copy {
@@ -34,14 +34,14 @@ object Copy {
   val COUNT = 10000
 }
 
-class CopyFactory(nameServer: NameServer[Shard], scheduler: JobScheduler)
+class CopyFactory(nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJobFactory[Shard] {
   def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
     new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
                      nameServer, scheduler)
 }
 
-class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler)
+class CopyParser(nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
@@ -51,9 +51,12 @@ class CopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler)
 }
 
 class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.CopyCursor,
-           count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler)
+           count: Int, nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
-  def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+
+  def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
+    val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
+
     val (items, newCursor) = sourceShard.selectAll(cursor, count)
     destinationShard.writeCopies(items)
     Stats.incr("edges-copy", items.size)
@@ -73,7 +76,7 @@ object MetadataCopy {
   val END = Cursor.End
 }
 
-class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler)
+class MetadataCopyParser(nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
     val cursor = Cursor(attributes("cursor").asInstanceOf[AnyVal].toLong)
@@ -82,9 +85,12 @@ class MetadataCopyParser(nameServer: NameServer[Shard], scheduler: JobScheduler)
 }
 
 class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.CopyCursor,
-                   count: Int, nameServer: NameServer[Shard], scheduler: JobScheduler)
+                   count: Int, nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
-  def copyPage(sourceShard: Shard, destinationShard: Shard, count: Int) = {
+
+  def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
+    val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
+
     val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
     destinationShard.writeMetadata(items)
     Stats.incr("edges-copy", items.size)

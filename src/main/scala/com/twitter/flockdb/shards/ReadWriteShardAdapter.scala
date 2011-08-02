@@ -18,12 +18,12 @@ package com.twitter.flockdb
 package shards
 
 import scala.collection.mutable
-import com.twitter.gizzard.shards
+import com.twitter.gizzard.shards.RoutingNode
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 
-class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
-      extends shards.ReadWriteShardAdapter(shard) with Shard with Optimism {
+class ReadWriteShardAdapter(shard: RoutingNode[Shard])
+      extends Shard with Optimism {
   def selectIncludingArchived(sourceId: Long, count: Int, cursor: Cursor)                            = shard.readOperation(_.selectIncludingArchived(sourceId, count, cursor))
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                       = shard.readOperation(_.intersect(sourceId, states, destinationIds))
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                  = shard.readOperation(_.intersectEdges(sourceId, states, destinationIds))

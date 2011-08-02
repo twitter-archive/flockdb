@@ -37,7 +37,7 @@ object Main extends Service {
   }
 
   def shutdown() {
-    if (service ne null) service.shutdown()
+    if (service ne null) service.shutdown(false)
     service = null
     ServiceTracker.shutdown()
   }

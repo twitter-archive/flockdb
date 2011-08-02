@@ -25,7 +25,7 @@ object Metadata {
   def apply(sourceId: Long, state: State, updatedAt: Time) = new Metadata(sourceId, state, updatedAt)
 }
 
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: Int) extends Ordered[Metadata] with Repairable[Metadata] {
+case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: Int) extends Ordered[Metadata] {
 
   def this(sourceId: Long, state: State, count: Int, updatedAt: Time) =
       this(sourceId, state, count, updatedAt.inSeconds)

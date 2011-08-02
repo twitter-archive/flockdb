@@ -40,16 +40,16 @@ class EdgesSpec extends IntegrationSpecification {
   "Edge Integration" should {
     "contains_metadata"  in {
       reset(config)
-      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
+      flockService.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
     }
 
     "get_metadata"  in {
       reset(config)
-      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
+      flockService.contains_metadata(alice, FOLLOWS) must eventually(be_==(false))
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.contains_metadata(alice, FOLLOWS) must eventually(be_==(true))
 
       // updated_at should not be confused with created_at.  Flock rows are commonly inserted with updated_at t=0.
       // This is done to make their sort order low, and prevents a race condition in the case where in an empty db:
@@ -60,118 +60,118 @@ class EdgesSpec extends IntegrationSpecification {
       //      4. Play those two operations in the db out of order.
       //      5. Observe that alice is unfortunately still in the normal state.
       //
-      flock.get_metadata(alice, FOLLOWS) must eventually (be_==(new flockdb.Metadata(alice, State.Normal, 1, Time.epoch).toThrift))
+      flockService.get_metadata(alice, FOLLOWS) must eventually (be_==(new flockdb.Metadata(alice, State.Normal, 1, Time.epoch).toThrift))
     }
 
     "add" in {
       "existing graph" in {
         reset(config)
-        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         val term = new QueryTerm(alice, FOLLOWS, true)
         term.setDestination_ids(List[Long](bob).pack)
         term.setState_ids(List[Int](State.Normal.id))
         val op = new SelectOperation(SelectOperationType.SimpleQuery)
         op.setTerm(term)
         val page = new Page(1, Cursor.Start.position)
-        flock.select(List(op), page).ids.array.size must eventually(be_>(0))
+        flockService.select(List(op), page).ids.array.size must eventually(be_>(0))
         Thread.sleep(1000)
-        flock.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
-        flock.select(List(op), page).ids.array.size must eventually(be_==(0))
-        flock.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
+        flockService.execute(Select(alice, FOLLOWS, bob).remove.toThrift)
+        flockService.select(List(op), page).ids.array.size must eventually(be_==(0))
+        flockService.count(Select(alice, FOLLOWS, Nil).toThrift) mustEqual 0
       }
 
       "nonexistent graph" in {
         reset(config)
-        flock.execute(Select(alice, BORKEN, bob).add.toThrift) must throwA[FlockException]
+        flockService.execute(Select(alice, BORKEN, bob).add.toThrift) must throwA[FlockException]
       }
     }
 
     "remove" in {
       reset(config)
-      flock.execute(Select(bob, FOLLOWS, alice).remove.toThrift)
-      flock.contains(bob, FOLLOWS, alice) must eventually(beFalse)
-      flock.count(Select(alice, FOLLOWS, Nil).toThrift) must eventually(be_==(0))
-      flock.count(Select(Nil, FOLLOWS, alice).toThrift) must eventually(be_==(0))
+      flockService.execute(Select(bob, FOLLOWS, alice).remove.toThrift)
+      flockService.contains(bob, FOLLOWS, alice) must eventually(beFalse)
+      flockService.count(Select(alice, FOLLOWS, Nil).toThrift) must eventually(be_==(0))
+      flockService.count(Select(Nil, FOLLOWS, alice).toThrift) must eventually(be_==(0))
     }
 
     "archive" in {
       reset(config)
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-      flock.execute(Select(darcy, FOLLOWS, alice).add.toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
-      flock.count(Select((), FOLLOWS, alice).toThrift) must eventually(be_==(1))
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+      flockService.execute(Select(darcy, FOLLOWS, alice).add.toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
+      flockService.count(Select((), FOLLOWS, alice).toThrift) must eventually(be_==(1))
       for (destinationId <- List(bob, carl, darcy)) {
-        flock.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
+        flockService.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
       }
-      flock.count(Select(darcy, FOLLOWS, ()).toThrift) must eventually(be_==(1))
+      flockService.count(Select(darcy, FOLLOWS, ()).toThrift) must eventually(be_==(1))
 
       Thread.sleep(1000)
-      flock.execute((Select(alice, FOLLOWS, ()).archive + Select((), FOLLOWS, alice).archive).toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0))
-      flock.count(Select((), FOLLOWS, alice).toThrift) must eventually(be_==(0))
+      flockService.execute((Select(alice, FOLLOWS, ()).archive + Select((), FOLLOWS, alice).archive).toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0))
+      flockService.count(Select((), FOLLOWS, alice).toThrift) must eventually(be_==(0))
       for (destinationId <- List(bob, carl, darcy)) {
-        flock.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(0))
+        flockService.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(0))
       }
-      flock.count(Select(darcy, FOLLOWS, ()).toThrift) must eventually(be_==(0))
+      flockService.count(Select(darcy, FOLLOWS, ()).toThrift) must eventually(be_==(0))
 
       Thread.sleep(1000)
-      flock.execute((Select(alice, FOLLOWS, ()).add + Select((), FOLLOWS, alice).add).toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
-      flock.count(Select((), FOLLOWS, alice).toThrift) must eventually(be_==(1))
+      flockService.execute((Select(alice, FOLLOWS, ()).add + Select((), FOLLOWS, alice).add).toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
+      flockService.count(Select((), FOLLOWS, alice).toThrift) must eventually(be_==(1))
       for (destinationId <- List(bob, carl, darcy)) {
-        flock.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
+        flockService.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
       }
-      flock.count(Select(darcy, FOLLOWS, ()).toThrift) must eventually(be_==(1))
+      flockService.count(Select(darcy, FOLLOWS, ()).toThrift) must eventually(be_==(1))
     }
 
     "archive & unarchive concurrently" in {
       reset(config)
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
       for (destinationId <- List(bob, carl, darcy)) {
-        flock.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
+        flockService.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
       }
 
       val archiveTime = 2.seconds.fromNow
-      flock.execute((Select(alice, FOLLOWS, ()).addAt(archiveTime) +
+      flockService.execute((Select(alice, FOLLOWS, ()).addAt(archiveTime) +
                      Select((), FOLLOWS, alice).addAt(archiveTime)).toThrift)
-      archiveTime.inSeconds must eventually(be_==(flock.get(alice, FOLLOWS, bob).updated_at))
-      flock.execute((Select(alice, FOLLOWS, ()).archiveAt(archiveTime - 1.second) +
+      archiveTime.inSeconds must eventually(be_==(flockService.get(alice, FOLLOWS, bob).updated_at))
+      flockService.execute((Select(alice, FOLLOWS, ()).archiveAt(archiveTime - 1.second) +
                      Select((), FOLLOWS, alice).archiveAt(archiveTime - 1.second)).toThrift)
 
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
       for (destinationId <- List(bob, carl, darcy)) {
-        flock.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
+        flockService.count(Select((), FOLLOWS, destinationId).toThrift) must eventually(be_==(1))
       }
     }
 
     "toggle polarity" in {
       reset(config)
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
       Thread.sleep(1000)
-      flock.execute(Select(alice, FOLLOWS, ()).negate.toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0))
-      flock.count(Select(alice, FOLLOWS, ()).negative.toThrift) must eventually(be_==(3))
+      flockService.execute(Select(alice, FOLLOWS, ()).negate.toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(0))
+      flockService.count(Select(alice, FOLLOWS, ()).negative.toThrift) must eventually(be_==(3))
       Thread.sleep(1000)
-      flock.execute(Select(alice, FOLLOWS, ()).add.toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
-      flock.count(Select(alice, FOLLOWS, ()).negative.toThrift) must eventually(be_==(0))
+      flockService.execute(Select(alice, FOLLOWS, ()).add.toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(3))
+      flockService.count(Select(alice, FOLLOWS, ()).negative.toThrift) must eventually(be_==(0))
     }
 
     "counts" in {
       reset(config)
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
 
-      flock.count2(List(Select((), FOLLOWS, bob).toThrift,
+      flockService.count2(List(Select((), FOLLOWS, bob).toThrift,
                         Select((), FOLLOWS, carl).toThrift,
                         Select((), FOLLOWS, darcy).toThrift)).toIntArray.toList must eventually(be_==(List(1, 1, 1)))
     }
@@ -179,15 +179,15 @@ class EdgesSpec extends IntegrationSpecification {
     "select_edges" in {
       "simple query" in {
         reset(config)
-        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
         Thread.sleep(1000)
-        flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-        flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))
+        flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+        flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))
 
         val term = new QueryTerm(alice, FOLLOWS, true)
         term.setState_ids(List[Int](State.Normal.id))
         val query = new EdgeQuery(term, new Page(10, Cursor.Start.position))
-        val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
+        val resultsList = flockService.select_edges(List[EdgeQuery](query)).toList
         resultsList.size mustEqual 1
         val results = resultsList(0)
         results.next_cursor mustEqual Cursor.End.position
@@ -197,15 +197,15 @@ class EdgesSpec extends IntegrationSpecification {
 
       "intersection" in {
         reset(config)
-        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-        flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-        flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))
+        flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+        flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(2))
 
         val term = new QueryTerm(alice, FOLLOWS, true)
         term.setDestination_ids(List[Long](carl, darcy).pack)
         term.setState_ids(List[Int](State.Normal.id))
         val query = new EdgeQuery(term, new Page(10, Cursor.Start.position))
-        val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
+        val resultsList = flockService.select_edges(List[EdgeQuery](query)).toList
         resultsList.size mustEqual 1
         val results = resultsList(0)
         results.next_cursor mustEqual Cursor.End.position

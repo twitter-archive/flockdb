@@ -52,21 +52,18 @@ abstract class ConfiguredSpecification extends Specification {
 }
 
 abstract class IntegrationSpecification extends ConfiguredSpecification with NameServerDatabase {
-  val f = new FlockDB(config)
-  val (manager, nameServer, flock, jobScheduler) = {
-    (f.managerServer, f.nameServer, f.flockService, f.jobScheduler)
-  }
+  val flock        = new FlockDB(config)
+  val flockService = flock.flockService
 
-  jobScheduler.start()
+  flock.jobScheduler.start()
 
   def reset(config: flockdb.config.FlockDB): Unit = {
     reset(config, 1)
   }
 
   def reset(config: flockdb.config.FlockDB, count: Int): Unit = {
-    materialize(config.nameServer)
-    nameServer.rebuildSchema()
-    nameServer.reload()
+    materialize(config)
+    flock.nameServer.reload()
 
     val rootQueryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection.withoutDatabase)
     //rootQueryEvaluator.execute("DROP DATABASE IF EXISTS " + config.databaseConnection.database)
@@ -76,16 +73,17 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
       Seq("forward", "backward").foreach { direction =>
         val tableId = if (direction == "forward") graph else graph * -1
         val replicatingShardId = ShardId("localhost", "replicating_" + direction + "_" + graph)
-        nameServer.createShard(ShardInfo(replicatingShardId,
-          "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal))
-        nameServer.setForwarding(Forwarding(tableId, 0, replicatingShardId))
+        flock.shardManager.createAndMaterializeShard(
+          ShardInfo(replicatingShardId, "com.twitter.gizzard.shards.ReplicatingShard", "", "", Busy.Normal)
+        )
+        flock.shardManager.setForwarding(Forwarding(tableId, 0, replicatingShardId))
 
         for (sqlShardId <- (1 to count)) {
           val shardId = ShardId("localhost", direction + "_" + sqlShardId + "_" + graph)
 
-          nameServer.createShard(ShardInfo(shardId,
+          flock.shardManager.createAndMaterializeShard(ShardInfo(shardId,
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-          nameServer.addLink(replicatingShardId, shardId, 1)
+          flock.shardManager.addLink(replicatingShardId, shardId, 1)
 
           queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_edges")
           queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_metadata")
@@ -93,23 +91,23 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
       }
     }
 
-    nameServer.reload()
+    flock.nameServer.reload()
   }
 
   def jobSchedulerMustDrain = {
-    var last = jobScheduler.size
-    while(jobScheduler.size > 0) {
-      jobScheduler.size must eventually(be_<(last))
-      last = jobScheduler.size
+    var last = flock.jobScheduler.size
+    while(flock.jobScheduler.size > 0) {
+      flock.jobScheduler.size must eventually(be_<(last))
+      last = flock.jobScheduler.size
     }
-    while(jobScheduler.activeThreads > 0) {
+    while(flock.jobScheduler.activeThreads > 0) {
       Thread.sleep(10)
     }
   }
 
   def reset(config: flockdb.config.FlockDB, db: String) {
     try {
-      evaluator(config.nameServer).execute("DROP DATABASE IF EXISTS " + db)
+      evaluator(config).execute("DROP DATABASE IF EXISTS " + db)
     } catch {
       case e =>
         e.printStackTrace()

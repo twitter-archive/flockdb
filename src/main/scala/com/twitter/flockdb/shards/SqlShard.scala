@@ -21,9 +21,8 @@ import java.util.Random
 import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
-import com.twitter.gizzard.shards
 import com.twitter.gizzard.Stats
-import com.twitter.gizzard.shards.ShardException
+import com.twitter.gizzard.shards._
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query
@@ -44,10 +43,12 @@ object QueryClass {
   val SelectMetadata             = QuerulousQueryClass("select_metadata")
 }
 
-object FlockExceptionWrappingProxyFactory extends SqlExceptionWrappingProxyFactory[Shard]
-
-class SqlShardFactory(instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory, lowLatencyQueryEvaluatorFactory: QueryEvaluatorFactory, materializingQueryEvaluatorFactory: QueryEvaluatorFactory, connection: Connection)
-  extends shards.ShardFactory[Shard] {
+class SqlShardFactory(
+  instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory,
+  lowLatencyQueryEvaluatorFactory: QueryEvaluatorFactory,
+  materializingQueryEvaluatorFactory: QueryEvaluatorFactory,
+  connection: Connection)
+extends ShardFactory[Shard] {
 
   val deadlockRetries = 3
 
@@ -76,28 +77,40 @@ CREATE TABLE IF NOT EXISTS %s (
 ) TYPE=INNODB
 """
 
-  def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
+  def instantiate(shardInfo: ShardInfo, weight: Int) = {
     val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
     val lowLatencyQueryEvaluator = lowLatencyQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
-    FlockExceptionWrappingProxyFactory(new SqlShard(queryEvaluator, lowLatencyQueryEvaluator, shardInfo, weight, children, deadlockRetries))
+    new SqlExceptionWrappingProxyFactory[Shard](shardInfo.id).apply(
+      new SqlShard(shardInfo, queryEvaluator, lowLatencyQueryEvaluator, deadlockRetries)
+    )
   }
 
-  def materialize(shardInfo: shards.ShardInfo) = {
+  //XXX: enforce readonly connection
+  def instantiateReadOnly(shardInfo: ShardInfo, weight: Int) = instantiate(shardInfo, weight)
+
+  def materialize(shardInfo: ShardInfo) = {
     try {
       val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
+
       queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database)
       queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
       queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
+
     } catch {
-      case e: SQLException => throw new shards.ShardException(e.toString)
-      case e: SqlQueryTimeoutException => throw new shards.ShardTimeoutException(e.timeout, shardInfo.id, e)
+      case e: SQLException => throw new ShardException(e.toString)
+      case e: SqlQueryTimeoutException => throw new ShardTimeoutException(e.timeout, shardInfo.id, e)
     }
   }
 }
 
 
-class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator: QueryEvaluator, val shardInfo: shards.ShardInfo,
-               val weight: Int, val children: Seq[Shard], deadlockRetries: Int) extends Shard with Optimism {
+class SqlShard(
+  shardInfo: ShardInfo,
+  queryEvaluator: QueryEvaluator,
+  lowLatencyQueryEvaluator: QueryEvaluator,
+  deadlockRetries: Int)
+extends Shard with Optimism {
+
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
 
@@ -338,12 +351,8 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
   }
 
   override def equals(other: Any) = {
-    other match {
-      case other: SqlShard =>
-        tablePrefix == other.tablePrefix && queryEvaluator == other.queryEvaluator
-      case _ =>
-        false
-    }
+    error("called!")
+    false
   }
 
   override def hashCode = {

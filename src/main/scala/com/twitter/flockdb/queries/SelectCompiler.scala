@@ -18,7 +18,8 @@ package com.twitter.flockdb
 package queries
 
 import scala.collection.mutable
-import com.twitter.gizzard.{Stats, Future}
+import com.twitter.gizzard.Stats
+import com.twitter.gizzard.util.Future
 import operations.{SelectOperation, SelectOperationType}
 import thrift.FlockException
 

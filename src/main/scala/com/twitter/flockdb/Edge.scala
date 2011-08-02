@@ -18,14 +18,14 @@ package com.twitter.flockdb
 
 import com.twitter.util.Time
 import com.twitter.flockdb.jobs.single._
-import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob, Repairable}
+import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob}
 
 object Edge {
   def apply(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, state: State) = new Edge(sourceId, destinationId, position, updatedAt, count, state)
 }
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSeconds: Int, count: Int,
-                state: State) extends Ordered[Edge] with Repairable[Edge]{
+                state: State) extends Ordered[Edge] {
 
   def this(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, state: State) =
     this(sourceId, destinationId, position, updatedAt.inSeconds, count, state)

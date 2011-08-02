@@ -23,7 +23,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.twitter.gizzard.scheduler._
 
-trait Shard extends shards.Shard {
+trait Shard {
   @throws(classOf[shards.ShardException]) def get(sourceId: Long, destinationId: Long): Option[Edge]
   @throws(classOf[shards.ShardException]) def getMetadata(sourceId: Long): Option[Metadata]
 

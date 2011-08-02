@@ -40,7 +40,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
     val term = new QueryTerm(alice, FOLLOWS, true)
     term.setState_ids(List[Int](State.Normal.id))
     val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
+    val resultsList = flockService.select_edges(List[EdgeQuery](query)).toList
     resultsList.size mustEqual 1
     resultsList(0).edges
   }
@@ -51,21 +51,21 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
 
       for(i <- 0 until 10) {
         if (i % 2 == 0) {
-          flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+          flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
         } else {
-          flock.execute(Select(alice, FOLLOWS, i).archive.toThrift)
+          flockService.execute(Select(alice, FOLLOWS, i).archive.toThrift)
         }
         Thread.sleep(1000) // prevent same-millisecond collision
       }
 
-      jobScheduler.size must eventually(be(0)) // Make sure adds get applied.  I can't wait for Time.asOf()
+      flock.jobScheduler.size must eventually(be(0)) // Make sure adds get applied.  I can't wait for Time.asOf()
 
       alicesFollowings().size must eventually(be_==(5))
       alicesFollowings().toList.map(_.destination_id) mustEqual List(8,6,4,2,0)
 
       Thread.sleep(1000)
 
-      val job = Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, flockdb.Priority.High, pageSize, flock.edges.forwardingManager, flock.edges.schedule)
+      val job = Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, flockdb.Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler)
       job()
 
       alicesFollowings().size must eventually(be(10))

@@ -16,7 +16,8 @@
 
 package com.twitter.flockdb
 
-import com.twitter.gizzard.{Stats, Future}
+import com.twitter.gizzard.Stats
+import com.twitter.gizzard.util.Future
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
@@ -27,13 +28,12 @@ import com.twitter.logging.Logger
 import queries._
 import thrift.FlockException
 
-class EdgesService(val nameServer: NameServer[shards.Shard],
-                   var forwardingManager: ForwardingManager,
-                   val copyFactory: CopyJobFactory[shards.Shard],
-                   val schedule: PrioritizingJobScheduler,
-                   future: Future,
-                   intersectionQueryConfig: config.IntersectionQuery,
-                   aggregateJobsPageSize: Int) {
+class EdgesService(
+  forwardingManager: ForwardingManager,
+  schedule: PrioritizingJobScheduler,
+  future: Future,
+  intersectionQueryConfig: config.IntersectionQuery,
+  aggregateJobsPageSize: Int) {
 
   private val log = Logger.get(getClass.getName)
   private val exceptionLog = Logger.get("exception")

@@ -41,14 +41,14 @@ class ProductionNameServerReplica(host: String) extends Mysql {
     }
 
     query.timeouts = Map(
-      QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second),
-      QueryClass.SelectCopy -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify -> QueryTimeout(3.seconds),
-      QueryClass.SelectSingle               -> QueryTimeout(1.second),
-      QueryClass.SelectIntersection         -> QueryTimeout(1.second),
-      QueryClass.SelectIntersectionSmall    -> QueryTimeout(1.second),
-      QueryClass.SelectMetadata             -> QueryTimeout(1.second)
+      QueryClass.Select                  -> QueryTimeout(1.second),
+      QueryClass.Execute                 -> QueryTimeout(1.second),
+      QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
+      QueryClass.SelectModify            -> QueryTimeout(3.seconds),
+      QueryClass.SelectSingle            -> QueryTimeout(1.second),
+      QueryClass.SelectIntersection      -> QueryTimeout(1.second),
+      QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
+      QueryClass.SelectMetadata          -> QueryTimeout(1.second)
     )
   }
 }
@@ -61,18 +61,16 @@ new FlockDB {
     threadPool.maxThreads = 250
   }
 
-  val nameServer = new com.twitter.gizzard.config.NameServer {
-    mappingFunction = ByteSwapper
-    jobRelay = NoJobRelay
+  mappingFunction = ByteSwapper
+  jobRelay        = NoJobRelay
 
-    val replicas = Seq(
-      new ProductionNameServerReplica("flockdb001.twitter.com"),
-      new ProductionNameServerReplica("flockdb002.twitter.com")
-    )
-  }
+  nameServerReplicas = Seq(
+    new ProductionNameServerReplica("flockdb001.twitter.com"),
+    new ProductionNameServerReplica("flockdb002.twitter.com")
+  )
 
-  jobInjector.timeout = 100.millis
-  jobInjector.idleTimeout = 60.seconds
+  jobInjector.timeout               = 100.millis
+  jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
 
   val replicationFuture = new Future {

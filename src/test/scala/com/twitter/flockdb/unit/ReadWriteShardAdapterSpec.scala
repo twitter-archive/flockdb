@@ -17,8 +17,6 @@
 package com.twitter.flockdb
 package unit
 
-import com.twitter.gizzard.shards.{ReadWriteShard, ShardInfo}
-import com.twitter.gizzard.test.FakeReadWriteShard
 import com.twitter.util.Time
 import org.specs.mock.{ClassMocker, JMocker}
 import shards.{ReadWriteShardAdapter, Shard}
