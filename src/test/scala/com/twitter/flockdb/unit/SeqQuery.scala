@@ -20,7 +20,7 @@ package queries
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
 
-class SeqQuery(s: Seq[Long]) extends Query {
+class SeqQuery(s: Seq[Long]) extends SimpleQueryNode {
   val seq = sort(s)
   def sizeEstimate = seq.size
   def selectWhereIn(i: Seq[Long]) = sort(seq.toList intersect i.toList).toList
@@ -36,4 +36,7 @@ class SeqQuery(s: Seq[Long]) extends Query {
   }
 
   private def sort(s: Seq[Long]) = Sorting.stableSort(s, (x: Long, y: Long) => y < x)
+
+  override def toString =
+    "<SeqQuery ids=("+s.mkString(",")+")>"
 }

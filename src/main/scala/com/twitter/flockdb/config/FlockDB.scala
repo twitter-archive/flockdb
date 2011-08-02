@@ -1,15 +1,12 @@
 package com.twitter.flockdb.config
 
 import com.twitter.gizzard.config._
+import com.twitter.ostrich.admin.config.AdminServiceConfig
 import com.twitter.querulous.config.{Connection, QueryEvaluator}
 import com.twitter.util.TimeConversions._
-import com.twitter.flockdb.queries.Query
+import com.twitter.flockdb.queries.QueryTree
 import com.twitter.flockdb.queries
 
-trait AdminConfig {
-  def httpPort: Int
-  def textPort: Int
-}
 
 trait FlockDBServer extends TServer {
   var name = "flockdb_edges"
@@ -21,8 +18,8 @@ trait IntersectionQuery {
   var averageIntersectionProportion = 0.1
   var intersectionPageSizeMax       = 4000
 
-  def intersect(query1: queries.Query, query2: queries.Query) = new queries.IntersectionQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
-  def difference(query1: queries.Query, query2: queries.Query) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
+  def intersect(query1: QueryTree, query2: QueryTree) = new queries.IntersectionQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
+  def difference(query1: QueryTree, query2: QueryTree) = new queries.DifferenceQuery(query1, query2, averageIntersectionProportion, intersectionPageSizeMax, intersectionTimeout)
 }
 
 trait FlockDB extends GizzardServer {
@@ -32,11 +29,13 @@ trait FlockDB extends GizzardServer {
   var aggregateJobsPageSize         = 500
 
   def databaseConnection: Connection
+
   def edgesQueryEvaluator: QueryEvaluator
+  def lowLatencyQueryEvaluator: QueryEvaluator
   def materializingQueryEvaluator: QueryEvaluator
 
   def replicationFuture: Future
   def readFuture: Future
 
-  def adminConfig: AdminConfig
+  def adminConfig: AdminServiceConfig
 }

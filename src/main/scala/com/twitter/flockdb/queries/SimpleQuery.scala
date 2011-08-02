@@ -17,21 +17,31 @@
 package com.twitter.flockdb
 package queries
 
-import net.lag.configgy.Configgy
 import shards.Shard
+import com.twitter.gizzard.Stats
 
-class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Query {
-  val config = Configgy.config
+class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends SimpleQueryNode {
+  def sizeEstimate() = {
+    Stats.transaction.record("Selecting counts from "+shard)
+    time(shard.count(sourceId, states))
+  }
 
-  def sizeEstimate() = shard.count(sourceId, states)
-
-  def selectWhereIn(page: Seq[Long]) = shard.intersect(sourceId, states, page)
+  def selectWhereIn(page: Seq[Long]) = {
+    Stats.transaction.record("Intersecting "+page.size+" ids from "+shard)
+    time(shard.intersect(sourceId, states, page))
+  }
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
-    shard.selectByDestinationId(sourceId, states, count, cursor)
+    Stats.transaction.record("Selecting "+count+" destinationIds from "+shard)
+    time(shard.selectByDestinationId(sourceId, states, count, cursor))
   }
 
   def selectPage(count: Int, cursor: Cursor) = {
-    shard.selectByPosition(sourceId, states, count, cursor)
+    Stats.transaction.record("Selecting "+count+" edges from "+shard)
+    time(shard.selectByPosition(sourceId, states, count, cursor))
+  }
+
+  override def toString = {
+    "<SimpleQuery sourceId="+sourceId+" states=("+states.map(_.name).mkString(",")+")"+duration.map(" time="+_.inMillis).mkString+">"
   }
 }

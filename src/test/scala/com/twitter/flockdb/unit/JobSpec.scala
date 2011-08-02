@@ -30,7 +30,6 @@ import shards.{Shard, SqlShard, ReadWriteShardAdapter, OptimisticLockException}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove, Archive, NodePair}
 
-
 class SimpleAdapter(shard: Shard) extends ReadWriteShardAdapter(new IdentityShard[Shard](shard))
 
 class IdentityShard[ConcreteShard <: Shard](shard: ConcreteShard)

@@ -22,7 +22,8 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
-import queries.SelectCompiler
+import com.twitter.flockdb.{Page => FlockPage}
+import queries.{SelectCompiler, InvalidQueryException}
 import operations.{SelectOperation, SelectOperationType}
 import shards.Shard
 import thrift.{Page, Results}
@@ -63,6 +64,26 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
         query.sizeEstimate mustEqual 23
       }
     }
+
+    "should throw" in {
+      "on an empty query" in {
+         val program = Nil
+         selectCompiler(program) must throwA[InvalidQueryException]
+      }
+
+      "on a malformed binary operation query" in {
+        val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
+          new SelectOperation(SelectOperationType.Intersection, None) :: Nil
+        selectCompiler(program) must throwA[InvalidQueryException]
+      }
+
+      "on a malformed dual-literal query" in {
+        val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
+          new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) :: Nil
+        selectCompiler(program) must throwA[InvalidQueryException]
+      }
+    }
+
 
     "execute a simple list query" in {
       expect {
@@ -119,6 +140,19 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       val query = selectCompiler(program)
       query.getClass.getName mustMatch "DifferenceQuery"
       query.sizeEstimate mustEqual 10
+    }
+
+
+    "time a simple list query" in {
+      expect {
+        one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
+        one(shard).intersect(sourceId, List(State.Normal), List[Long](12, 13)) willReturn List[Long](12,13)
+      }
+      val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, Some(List[Long](12, 13)), List(State.Normal)))) :: Nil
+      val queryTree = selectCompiler(program)
+      queryTree.toString mustEqual "<WhereInQuery sourceId="+sourceId+" states=(Normal) destIds=(12,13)>"
+      val rv = queryTree.select(FlockPage(0,Cursor(0)))
+      queryTree.toString mustEqual "<WhereInQuery sourceId="+sourceId+" states=(Normal) destIds=(12,13) time=0>"
     }
   }
 }

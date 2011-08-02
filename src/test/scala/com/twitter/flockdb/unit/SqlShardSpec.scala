@@ -46,7 +46,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
 
     val queryEvaluatorFactory = config.edgesQueryEvaluator()
     val queryEvaluator = queryEvaluatorFactory(config.databaseConnection)
-    val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
+    val shardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
     val shardInfo = ShardInfo(ShardId("localhost", "table_001"), "com.twitter.flockdb.SqlShard",
       "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
     var shard: Shard = null
@@ -60,10 +60,10 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     }
 
     "create" in {
-      val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
+      val createShardFactory = new SqlShardFactory(queryEvaluatorFactory, queryEvaluatorFactory, queryEvaluatorFactory, config.databaseConnection)
       val createShardInfo = ShardInfo(ShardId("localhost", "create_test"), "com.twitter.flockdb.SqlShard",
         "INT UNSIGNED", "INT UNSIGNED", Busy.Normal)
-      val createShard = new SqlShard(queryEvaluator, createShardInfo, 1, Nil, 0)
+      val createShard = new SqlShard(queryEvaluator, queryEvaluator, createShardInfo, 1, Nil, 0)
 
       "when the database doesn't exist" >> {
         createShardFactory.materialize(createShardInfo)
@@ -91,15 +91,6 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.add(carl, alice, 1, now)
           shard.count(alice, List(State.Normal)) mustEqual 2
           shard.count(carl, List(State.Normal)) mustEqual 1
-        }
-
-        "multiple counts" >> {
-          val results = new mutable.HashMap[Long, Int]
-          shard.add(alice, bob, 1, now)
-          shard.add(alice, carl, 2, now)
-          shard.add(carl, alice, 1, now)
-          shard.counts(List(alice, carl), results)
-          results mustEqual Map(alice -> 2, carl -> 1)
         }
 
         "when the user does not exist yet" >> {
@@ -700,7 +691,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         }
 
         "retries edges that failed a bulk-insert" in {
-          val stubShard = new SqlShard(queryEvaluator, shardInfo, 0, Nil, 0) {
+          val stubShard = new SqlShard(queryEvaluator, queryEvaluator, shardInfo, 0, Nil, 0) {
             override def writeBurst(transaction: Transaction, edges: Seq[Edge]) = {
               val completed = new mutable.ArrayBuffer[Edge]
               val failed = new mutable.ArrayBuffer[Edge]

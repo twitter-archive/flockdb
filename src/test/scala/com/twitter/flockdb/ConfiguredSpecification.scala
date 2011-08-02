@@ -24,9 +24,7 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.test.NameServerDatabase
 import com.twitter.util.Eval
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import com.twitter.ostrich.W3CStats
-import net.lag.logging.Logger
-import net.lag.configgy.Configgy
+import com.twitter.logging.Logger
 import scala.collection.mutable
 import com.twitter.flockdb
 
@@ -38,7 +36,7 @@ abstract class ConfiguredSpecification extends Specification {
   lazy val config = {
     val c = Eval[flockdb.config.FlockDB](new File("config/test.scala"))
     try {
-      c.logging()
+      c.loggers.foreach { _() }
       c
     } catch {
       case e: Exception => {
@@ -54,10 +52,8 @@ abstract class ConfiguredSpecification extends Specification {
 }
 
 abstract class IntegrationSpecification extends ConfiguredSpecification with NameServerDatabase {
-  val f = new FlockDB(config, new W3CStats(Logger.get, Array("workaround")))
+  val f = new FlockDB(config)
   val (manager, nameServer, flock, jobScheduler) = {
-    // XXX: Ostrich has a bug which causes a NPE when you pass in an empty array to W3CStats.
-    // Remove this when we upgrade ostrich to a version that contains commit 71d07d32dcb76b029bdc11c519c867d7a2431cc2
     (f.managerServer, f.nameServer, f.flockService, f.jobScheduler)
   }
 

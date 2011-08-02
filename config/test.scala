@@ -1,11 +1,16 @@
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
 import com.twitter.querulous.config._
+import com.twitter.querulous.database.DatabaseFactory
+import com.twitter.querulous.query.QueryFactory
 import com.twitter.querulous.StatsCollector
 import com.twitter.conversions.time._
 import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
+import com.twitter.ostrich.admin.config.AdminServiceConfig
+import com.twitter.logging.Level
+import com.twitter.logging.config.{FileHandlerConfig, LoggerConfig}
 
 
 trait Credentials extends Connection {
@@ -38,8 +43,19 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     open = 1.second
   }
 
-  override def apply(stats: StatsCollector) = {
-    MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats) } )
+  query.timeouts = Map(
+    QueryClass.Select       -> QueryTimeout(100.millis),
+    QueryClass.SelectModify -> QueryTimeout(5.seconds),
+    QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
+    QueryClass.Execute      -> QueryTimeout(5.seconds),
+    QueryClass.SelectSingle -> QueryTimeout(100.millis),
+    QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
+    QueryClass.SelectIntersectionSmall    -> QueryTimeout(100.millis),
+    QueryClass.SelectMetadata             -> QueryTimeout(100.millis)
+  )
+
+  override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {
+    MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats, dbStatsFactory, queryStatsFactory) } )
   }
 }
 
@@ -94,15 +110,8 @@ new FlockDB {
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
-  val edgesQueryEvaluator = new TestQueryEvaluator("edges") {
-    query.timeouts = Map(
-      QueryClass.Select       -> QueryTimeout(100.millis),
-      QueryClass.SelectModify -> QueryTimeout(5.seconds),
-      QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
-      QueryClass.Execute      -> QueryTimeout(5.seconds)
-    )
-  }
-
+  val edgesQueryEvaluator = new TestQueryEvaluator("edges")
+  val lowLatencyQueryEvaluator = edgesQueryEvaluator
   val materializingQueryEvaluator = edgesQueryEvaluator
 
   // schedulers
@@ -134,16 +143,11 @@ new FlockDB {
 
   // Admin/Logging
 
-  val adminConfig = new AdminConfig {
-    val textPort = 9991
-    val httpPort = 9990
+  val adminConfig = new AdminServiceConfig {
+    httpPort = Some(9990)
   }
 
-  logging = new LogConfigString("""
-level = "fatal"
-console = true
-throttle_period_msec = 60000
-throttle_rate = 10
-""")
-
+  loggers = List(new LoggerConfig {
+    level = Some(Level.FATAL)
+  })
 }
