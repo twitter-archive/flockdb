@@ -53,17 +53,4 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def negate(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                   = shard.writeOperation(_.negate(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                  = shard.writeOperation(_.archive(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, updatedAt: Time)                                                       = shard.writeOperation(_.archive(sourceId, updatedAt))
-
-  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
-    if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
-      val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]
-      val lockServer = children.head.asInstanceOf[Shard]
-      val rest = children.drop(1).asInstanceOf[Seq[Shard]]
-      lockServer.withLock(sourceId) { (lock, metadata) =>
-        f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.future)), metadata)
-      }
-    } else {
-      shard.writeOperation(_.withLock(sourceId)(f))
-    }
-  }
 }
