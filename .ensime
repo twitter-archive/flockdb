@@ -1,0 +1,13 @@
+;; This config was generated using ensime-config-gen. Feel free to customize its contents manually.
+
+(
+
+:project-package "com.twitter.flockdb"
+
+:use-sbt t
+
+:sources ("target/gen-java")
+
+:compile-jars ("lib_managed")
+
+)
