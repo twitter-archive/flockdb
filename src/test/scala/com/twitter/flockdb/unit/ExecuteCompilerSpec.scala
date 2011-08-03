@@ -57,7 +57,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
     doBefore {
       scheduler = mock[PrioritizingJobScheduler]
       forwardingManager = mock[ForwardingManager]
-      executeCompiler = new ExecuteCompiler(scheduler, forwardingManager, config.aggregateJobsPageSize)
+      executeCompiler = new ExecuteCompiler(scheduler, forwardingManager, config.aggregateJobsPageSize, IdentityUuidGenerator)
     }
 
     "without execute_at present" in {
@@ -123,7 +123,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.Unarchive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
@@ -133,7 +133,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.Unarchive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
       }
 
@@ -195,7 +195,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.RemoveAll(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
@@ -205,7 +205,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.RemoveAll(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
       }
 
@@ -267,7 +267,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.Archive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.Archive(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
@@ -277,7 +277,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.Archive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.Archive(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
       }
 
@@ -339,7 +339,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.Negate(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.Negate(alice, FOLLOWS, Direction.Forward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
 
         "backward" >> {
@@ -349,7 +349,7 @@ object ExecuteCompilerSpec extends ConfiguredSpecification with JMocker with Cla
             one(scheduler).put(will(beEqual(Priority.Low.id)), nestedJob.capture)
           }
           executeCompiler(program)
-          jsonMatching(List(multi.Negate(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null)), nestedJob.captured.jobs)
+          jsonMatching(List(multi.Negate(alice, FOLLOWS, Direction.Backward, now, Priority.Low, config.aggregateJobsPageSize, null, null, IdentityUuidGenerator)), nestedJob.captured.jobs)
         }
       }
 

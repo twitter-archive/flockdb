@@ -202,12 +202,6 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
       List(sourceId, states.map(_.id).toList): _*)
   }
 
-  def selectIncludingArchived(sourceId: Long, count: Int, cursor: Cursor) = {
-    select(SelectModify, "destination_id", "unique_source_id_destination_id", count, cursor,
-      "source_id = ? AND state != ?",
-      sourceId, Removed.id)
-  }
-
   def selectByPosition(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor) = {
     select("position", "PRIMARY", count, cursor,
       "source_id = ? AND state IN (?)",
@@ -242,10 +236,12 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
   }
 
   def selectEdges(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor) = {
+    require(!states.isEmpty, "must provide some states")
+
     val conditions = "source_id = ? AND state IN (?)"
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"
     val inequality = if (order == "DESC") "<" else ">"
-    val args = sourceId :: states.map(_.id).toList
+    val args = sourceId :: List(states.map(_.id))
     val (edgesQuery, args1) = query("*", "position", "PRIMARY", count + 1, cursor, order, inequality, conditions, args)
     val (continueCursorQuery, args2) = query("*", "position", "PRIMARY", 1, cursor, opposite(order), opposite(inequality), conditions, args)
 
@@ -395,11 +391,7 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val shardInfo: shards.ShardIn
                          oldEdge: Edge): Int = {
     if ((oldEdge.updatedAtSeconds == edge.updatedAtSeconds) && (oldEdge.state max edge.state) != edge.state) return 0
 
-    val updatedRows = if (
-      oldEdge.state != Archived &&  // Only update position when coming from removed or negated into normal
-      oldEdge.state != Normal &&
-      edge.state == Normal
-    ) {
+    val updatedRows = if (edge.state == Normal) { // only update position if Normal (current business rule)
       transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                           "position = ?, count = 0, state = ? " +
                           "WHERE source_id = ? AND destination_id = ? AND " +

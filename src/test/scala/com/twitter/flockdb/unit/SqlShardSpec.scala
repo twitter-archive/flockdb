@@ -295,27 +295,23 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         }
       }
 
-      "includingArchived" >> {
-        shard.add(alice, bob, 1, now)
-        shard.add(alice, carl, 2, now)
-        shard.add(carl, darcy, 1, now)
-        shard.archive(alice, earl, 1, now)
-
-        shard.selectIncludingArchived(alice, 5, Cursor.Start).toThrift mustEqual new Results(List[Long](earl, carl, bob).pack, Cursor.End.position, Cursor.End.position)
-      }
-
       "get edge objects" >> {
         shard.add(alice, bob, 3, now)
         shard.add(alice, carl, 5, now)
+        shard.remove(alice, alice, 7, now)
 
         val aliceBob = new Edge(alice, bob, 3, now, 0, State.Normal).toThrift
         val aliceCarl = new Edge(alice, carl, 5, now, 0, State.Normal).toThrift
+        val aliceAlice = new Edge(alice, alice, 7, now, 0, State.Removed).toThrift
+
         shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob), Cursor.End.position, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
         shard.selectEdges(alice, List(State.Normal), 3, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
         shard.selectEdges(bob, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge](), Cursor.End.position, Cursor.End.position)
+
+        shard.selectEdges(alice, List(State.Normal, State.Removed), 3, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceAlice, aliceCarl, aliceBob), Cursor.End.position, Cursor.End.position)
 
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(-5)).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge](), Cursor.End.position, Cursor.End.position)
         shard.selectEdges(alice, List(State.Normal), 1, Cursor(-3)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
@@ -347,19 +343,18 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the row already exists" >> {
           "when the already-existing row is older than the row to be inserted" >> {
 
-            // Flock-fix redefines a re-insert as a no-op
             "when the already existing row is not deleted" >> {
               shard.add(alice, bob, 1, now)
 
               shard.add(alice, bob, 2, now + 10.seconds)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, now + 10.seconds, 0, State.Normal))
             }
 
             "when the already existing row is not archived" >> {
               shard.archive(alice, bob, 1, now)
 
               shard.add(alice, bob, 2, now + 10.seconds)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 2, now + 10.seconds, 0, State.Normal))
             }
           }
 
