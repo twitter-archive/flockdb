@@ -97,10 +97,6 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) {
     .copyFactory(new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id)))
   }
 
-
-  // for backward compat:
-  //shardRepo.setupPackage("com.twitter.service.flock.edges")
-
   val forwardingManager = new ForwardingManager(nameServer.multiTableForwarder[Shard])
 
   jobCodec += ("single.Add".r, new jobs.single.AddParser(forwardingManager, OrderedUuidGenerator))
