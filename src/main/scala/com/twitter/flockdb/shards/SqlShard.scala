@@ -115,6 +115,12 @@ class SqlShard(val queryEvaluator: QueryEvaluator, val lowLatencyQueryEvaluator:
     }
   }
 
+  def getMetadataForWrite(sourceId: Long): Option[Metadata] = {
+    queryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+      new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
+    }
+  }
+
   def selectAllMetadata(cursor: Cursor, count: Int) = {
     val metadatas = new mutable.ArrayBuffer[Metadata]
     var nextCursor = Cursor.Start
