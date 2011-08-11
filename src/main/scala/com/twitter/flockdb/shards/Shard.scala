@@ -26,9 +26,10 @@ import com.twitter.gizzard.scheduler._
 trait Shard {
   @throws(classOf[shards.ShardException]) def get(sourceId: Long, destinationId: Long): Option[Edge]
   @throws(classOf[shards.ShardException]) def getMetadata(sourceId: Long): Option[Metadata]
+  @throws(classOf[shards.ShardException]) def getMetadataForWrite(sourceId: Long): Option[Metadata]
 
   @throws(classOf[shards.ShardException]) def getMetadatas(sourceId: Long): Seq[Either[Throwable,Option[Metadata]]] = {
-    Seq(try { Right(getMetadata(sourceId)) } catch { case e => Left(e) })
+    Seq(try { Right(getMetadataForWrite(sourceId)) } catch { case e => Left(e) })
   }
 
   @throws(classOf[shards.ShardException]) def optimistically(sourceId: Long)(f: State => Unit)

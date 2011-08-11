@@ -37,23 +37,19 @@ class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectio
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = time({
-    if (count1 == 0 || count2 == 0) {
-      new ResultWindow(List[(Long,Cursor)](), count, cursor)
-    } else {
-      val guessedPageSize = (count / averageIntersectionProportion).toInt
-      val internalPageSize = guessedPageSize min intersectionPageSizeMax.toInt
-      val timeout = intersectionTimeout.inMillis
+    val guessedPageSize = (count / averageIntersectionProportion).toInt
+    val internalPageSize = guessedPageSize min intersectionPageSizeMax.toInt
+    val timeout = intersectionTimeout.inMillis
 
-      val now = System.currentTimeMillis
-      var resultWindow = pageIntersection(smallerQuery, largerQuery, internalPageSize, count, cursor)
-      while (resultWindow.page.size < count &&
-             resultWindow.continueCursor != Cursor.End &&
-             System.currentTimeMillis - now < timeout
-      ) {
-        resultWindow = resultWindow ++ pageIntersection(smallerQuery, largerQuery, internalPageSize, count, resultWindow.continueCursor)
-      }
-      resultWindow
+    val now = System.currentTimeMillis
+    var resultWindow = pageIntersection(smallerQuery, largerQuery, internalPageSize, count, cursor)
+    while (resultWindow.page.size < count &&
+           resultWindow.continueCursor != Cursor.End &&
+           System.currentTimeMillis - now < timeout
+    ) {
+      resultWindow = resultWindow ++ pageIntersection(smallerQuery, largerQuery, internalPageSize, count, resultWindow.continueCursor)
     }
+    resultWindow
   })
 
   def selectWhereIn(page: Seq[Long]) = time({
