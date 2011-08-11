@@ -44,13 +44,7 @@ class ProductionNameServerReplica(host: String) extends Mysql {
 
     query.timeouts = Map(
       QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second),
-      QueryClass.SelectCopy -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify -> QueryTimeout(3.seconds),
-      QueryClass.SelectSingle               -> QueryTimeout(1.second),
-      QueryClass.SelectIntersection         -> QueryTimeout(1.second),
-      QueryClass.SelectIntersectionSmall    -> QueryTimeout(1.second),
-      QueryClass.SelectMetadata             -> QueryTimeout(1.second)
+      QueryClass.Execute -> QueryTimeout(1.second)
     )
   }
 }
@@ -65,17 +59,11 @@ new FlockDB {
     threadPool.maxThreads = 250
   }
 
-  val nameServer = new com.twitter.gizzard.config.NameServer {
-    mappingFunction = ByteSwapper
-    jobRelay = NoJobRelay
-
-    val replicas = Seq(
-      new ProductionNameServerReplica("localhost")
-    )
-  }
-
-  jobInjector.timeout = 100.millis
-  jobInjector.idleTimeout = 60.seconds
+  mappingFunction                   = ByteSwapper
+  jobRelay                          = NoJobRelay
+  nameServerReplicas                = Seq(new ProductionNameServerReplica("localhost"))
+  jobInjector.timeout               = 100.millis
+  jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
 
   val replicationFuture = new Future {
@@ -98,8 +86,20 @@ new FlockDB {
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
-  val edgesQueryEvaluator = new ProductionQueryEvaluator
-  val lowLatencyQueryEvaluator = new ProductionQueryEvaluator
+  val edgesQueryEvaluator = new ProductionQueryEvaluator {
+    query.timeouts = Map(
+      QueryClass.Select                  -> QueryTimeout(1.second),
+      QueryClass.Execute                 -> QueryTimeout(1.second),
+      QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
+      QueryClass.SelectModify            -> QueryTimeout(3.seconds),
+      QueryClass.SelectSingle            -> QueryTimeout(1.second),
+      QueryClass.SelectIntersection      -> QueryTimeout(1.second),
+      QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
+      QueryClass.SelectMetadata          -> QueryTimeout(1.second)
+    )
+  }
+
+  val lowLatencyQueryEvaluator = edgesQueryEvaluator
 
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
     database.pool = new ThrottledPoolingDatabase {

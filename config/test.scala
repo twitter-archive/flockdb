@@ -67,22 +67,20 @@ new FlockDB {
     threadPool.maxThreads = 250
   }
 
-  val nameServer = new com.twitter.gizzard.config.NameServer {
-    mappingFunction = Identity
-    jobRelay = NoJobRelay
+  mappingFunction = Identity
+  jobRelay        = NoJobRelay
 
-    val replicas = Seq(new Mysql {
-      queryEvaluator  = new TestQueryEvaluator("nameserver")
+  nameServerReplicas = Seq(new Mysql {
+    queryEvaluator  = new TestQueryEvaluator("nameserver")
 
-      val connection = new Connection with Credentials {
-        val hostnames = Seq("localhost")
-        val database = "flock_edges_test"
-      }
-    })
-  }
+    val connection = new Connection with Credentials {
+      val hostnames = Seq("localhost")
+      val database = "flock_edges_test"
+    }
+  })
 
-  jobInjector.timeout = 100.milliseconds
-  jobInjector.idleTimeout = 60.seconds
+  jobInjector.timeout               = 100.milliseconds
+  jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
 
   // futures

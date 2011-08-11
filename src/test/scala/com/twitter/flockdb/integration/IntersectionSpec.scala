@@ -38,7 +38,7 @@ object IntersectionSpec extends IntegrationSpecification {
     op1.setTerm(new QueryTerm(user1, FOLLOWS, true))
     val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
     op2.setTerm(new QueryTerm(user2, FOLLOWS, true))
-    flock.select(List[SelectOperation](
+    flockService.select(List[SelectOperation](
       op1,
       op2,
       new SelectOperation(SelectOperationType.Intersection)), page)
@@ -48,12 +48,12 @@ object IntersectionSpec extends IntegrationSpecification {
     "intersection_for" in {
       "pagination" in {
         reset(config)
-        flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-        flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-        flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-        flock.execute(Select(carl, FOLLOWS, bob).add.toThrift)
-        flock.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
-        flock.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
+        flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+        flockService.execute(Select(carl, FOLLOWS, bob).add.toThrift)
+        flockService.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
+        flockService.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
 
         var result = new Results(List[Long](darcy).pack, darcy, Cursor.End.position)
         intersection_of(alice, carl, new Page(1, Cursor.Start.position)) mustEqual result
@@ -67,8 +67,8 @@ object IntersectionSpec extends IntegrationSpecification {
 
       "one list is empty" in {
         reset(config)
-        for (i <- 1 until 11) flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
-        flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
+        for (i <- 1 until 11) flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
 
         var result = new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
         intersection_of(alice, carl, new Page(10, Cursor.Start.position)) mustEqual result

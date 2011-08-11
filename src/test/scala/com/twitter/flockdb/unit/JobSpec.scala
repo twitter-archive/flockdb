@@ -19,7 +19,7 @@ package unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardInfo, ShardException, ReadWriteShard}
+import com.twitter.gizzard.shards.{ShardInfo, ShardException, LeafRoutingNode}
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
@@ -30,28 +30,6 @@ import shards.{Shard, SqlShard, ReadWriteShardAdapter, OptimisticLockException}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove, Archive, NodePair}
 
-
-class FakeLockingShard(shard: Shard) extends SqlShard(null, null, new ShardInfo("a", "b", "c"), 1, Nil, 0) {
-  override def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = f(shard, shard.getMetadata(sourceId).get) // jMock is not up to the task
-}
-
-class SimpleAdapter(shard: Shard) extends ReadWriteShardAdapter(new IdentityShard[Shard](shard))
-
-class IdentityShard[ConcreteShard <: Shard](shard: ConcreteShard)
-  extends ReadWriteShard[ConcreteShard] {
-  val children = Seq(shard)
-  val weight = 1
-  def shardInfo =  new ShardInfo("a", "b", "c")
-
-  def readAllOperation[A](method: (ConcreteShard => A)) = Seq(try { Right(method(shard)) } catch { case e => Left(e) })
-  def readOperation[A](method: (ConcreteShard => A)) = method(shard)
-
-  def writeOperation[A](method: (ConcreteShard => A)) = method(shard)
-
-  def rebuildableReadOperation[A](method: (ConcreteShard => Option[A]))(rebuild: (ConcreteShard, ConcreteShard) => Unit) =
-    method(shard)
-}
-
 class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val FOLLOWS = 1
 
@@ -61,25 +39,13 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val jane = 56L
   val darcy = 62L
 
-  val uuidGenerator = IdentityUuidGenerator
-  var forwardingManager: ForwardingManager = null
-  var shard1: Shard = null
-  var shard2: Shard = null
-  var shard3: Shard = null
-  var shard4: Shard = null
-  var shard1Mock: Shard = null
-  var shard2Mock: Shard = null
-  val scheduler = mock[PrioritizingJobScheduler]
+  val uuidGenerator     = IdentityUuidGenerator
+  val forwardingManager = mock[ForwardingManager]
+  val mocks             = (0 to 3) map { _ => mock[Shard] }
 
-  def before() {
-    doBefore {
-      forwardingManager = mock[ForwardingManager]
-      shard1Mock = mock[Shard]
-      shard2Mock = mock[Shard]
-      shard1 = new SimpleAdapter(shard1Mock)
-      shard2 = new SimpleAdapter(shard2Mock)
-    }
-  }
+  // allow the readwrite shard adapter to implement optimistically
+  val shards            = mocks map { m => new ReadWriteShardAdapter(LeafRoutingNode(m)) }
+  val scheduler         = mock[PrioritizingJobScheduler]
 
   def test(desc: String, jobState: State, bobBefore: State, maryBefore: State, bobAfter: State, maryAfter: State, applied: State, f: jobs.single.Single => Unit) = {
     desc in {
@@ -90,30 +56,30 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           case Archived => jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
         }
         expect {
-          allowing(forwardingManager).find(bob, FOLLOWS, Forward) willReturn shard1
-          allowing(forwardingManager).find(mary, FOLLOWS, Backward) willReturn shard2
+          allowing(forwardingManager).find(bob, FOLLOWS, Forward) willReturn shards(0)
+          allowing(forwardingManager).find(mary, FOLLOWS, Backward) willReturn shards(1)
 
           // Before
-          one(shard1Mock).getMetadataForWrite(bob) willReturn Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second))
-          one(shard2Mock).getMetadataForWrite(mary) willReturn Some(new Metadata(mary, maryBefore, 1, Time.now - 1.second))
+          one(mocks(0)).getMetadataForWrite(bob) willReturn Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second))
+          one(mocks(1)).getMetadataForWrite(mary) willReturn Some(new Metadata(mary, maryBefore, 1, Time.now - 1.second))
 
           // After
-          allowing(shard1Mock).getMetadataForWrite(bob) willReturn Some(new Metadata(mary, bobAfter, 1, Time.now))
-          allowing(shard2Mock).getMetadataForWrite(mary) willReturn Some(new Metadata(mary, maryAfter, 1, Time.now))
+          allowing(mocks(0)).getMetadataForWrite(bob) willReturn Some(new Metadata(mary, bobAfter, 1, Time.now))
+          allowing(mocks(1)).getMetadataForWrite(mary) willReturn Some(new Metadata(mary, maryAfter, 1, Time.now))
 
           // Results
           applied match {
             case Normal => {
-              one(shard1Mock).add(bob, mary, 1, Time.now)
-              one(shard2Mock).add(mary, bob, 1, Time.now)
+              one(mocks(0)).add(bob, mary, 1, Time.now)
+              one(mocks(1)).add(mary, bob, 1, Time.now)
             }
             case Archived => {
-              one(shard1Mock).archive(bob, mary, 1, Time.now)
-              one(shard2Mock).archive(mary, bob, 1, Time.now)
+              one(mocks(0)).archive(bob, mary, 1, Time.now)
+              one(mocks(1)).archive(mary, bob, 1, Time.now)
             }
             case Removed => {
-              one(shard1Mock).remove(bob, mary, 1, Time.now)
-              one(shard2Mock).remove(mary, bob, 1, Time.now)
+              one(mocks(0)).remove(bob, mary, 1, Time.now)
+              one(mocks(1)).remove(mary, bob, 1, Time.now)
             }
           }
         }
@@ -123,7 +89,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Add" should {
-    before()
     //                         Input   Before            After             Resulting
     //                         Job     Bob     Mary      Bob     Mary      Job
     test("normal add",         Normal, Normal, Normal,   Normal, Normal,   Normal, _.apply)
@@ -145,8 +110,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Remove" should {
-    before()
-
     //                         Input    Before            After             Resulting
     //                         Job      Bob     Mary      Bob     Mary      Job
     test("normal remove",      Removed, Normal, Normal,   Normal, Normal,   Removed, _.apply)
@@ -165,8 +128,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Archive" should {
-    before()
-
     //                          Input     Before             After             Resulting
     //                          Job       Bob     Mary       Bob     Mary      Job
     test("normal archive",      Archived, Normal, Normal,    Normal, Normal,   Archived, _.apply)
@@ -188,14 +149,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Archive" should {
-    doBefore {
-      forwardingManager = mock[ForwardingManager]
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      shard3 = mock[Shard]
-      shard4 = mock[Shard]
-    }
-
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
         val job = new jobs.multi.Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
@@ -210,14 +163,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "Unarchive" should {
-    doBefore {
-      forwardingManager = mock[ForwardingManager]
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      shard3 = mock[Shard]
-      shard4 = mock[Shard]
-    }
-
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
         val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
@@ -232,14 +177,6 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   }
 
   "RemoveAll" should {
-    doBefore {
-      forwardingManager = mock[ForwardingManager]
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      shard3 = mock[Shard]
-      shard4 = mock[Shard]
-    }
-
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
         val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)

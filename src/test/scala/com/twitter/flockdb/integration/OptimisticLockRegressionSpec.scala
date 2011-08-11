@@ -59,20 +59,20 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
   "Inserting conflicting items" should {
     "recover via the optimistic lock" in {
       reset(config)
-      f.jobCodec += ("SlowAdd".r, new SlowAddParser(f.forwardingManager, OrderedUuidGenerator))
+      flock.jobCodec += ("SlowAdd".r, new SlowAddParser(flock.forwardingManager, OrderedUuidGenerator))
 
-      val scheduler = jobScheduler(flockdb.Priority.High.id)
+      val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
       val errors = scheduler.errorQueue
 
       // No thrift api for this, so this is the best I know how to do.
-      scheduler.put(new SlowAdd(1, FOLLOWS, 5106, 123456, Time.now, flock.edges.forwardingManager, OrderedUuidGenerator))
+      scheduler.put(new SlowAdd(1, FOLLOWS, 5106, 123456, Time.now, flock.forwardingManager, OrderedUuidGenerator))
 
-      flock.execute(Select(1, FOLLOWS, ()).archive.toThrift)
+      flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
 
       jobSchedulerMustDrain
 
-      flock.contains(1, FOLLOWS, 5106) must eventually(be_==(true))
-      flock.get(1, FOLLOWS, 5106).state_id must eventually(be_==(State.Normal.id))
+      flockService.contains(1, FOLLOWS, 5106) must eventually(be_==(true))
+      flockService.get(1, FOLLOWS, 5106).state_id must eventually(be_==(State.Normal.id))
 
       var found = false
       while (errors.size > 0) {
@@ -86,7 +86,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
 
       found mustEqual true
 
-      flock.get(1, FOLLOWS, 5106).state_id must eventually(be_==(State.Archived.id))
+      flockService.get(1, FOLLOWS, 5106).state_id must eventually(be_==(State.Archived.id))
     }
 
 
@@ -94,32 +94,32 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
       // println("gogo")
       reset(config)
 
-      val scheduler = jobScheduler(flockdb.Priority.High.id)
+      val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
       val errors = scheduler.errorQueue
 
       // println("spamming edges")
       for(i <- 1 to 500) {
         (i % 2) match {
-          case 0 => flock.execute(Select(1, FOLLOWS, i).add.toThrift)
-          case 1 => flock.execute(Select(1, FOLLOWS, i).archive.toThrift)
+          case 0 => flockService.execute(Select(1, FOLLOWS, i).add.toThrift)
+          case 1 => flockService.execute(Select(1, FOLLOWS, i).archive.toThrift)
         }
       }
 
       // println("spamming removes")
       for(i <- 1 to 50) {
-        flock.execute(Select((), FOLLOWS, i * 10).remove.toThrift)
+        flockService.execute(Select((), FOLLOWS, i * 10).remove.toThrift)
       }
 
       // println("spamming bulks")
       for(i <- 1 to 10) {
         (i % 2) match {
-          case 0 => flock.execute(Select(1, FOLLOWS, ()).add.toThrift)
-          case 1 => flock.execute(Select(1, FOLLOWS, ()).archive.toThrift)
+          case 0 => flockService.execute(Select(1, FOLLOWS, ()).add.toThrift)
+          case 1 => flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
         }
       }
 
       // println("final state")
-      flock.execute(Select(1, FOLLOWS, ()).archive.toThrift)
+      flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
 
       // println("draining")
 
@@ -153,13 +153,13 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
 
       val selectArchived =     new SimpleSelect(new operations.SelectOperation(operations.SelectOperationType.SimpleQuery, Some(new flockdb.QueryTerm(alice, FOLLOWS, true, None, List(State.Archived)))))
 
-      flock.count(selectArchived.toThrift) must eventually(be_==(450))
-      flock.count(Select(1, FOLLOWS, ()).toThrift) mustEqual 0
+      flockService.count(selectArchived.toThrift) must eventually(be_==(450))
+      flockService.count(Select(1, FOLLOWS, ()).toThrift) mustEqual 0
 
       for(i <- 1 to 500) {
         (i % 10) match {
           case 0 => ()
-          case _ => flock.get(1, FOLLOWS, i).state_id mustEqual State.Archived.id
+          case _ => flockService.get(1, FOLLOWS, i).state_id mustEqual State.Archived.id
         }
       }
     }

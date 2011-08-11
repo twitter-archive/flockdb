@@ -35,9 +35,8 @@ import thrift._
 
 class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
   override def reset(config: FlockDBConfig, name: String) {
-    materialize(config.nameServer)
-    nameServer.rebuildSchema()
-    nameServer.reload()
+    materialize(config)
+    flock.nameServer.reload()
 
     val rootQueryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection.withoutDatabase)
     //rootQueryEvaluator.execute("DROP DATABASE IF EXISTS " + config.databaseConnection.database)
@@ -51,15 +50,15 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
           val shardId2 = ShardId("localhost", direction + "_" + graph + "_b")
           val replicatingShardId = ShardId("localhost", "replicating_" + direction + "_" + graph)
 
-          nameServer.createShard(ShardInfo(shardId1,
+          flock.shardManager.createAndMaterializeShard(ShardInfo(shardId1,
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-          nameServer.createShard(ShardInfo(shardId2,
+          flock.shardManager.createAndMaterializeShard(ShardInfo(shardId2,
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
-          nameServer.createShard(ShardInfo(replicatingShardId,
+          flock.shardManager.createAndMaterializeShard(ShardInfo(replicatingShardId,
             "ReplicatingShard", "", "", Busy.Normal))
-          nameServer.addLink(replicatingShardId, shardId1, 1)
-          nameServer.addLink(replicatingShardId, shardId2, 1)
-          nameServer.setForwarding(Forwarding(tableId, 0, replicatingShardId))
+          flock.shardManager.addLink(replicatingShardId, shardId1, 1)
+          flock.shardManager.addLink(replicatingShardId, shardId2, 1)
+          flock.shardManager.setForwarding(Forwarding(tableId, 0, replicatingShardId))
 
           queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_edges")
           queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_metadata")
@@ -69,19 +68,19 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
           val shardId1 = ShardId("localhost", direction + "_" + graph + "_replicating")
           val shardId2 = ShardId("localhost", direction + "_" + graph + "_a")
           val shardId3 = ShardId("localhost", direction + "_" + graph + "_b")
-          nameServer.createShard(ShardInfo(shardId1, "ReplicatingShard", "", "", Busy.Normal))
-          nameServer.createShard(ShardInfo(shardId2, name, "", "", Busy.Normal))
-          nameServer.createShard(ShardInfo(shardId3,
+          flock.shardManager.createAndMaterializeShard(ShardInfo(shardId1, "ReplicatingShard", "", "", Busy.Normal))
+          flock.shardManager.createAndMaterializeShard(ShardInfo(shardId2, name, "", "", Busy.Normal))
+          flock.shardManager.createAndMaterializeShard(ShardInfo(shardId3,
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
 
-          nameServer.addLink(shardId1, shardId2, 1)
-          nameServer.addLink(shardId2, shardId3, 1)
-          nameServer.setForwarding(Forwarding(tableId, 0, shardId1))
+          flock.shardManager.addLink(shardId1, shardId2, 1)
+          flock.shardManager.addLink(shardId2, shardId3, 1)
+          flock.shardManager.setForwarding(Forwarding(tableId, 0, shardId1))
         }
       }
     }
 
-    nameServer.reload()
+    flock.nameServer.reload()
   }
 
   val alice = 1L
@@ -92,7 +91,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
     val term = new QueryTerm(alice, FOLLOWS, true)
     term.setState_ids(List[Int](State.Normal.id))
     val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flock.select_edges(List[EdgeQuery](query)).toList
+    val resultsList = flockService.select_edges(List[EdgeQuery](query)).toList
     resultsList.size mustEqual 1
     resultsList(0).edges
   }
@@ -102,7 +101,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       reset(config, "com.twitter.gizzard.shards.BlackHoleShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
-        flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
       }
 
       alicesFollowings.size must eventually(be(10))
@@ -114,10 +113,10 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       reset(config, "com.twitter.gizzard.shards.ReadOnlyShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
-        flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
       }
 
-      val scheduler = jobScheduler(flockdb.Priority.High.id)
+      val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
       val errors = scheduler.errorQueue
       errors.size must eventually(be(10))
     }
@@ -128,10 +127,10 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       reset(config, "com.twitter.gizzard.shards.WriteOnlyShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
-        flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
       }
 
-      val scheduler = jobScheduler(flockdb.Priority.High.id)
+      val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
       val errors = scheduler.errorQueue
       errors.size must eventually(be(10))
     }

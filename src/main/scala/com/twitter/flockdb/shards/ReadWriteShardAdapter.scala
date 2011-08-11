@@ -18,12 +18,12 @@ package com.twitter.flockdb
 package shards
 
 import scala.collection.mutable
-import com.twitter.gizzard.shards
+import com.twitter.gizzard.shards.RoutingNode
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 
-class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
-      extends shards.ReadWriteShardAdapter(shard) with Shard with Optimism {
+class ReadWriteShardAdapter(shard: RoutingNode[Shard])
+      extends Shard with Optimism {
   def selectIncludingArchived(sourceId: Long, count: Int, cursor: Cursor)                            = shard.readOperation(_.selectIncludingArchived(sourceId, count, cursor))
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                       = shard.readOperation(_.intersect(sourceId, states, destinationIds))
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long])                  = shard.readOperation(_.intersectEdges(sourceId, states, destinationIds))
@@ -53,17 +53,4 @@ class ReadWriteShardAdapter(shard: shards.ReadWriteShard[Shard])
   def negate(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                   = shard.writeOperation(_.negate(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                  = shard.writeOperation(_.archive(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, updatedAt: Time)                                                       = shard.writeOperation(_.archive(sourceId, updatedAt))
-
-  def withLock[A](sourceId: Long)(f: (Shard, Metadata) => A) = {
-    if (shard.isInstanceOf[shards.ReplicatingShard[_]]) {
-      val replicatingShard = shard.asInstanceOf[shards.ReplicatingShard[Shard]]
-      val lockServer = children.head.asInstanceOf[Shard]
-      val rest = children.drop(1).asInstanceOf[Seq[Shard]]
-      lockServer.withLock(sourceId) { (lock, metadata) =>
-        f(new ReadWriteShardAdapter(new shards.ReplicatingShard(shardInfo, weight, List(lock) ++ rest, replicatingShard.loadBalancer, replicatingShard.future)), metadata)
-      }
-    } else {
-      shard.writeOperation(_.withLock(sourceId)(f))
-    }
-  }
 }

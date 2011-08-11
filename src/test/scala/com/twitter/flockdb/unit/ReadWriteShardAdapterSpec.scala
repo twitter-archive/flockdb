@@ -17,8 +17,6 @@
 package com.twitter.flockdb
 package unit
 
-import com.twitter.gizzard.shards.{ReadWriteShard, ShardInfo}
-import com.twitter.gizzard.test.FakeReadWriteShard
 import com.twitter.util.Time
 import org.specs.mock.{ClassMocker, JMocker}
 import shards.{ReadWriteShardAdapter, Shard}
@@ -30,30 +28,6 @@ object ReadWriteShardAdapterSpec extends ConfiguredSpecification with JMocker wi
   var shard2: Shard = null
   var shard3: Shard = null
 
-  "ReadWriteShardAdapter" should {
-    doBefore {
-      shard1 = mock[Shard]
-      shard2 = mock[Shard]
-      shard3 = mock[Shard]
-    }
-
-    "call withLock only on the primary child" in {
-      Time.withCurrentTimeFrozen { time =>
-        val sourceId = 23
-        val metadata = mock[Metadata]
-
-        expect {
-          one(shard2).getMetadata(sourceId) willReturn Some(metadata)
-          one(shard2).add(sourceId, Time.now)
-        }
-
-        val fake2 = new FakeLockingShard(shard2)
-        val fake1 = new FakeReadWriteShard[Shard](fake2, null, 1, Nil)
-        val shard = new ReadWriteShardAdapter(fake1)
-        shard.withLock(sourceId) { (innerShard, metadata) =>
-          innerShard.add(sourceId, Time.now)
-        }
-      }
-    }
+  "ReadWriteShardAdapter" in {
   }
 }

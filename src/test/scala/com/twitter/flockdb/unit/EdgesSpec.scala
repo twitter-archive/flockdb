@@ -19,9 +19,8 @@ package unit
 
 import scala.collection.mutable
 import scala.collection.JavaConversions._
-import com.twitter.gizzard.Future
+import com.twitter.gizzard.util.Future
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
@@ -43,14 +42,12 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val mary = 2L
 
     val nestedJob = capturingParam[JsonNestedJob]
-    val nameServer = mock[NameServer[Shard]]
     val uuidGenerator = mock[UuidGenerator]
     val forwardingManager = mock[ForwardingManager]
     val shard = mock[Shard]
     val scheduler = mock[PrioritizingJobScheduler]
     val future = mock[Future]
-    val copyFactory = mock[CopyJobFactory[Shard]]
-    val flock = new FlockDBThriftAdapter(new EdgesService(nameServer, forwardingManager, copyFactory, scheduler, future, config.intersectionQuery, config.aggregateJobsPageSize), null)
+    val flock = new FlockDBThriftAdapter(new EdgesService(forwardingManager, scheduler, future, config.intersectionQuery, config.aggregateJobsPageSize), null)
 
     "add" in {
       Time.withCurrentTimeFrozen { time =>

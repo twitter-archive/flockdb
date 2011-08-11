@@ -35,19 +35,19 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     val darcy = 4L
 
     def setup1() {
-      flock.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      flock.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-      flock.execute(Select(carl, FOLLOWS, bob).add.toThrift)
-      flock.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
-      flock.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
+      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
+      flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
+      flockService.execute(Select(carl, FOLLOWS, bob).add.toThrift)
+      flockService.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
+      flockService.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
     }
 
     def setup2() {
-      for (i <- 1 until 11) flock.execute(Select(alice, FOLLOWS, i).add.toThrift)
-      for (i <- 1 until 7) flock.execute(Select(bob, FOLLOWS, i * 2).add.toThrift)
-      flock.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
-      flock.count(Select(bob, FOLLOWS, ()).toThrift) must eventually(be_==(6))
+      for (i <- 1 until 11) flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
+      for (i <- 1 until 7) flockService.execute(Select(bob, FOLLOWS, i * 2).add.toThrift)
+      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
+      flockService.count(Select(bob, FOLLOWS, ()).toThrift) must eventually(be_==(6))
     }
 
     "pagination" in {
@@ -65,13 +65,13 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
         new SelectOperation(SelectOperationType.Intersection) :: Nil
 
       var result = new Results(List[Long](darcy).pack, darcy, Cursor.End.position)
-      flock.select(program, new Page(1, Cursor.Start.position)) mustEqual result
+      flockService.select(program, new Page(1, Cursor.Start.position)) mustEqual result
 
       result = new Results(List[Long](bob).pack, Cursor.End.position, -bob)
-      flock.select(program, new Page(1, darcy)) mustEqual result
+      flockService.select(program, new Page(1, darcy)) mustEqual result
 
       result = new Results(List[Long](darcy, bob).pack, Cursor.End.position, Cursor.End.position)
-      flock.select(program, new Page(2, Cursor.Start.position)) mustEqual result
+      flockService.select(program, new Page(2, Cursor.Start.position)) mustEqual result
     }
 
     "one list is empty" in {
@@ -88,7 +88,7 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
       op2.setTerm(term2)
       var program = op1 :: op2 ::
         new SelectOperation(SelectOperationType.Intersection) :: Nil
-      flock.select(program, new Page(10, Cursor.Start.position)) mustEqual result
+      flockService.select(program, new Page(10, Cursor.Start.position)) mustEqual result
     }
 
     "difference" in {
@@ -104,10 +104,10 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
       op2.setTerm(term2)
       var program = op1 :: op2 ::
         new SelectOperation(SelectOperationType.Difference) :: Nil
-      flock.select(program, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
-      flock.select(program, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
-      flock.select(program, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
-      flock.select(program, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
+      flockService.select(program, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
+      flockService.select(program, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
+      flockService.select(program, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
+      flockService.select(program, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
     }
   }
 }
