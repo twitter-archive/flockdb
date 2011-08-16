@@ -66,13 +66,6 @@ new FlockDB {
   jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
 
-  val replicationFuture = new Future {
-    poolSize = 100
-    maxPoolSize = 100
-    keepAlive = 5.seconds
-    timeout = 6.seconds
-  }
-
   val readFuture = new Future {
     poolSize = 100
     maxPoolSize = 100
