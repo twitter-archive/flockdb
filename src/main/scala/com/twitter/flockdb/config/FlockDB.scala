@@ -34,7 +34,6 @@ trait FlockDB extends GizzardServer {
   def lowLatencyQueryEvaluator: QueryEvaluator
   def materializingQueryEvaluator: QueryEvaluator
 
-  def replicationFuture: Future
   def readFuture: Future
 
   def adminConfig: AdminServiceConfig
