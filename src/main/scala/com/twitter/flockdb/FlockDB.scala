@@ -16,42 +16,18 @@
 
 package com.twitter.flockdb
 
-import java.lang.{Long => JLong, String}
-import java.util.{ArrayList => JArrayList, List => JList}
-import scala.collection.mutable
-import scala.collection.JavaConversions._
-import com.twitter.gizzard.GizzardServer
-import com.twitter.gizzard.util.Future
-import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.nameserver
-import com.twitter.gizzard.shards.{ShardException, ShardInfo, ReplicatingShard, ShardId}
-import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.gizzard.proxy.{ExceptionHandlingProxyFactory}
-import com.twitter.logging.Logger
-import com.twitter.gizzard.Stats
-import com.twitter.querulous.StatsCollector
-import com.twitter.querulous.database.DatabaseFactory
-import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import com.twitter.querulous.query.{QueryClass, QueryFactory}
-import com.twitter.flockdb.conversions.Edge._
-import com.twitter.flockdb.conversions.Metadata._
-import com.twitter.flockdb.conversions.EdgeQuery._
-import com.twitter.flockdb.conversions.EdgeResults._
-import com.twitter.flockdb.conversions.ExecuteOperations._
-import com.twitter.flockdb.conversions.Page._
-import com.twitter.flockdb.conversions.Results._
-import com.twitter.flockdb.conversions.SelectQuery._
-import com.twitter.flockdb.conversions.SelectOperation._
 import com.twitter.util.Duration
-import queries._
-import shards.{Shard, SqlShardFactory}
-import jobs.multi.{RemoveAll, Archive, Unarchive}
-import jobs.single.{Add, Remove}
-import Direction._
-import thrift.FlockException
-import config.{FlockDB => FlockDBConfig}
+import com.twitter.ostrich.admin.Service
+import com.twitter.querulous.StatsCollector
+import com.twitter.gizzard.GizzardServer
+import com.twitter.gizzard.scheduler._
+import com.twitter.gizzard.proxy.ExceptionHandlingProxyFactory
+import com.twitter.gizzard.Stats
+import com.twitter.flockdb.shards.{Shard, SqlShardFactory}
+import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 
-class FlockDB(config: FlockDBConfig) extends GizzardServer(config) {
+
+class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service {
   object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
     e match {
       case _: thrift.FlockException =>
@@ -134,19 +110,41 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) {
     config.server(processor)
   }
 
+  // satisfy service
+
   def start() {
     startGizzard()
     val runnable = new Runnable { def run() { flockThriftServer.serve() } }
     new Thread(runnable, "FlockDBServerThread").start()
   }
 
-  def shutdown(quiesce: Boolean) {
+  def shutdown() {
     flockThriftServer.stop()
-    shutdownGizzard(quiesce)
+    shutdownGizzard(false)
+  }
+
+  override def quiesce() {
+    flockThriftServer.stop()
+    shutdownGizzard(true)
   }
 }
 
 class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler) extends thrift.FlockDB.Iface {
+  import java.util.{List => JList}
+  import scala.collection.JavaConversions._
+  import com.twitter.gizzard.thrift.conversions.Sequences._
+  import com.twitter.flockdb.conversions.Edge._
+  import com.twitter.flockdb.conversions.Metadata._
+  import com.twitter.flockdb.conversions.EdgeQuery._
+  import com.twitter.flockdb.conversions.EdgeResults._
+  import com.twitter.flockdb.conversions.ExecuteOperations._
+  import com.twitter.flockdb.conversions.Page._
+  import com.twitter.flockdb.conversions.Results._
+  import com.twitter.flockdb.conversions.SelectQuery._
+  import com.twitter.flockdb.conversions.SelectOperation._
+  import com.twitter.gizzard.shards.ShardException
+  import thrift.FlockException
+
   def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.contains(source_id, graph_id, destination_id)
   }

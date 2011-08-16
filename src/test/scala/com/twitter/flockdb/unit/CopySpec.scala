@@ -34,7 +34,7 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard2Info = new ShardInfo("TestShard", "shard2", "test")
   val count = 2300
 
-  "Copy" should {
+  // "Copy" should {
   //   val cursor1 = Cursor(337L)
   //   val cursor2 = Cursor(555L)
   //   val nameServer = mock[NameServer]
@@ -135,5 +135,5 @@ class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   //     json mustMatch "MetadataCopy"
   //     json mustMatch "\"cursor\":" + cursor.position
   //   }
-  }
+  // }
 }

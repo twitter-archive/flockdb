@@ -1,50 +1,39 @@
 package com.twitter.flockdb
 
-import com.twitter.ostrich.admin.{ServiceTracker, Service}
-import com.twitter.logging.{FileHandler, Logger}
 import com.twitter.util.Eval
-import org.apache.thrift.server.TServer
+import com.twitter.logging.Logger
+import com.twitter.ostrich.admin.{Service, ServiceTracker, RuntimeEnvironment, AdminHttpService}
 import java.io.File
-import config.{FlockDB => FlockDBConfig}
 
-object Main extends Service {
-  var service: FlockDB = null
-  var config: FlockDBConfig = null
+import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
+
+object Main {
+  val log = Logger.get
+
+  var adminServer: Option[AdminHttpService] = None
 
   def main(args: Array[String]) {
     try {
-      val eval = new Eval
-      config  = eval[FlockDBConfig](args.map(new File(_)): _*)
-      service = new FlockDB(config)
+      log.info("Starting FlockDB.")
 
-      start()
+      val eval    = new Eval
+      val config  = eval[FlockDBConfig](args.map(new File(_)): _*)
+      val runtime = new RuntimeEnvironment(this)
 
-      println("Running.")
+      Logger.configure(config.loggers)
+      adminServer = config.adminConfig()(runtime)
+
+      val service = new FlockDB(config)
+
+      ServiceTracker.register(service)
+      service.start()
+
     } catch {
       case e => {
-        println("Exception in initialization: ")
-        Logger.get("").fatal(e, "Exception in initialization.")
-        e.printStackTrace
-        shutdown()
+        log.fatal(e, "Exception in initialization: ", e.getMessage)
+        log.fatal(e.getStackTrace.toString)
+        System.exit(1)
       }
     }
-  }
-
-  def start() {
-    ServiceTracker.register(this)
-    config.adminConfig()
-    service.start()
-  }
-
-  def shutdown() {
-    if (service ne null) service.shutdown(false)
-    service = null
-    ServiceTracker.shutdown()
-  }
-
-  override def quiesce() {
-    if (service ne null) service.shutdown(true)
-    service = null
-    ServiceTracker.shutdown()
   }
 }
