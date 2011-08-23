@@ -44,7 +44,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val mocks             = (0 to 3) map { _ => mock[Shard] }
 
   // allow the readwrite shard adapter to implement optimistically
-  val shards            = mocks map { m => new ReadWriteShardAdapter(LeafRoutingNode(m)) }
+  val shards            = mocks map { m => LeafRoutingNode(m) }
   val scheduler         = mock[PrioritizingJobScheduler]
 
   def test(desc: String, jobState: State, bobBefore: State, maryBefore: State, bobAfter: State, maryAfter: State, applied: State, f: jobs.single.Single => Unit) = {
@@ -56,8 +56,8 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           case Archived => jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
         }
         expect {
-          allowing(forwardingManager).find(bob, FOLLOWS, Forward) willReturn shards(0)
-          allowing(forwardingManager).find(mary, FOLLOWS, Backward) willReturn shards(1)
+          allowing(forwardingManager).findNode(bob, FOLLOWS, Forward) willReturn shards(0)
+          allowing(forwardingManager).findNode(mary, FOLLOWS, Backward) willReturn shards(1)
 
           // Before
           one(mocks(0)).getMetadataForWrite(bob) willReturn Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second))

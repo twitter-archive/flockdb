@@ -21,7 +21,7 @@ import scala.collection._
 import scala.collection.mutable.ArrayBuffer
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import com.twitter.gizzard.shards.ShardInfo
+import com.twitter.gizzard.shards._
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
@@ -35,16 +35,24 @@ import thrift._
 
 
 class SlowAddParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
-  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new SlowAdd(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
+  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time, successes: List[ShardId]) = {
+    new SlowAdd(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator, successes)
   }
 }
 
-class SlowAdd(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
-               forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends Add(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
-  override def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) = {
+class SlowAdd(
+  sourceId: Long,
+  graphId: Int,
+  destinationId: Long,
+  position: Long,
+  updatedAt: Time,
+  forwardingManager: ForwardingManager,
+  uuidGenerator: UuidGenerator,
+  successes: List[ShardId] = Nil)
+extends Add(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator, successes) {
+  override def write(forward: NodeSet[Shard], backward: NodeSet[Shard], uuid: Long, state: State) = {
     Thread.sleep(300)
-    super.write(forwardShard, backwardShard, uuid, state)
+    super.write(forward, backward, uuid, state)
   }
 }
 

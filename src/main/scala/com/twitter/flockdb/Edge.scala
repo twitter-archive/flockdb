@@ -43,7 +43,7 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSe
       case State.Archived => Archive
       case State.Negative => Negate
     }
-    job(sourceId, tableId, destinationId, OrderedUuidGenerator.unapply(position).get, updatedAt, forwardingManager, OrderedUuidGenerator)
+    job(sourceId, tableId, destinationId, OrderedUuidGenerator.unapply(position).get, updatedAt, forwardingManager, OrderedUuidGenerator, Nil)
   }
 
   def similar(other:Edge) = {
