@@ -12,3 +12,5 @@ project/boot/
 project/plugins/project/
 ignore/
 flockdb.tmproj
+*.iml
+.idea/

@@ -45,6 +45,7 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
       Stats.addMetric(name, duration.inMillis.toInt)
       rv
     }
+    override def addGauge(name: String)(gauge: => Double) { Stats.addGauge(name)(gauge) }
   }
 
   val jobPriorities = List(Priority.Low, Priority.Medium, Priority.High).map(_.id)
