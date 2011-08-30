@@ -49,7 +49,7 @@ extends JsonJobParser {
   }
 }
 
-class Multi(
+case class Multi(
   sourceId: Long,
   graphId: Int,
   direction: Direction,
