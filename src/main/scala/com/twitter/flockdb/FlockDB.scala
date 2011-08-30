@@ -81,6 +81,18 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
   jobCodec += ("jobs\\.(Copy|Migrate)".r,                 new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
   jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
 
+  // XXX: remove when old tagged jobs no longer exist.
+  import jobs.LegacySingleJobParser
+  import jobs.LegacyMultiJobParser
+  jobCodec += ("single.Add".r,      LegacySingleJobParser.Add(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.Remove".r,   LegacySingleJobParser.Remove(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.Archive".r,  LegacySingleJobParser.Archive(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("single.Negate".r,   LegacySingleJobParser.Negate(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("multi.Archive".r,   LegacyMultiJobParser.Archive(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Unarchive".r, LegacyMultiJobParser.Unarchive(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.RemoveAll".r, LegacyMultiJobParser.RemoveAll(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Negate".r,    LegacyMultiJobParser.Negate(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+
   val flockService = {
     val edges = new EdgesService(
       forwardingManager,
