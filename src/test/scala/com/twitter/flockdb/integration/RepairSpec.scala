@@ -57,6 +57,16 @@ class RepairSpec extends IntegrationSpecification {
 
       shard3.negate(3L, 1L, 5L, Time.now)  // only on two shard
 
+      // bulk
+      shard1.add(5L, 2L, 1L, Time.now) // same
+      shard1.add(6L, 2L, 1L, Time.now) // same
+      shard1.add(7L, 2L, 1L, Time.now) // same
+      shard1.add(8L, 2L, 1L, Time.now) // same
+      shard1.add(9L, 2L, 1L, Time.now) // same
+      shard1.add(10L, 2L, 1L, Time.now) // same
+
+
+
       val list = new java.util.ArrayList[com.twitter.gizzard.thrift.ShardId]
       list.add(new com.twitter.gizzard.thrift.ShardId(shard1id.hostname, shard1id.tablePrefix))
       list.add(new com.twitter.gizzard.thrift.ShardId(shard2id.hostname, shard2id.tablePrefix))
