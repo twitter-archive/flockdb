@@ -31,24 +31,9 @@ object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
   val forwardingManager = mock[ForwardingManager]
 
   "Edge" should {
-    "normal becomes single.Add" in {
+    "becomes correct job" in {
       val edge = new Edge(source, dest, pos, now, count, State.Normal)
-      edge.toJob(graph, forwardingManager) mustEqual new Add(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
+      edge.toJob(graph, forwardingManager) mustEqual new Single(source, graph, dest, pos, State.Normal, now, forwardingManager, OrderedUuidGenerator)
     }
-
-    "removed becomes single.Remove" in {
-      val edge = new Edge(source, dest, pos, now, count, State.Removed)
-      edge.toJob(graph, forwardingManager) mustEqual new Remove(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
-    }
-
-    "archived becomes single.Archive" in {
-      val edge = new Edge(source, dest, pos, now, count, State.Archived)
-      edge.toJob(graph, forwardingManager) mustEqual new Archive(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
-    }
-    "negative becomes single.Negate" in {
-      val edge = new Edge(source, dest, pos, now, count, State.Negative)
-      edge.toJob(graph, forwardingManager) mustEqual new Negate(source, graph, dest, pos, now, forwardingManager, OrderedUuidGenerator)
-    }
-
   }
 }

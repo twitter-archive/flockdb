@@ -23,8 +23,8 @@ import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-import jobs.single
-import jobs.multi
+import jobs.single.Single
+import jobs.multi.Multi
 import operations.{ExecuteOperations, ExecuteOperationType}
 
 
@@ -44,35 +44,40 @@ class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: Fo
       // force an exception for nonexistent graphs
       forwardingManager.find(0, term.graphId, Direction.Forward)
 
-      results ++= (op.operationType match {
-        case ExecuteOperationType.Add =>
-          processDestinations(term) { (sourceId, destinationId) =>
-            single.Add(sourceId, term.graphId, destinationId, position, time, null, null)
-          } {
-            multi.Unarchive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
-          }
-        case ExecuteOperationType.Remove =>
-          processDestinations(term) { (sourceId, destinationId) =>
-            single.Remove(sourceId, term.graphId, destinationId, position, time, null, null)
-          } {
-            multi.RemoveAll(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
-          }
-        case ExecuteOperationType.Archive =>
-          processDestinations(term) { (sourceId, destinationId) =>
-            single.Archive(sourceId, term.graphId, destinationId, position, time, null, null)
-          } {
-            multi.Archive(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
-          }
-        case ExecuteOperationType.Negate =>
-          processDestinations(term) { (sourceId, destinationId) =>
-            single.Negate(sourceId, term.graphId, destinationId, position, time, null, null)
-          } {
-            multi.Negate(term.sourceId, term.graphId, Direction(term.isForward), time, program.priority, aggregateJobPageSize, null, null)
-          }
-        case n =>
-          throw new InvalidQueryException("Unknown operation " + n)
-      })
+      val state = op.operationType match {
+        case ExecuteOperationType.Add => State.Normal
+        case ExecuteOperationType.Remove => State.Removed
+        case ExecuteOperationType.Archive => State.Archived
+        case ExecuteOperationType.Negate => State.Negative
+        case n => throw new InvalidQueryException("Unknown operation " + n)
+      }
+
+      results ++= processDestinations(term) { (sourceId, destinationId) =>
+        new Single(
+          sourceId,
+          term.graphId,
+          destinationId,
+          position,
+          state,
+          time,
+          null,
+          null
+        )
+      } {
+        new Multi(
+          term.sourceId,
+          term.graphId,
+          Direction(term.isForward),
+          state,
+          time,
+          program.priority,
+          aggregateJobPageSize,
+          null,
+          null
+        )
+      }
     }
+
     scheduler.put(program.priority.id, new JsonNestedJob(results))
   }
 

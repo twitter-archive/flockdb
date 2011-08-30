@@ -26,8 +26,7 @@ import com.twitter.util.TimeConversions._
 import com.twitter.flockdb
 import com.twitter.flockdb.{SelectQuery, Metadata}
 import org.specs.mock.{ClassMocker, JMocker}
-import jobs.multi.{Archive, RemoveAll, Unarchive}
-import jobs.single.{Add, Remove}
+import jobs.multi.Multi
 import shards.{Shard, SqlShard}
 import thrift._
 
@@ -65,7 +64,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
 
       Thread.sleep(1000)
 
-      val job = Unarchive(alice, FOLLOWS, Direction.Forward, Time.now, flockdb.Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler)
+      val job = new Multi(alice, FOLLOWS, Direction.Forward, State.Normal, Time.now, flockdb.Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler)
       job()
 
       alicesFollowings().size must eventually(be(10))

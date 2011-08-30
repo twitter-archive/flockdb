@@ -19,7 +19,7 @@ package unit
 
 import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardInfo, ShardException, LeafRoutingNode}
+import com.twitter.gizzard.shards._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
@@ -27,16 +27,15 @@ import com.twitter.flockdb
 import flockdb.Direction._
 import flockdb.State._
 import shards.{Shard, SqlShard, ReadWriteShardAdapter, OptimisticLockException}
-import jobs.multi.{Archive, RemoveAll, Unarchive}
-import jobs.single.{Add, Remove, Archive, NodePair}
+import jobs.single.Single
 
 class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val FOLLOWS = 1
 
-  val bob = 1L
-  val mary = 23L
-  val carl = 42L
-  val jane = 56L
+  val bob   = 1L
+  val mary  = 23L
+  val carl  = 42L
+  val jane  = 56L
   val darcy = 62L
 
   val uuidGenerator     = IdentityUuidGenerator
@@ -44,17 +43,23 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val mocks             = (0 to 3) map { _ => mock[Shard] }
 
   // allow the readwrite shard adapter to implement optimistically
-  val shards            = mocks map { m => LeafRoutingNode(m) }
-  val scheduler         = mock[PrioritizingJobScheduler]
+  val shards    = mocks map { m => LeafRoutingNode(m) }
+  val scheduler = mock[PrioritizingJobScheduler]
 
-  def test(desc: String, jobState: State, bobBefore: State, maryBefore: State, bobAfter: State, maryAfter: State, applied: State, f: jobs.single.Single => Unit) = {
+  def test(
+    desc: String,
+    jobState: State,
+    bobBefore: State,
+    maryBefore: State,
+    bobAfter: State,
+    maryAfter: State,
+    applied: State,
+    f: jobs.single.Single => Unit
+  ) = {
     desc in {
       Time.withCurrentTimeFrozen { time =>
-        val job = jobState match {
-          case Normal => Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-          case Removed => Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-          case Archived => jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-        }
+        val job = new Single(bob, FOLLOWS, mary, 1, jobState, Time.now, forwardingManager, uuidGenerator)
+
         expect {
           allowing(forwardingManager).findNode(bob, FOLLOWS, Forward) willReturn shards(0)
           allowing(forwardingManager).findNode(mary, FOLLOWS, Backward) willReturn shards(1)
@@ -83,7 +88,36 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
             }
           }
         }
+
         f(job)
+      }
+    }
+  }
+
+  "Single" should {
+    "toJson" in {
+      Time.withCurrentTimeFrozen { time =>
+        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator)
+        val json = job.toJson
+        json mustMatch "Single"
+        json mustMatch "\"source_id\":" + bob
+        json mustMatch "\"graph_id\":" + FOLLOWS
+        json mustMatch "\"destination_id\":" + mary
+        json mustMatch "\"state\":"
+        json mustMatch "\"updated_at\":" + Time.now.inSeconds
+      }
+    }
+
+    "toJson with successes" in {
+      Time.withCurrentTimeFrozen { time =>
+        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator, List(ShardId("host", "prefix")))
+        val json = job.toJson
+        json mustMatch "Single"
+        json mustMatch "\"source_id\":" + bob
+        json mustMatch "\"graph_id\":" + FOLLOWS
+        json mustMatch "\"destination_id\":" + mary
+        json mustMatch "\"updated_at\":" + Time.now.inSeconds
+        json must include("\"write_successes\":[[\"host\",\"prefix\"]]")
       }
     }
   }
@@ -95,98 +129,19 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     test("lost lock add",      Normal, Normal, Normal,   Normal, Archived, Normal, _.apply must throwA[OptimisticLockException])
     test("when bob archived",  Normal, Archived, Normal, Archived, Normal, Archived, _.apply)
     test("when mary archived", Normal, Normal, Archived, Normal, Archived, Archived, _.apply)
-
-    "toJson" in {
-      Time.withCurrentTimeFrozen { time =>
-        val job = Add(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-        val json = job.toJson
-        json mustMatch "Add"
-        json mustMatch "\"source_id\":" + bob
-        json mustMatch "\"graph_id\":" + FOLLOWS
-        json mustMatch "\"destination_id\":" + mary
-        json mustMatch "\"updated_at\":" + Time.now.inSeconds
-      }
-    }
   }
 
   "Remove" should {
     //                         Input    Before            After             Resulting
     //                         Job      Bob     Mary      Bob     Mary      Job
     test("normal remove",      Removed, Normal, Normal,   Normal, Normal,   Removed, _.apply)
-
-    "toJson" in {
-      Time.withCurrentTimeFrozen { time =>
-        val job = new Remove(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-        val json = job.toJson
-        json mustMatch "Remove"
-        json mustMatch "\"source_id\":" + bob
-        json mustMatch "\"graph_id\":" + FOLLOWS
-        json mustMatch "\"destination_id\":" + mary
-        json mustMatch "\"updated_at\":" + Time.now.inSeconds
-      }
-    }
   }
 
   "Archive" should {
-    //                          Input     Before             After             Resulting
-    //                          Job       Bob     Mary       Bob     Mary      Job
-    test("normal archive",      Archived, Normal, Normal,    Normal, Normal,   Archived, _.apply)
-    test("archive removed",     Archived, Normal, Removed,   Normal, Removed,  Removed, _.apply)
-    test("archive removed",     Archived, Removed, Normal,   Removed, Normal,  Removed, _.apply)
-
-
-    "toJson" in {
-      Time.withCurrentTimeFrozen { time =>
-        val job = new jobs.single.Archive(bob, FOLLOWS, mary, 1, Time.now, forwardingManager, uuidGenerator)
-        val json = job.toJson
-        json mustMatch "Archive"
-        json mustMatch "\"source_id\":" + bob
-        json mustMatch "\"graph_id\":" + FOLLOWS
-        json mustMatch "\"destination_id\":" + mary
-        json mustMatch "\"updated_at\":" + Time.now.inSeconds
-      }
-    }
-  }
-
-  "Archive" should {
-    "toJson" in {
-      Time.withCurrentTimeFrozen { time =>
-        val job = new jobs.multi.Archive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
-        val json = job.toJson
-        json mustMatch "Archive"
-        json mustMatch "\"source_id\":" + bob
-        json mustMatch "\"graph_id\":" + FOLLOWS
-        json mustMatch "\"updated_at\":" + Time.now.inSeconds
-        json mustMatch "\"priority\":" + Priority.Low.id
-      }
-    }
-  }
-
-  "Unarchive" should {
-    "toJson" in {
-      Time.withCurrentTimeFrozen { time =>
-        val job = new Unarchive(bob, FOLLOWS, Direction.Forward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
-        val json = job.toJson
-        json mustMatch "Unarchive"
-        json mustMatch "\"source_id\":" + bob
-        json mustMatch "\"graph_id\":" + FOLLOWS
-        json mustMatch "\"updated_at\":" + Time.now.inSeconds
-        json mustMatch "\"priority\":" + Priority.Low.id
-      }
-    }
-  }
-
-  "RemoveAll" should {
-    "toJson" in {
-      Time.withCurrentTimeFrozen { time =>
-        val job = RemoveAll(bob, FOLLOWS, Direction.Backward, Time.now, Priority.Low, config.aggregateJobsPageSize, forwardingManager, scheduler)
-        val json = job.toJson
-        json mustMatch "RemoveAll"
-        json mustMatch "\"source_id\":" + bob
-        json mustMatch "\"graph_id\":" + FOLLOWS
-        json mustMatch "\"updated_at\":" + Time.now.inSeconds
-        json mustMatch "\"priority\":" + Priority.Low.id
-      }
-    }
+    //                         Input     Before             After             Resulting
+    //                         Job       Bob     Mary       Bob     Mary      Job
+    test("normal archive",     Archived, Normal, Normal,    Normal, Normal,   Archived, _.apply)
+    test("archive removed",    Archived, Normal, Removed,   Normal, Removed,  Removed, _.apply)
+    test("archive removed",    Archived, Removed, Normal,   Removed, Normal,  Removed, _.apply)
   }
 }

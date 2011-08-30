@@ -75,16 +75,10 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
 
   val forwardingManager = new ForwardingManager(nameServer.multiTableForwarder[Shard])
 
-  jobCodec += ("single.Add".r, new jobs.single.AddParser(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("single.Remove".r, new jobs.single.RemoveParser(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("single.Archive".r, new jobs.single.ArchiveParser(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("single.Negate".r, new jobs.single.NegateParser(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("multi.Archive".r, new jobs.multi.ArchiveParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
-  jobCodec += ("multi.Unarchive".r, new jobs.multi.UnarchiveParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
-  jobCodec += ("multi.RemoveAll".r, new jobs.multi.RemoveAllParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
-  jobCodec += ("multi.Negate".r, new jobs.multi.NegateParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("single.Single".r, new jobs.single.SingleJobParser(forwardingManager, OrderedUuidGenerator))
+  jobCodec += ("multi.Multi".r,   new jobs.multi.MultiJobParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
 
-  jobCodec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
+  jobCodec += ("jobs\\.(Copy|Migrate)".r,                 new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
   jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
 
   val flockService = {

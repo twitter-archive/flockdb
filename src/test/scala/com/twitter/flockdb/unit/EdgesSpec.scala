@@ -26,8 +26,7 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
-import jobs.multi.{RemoveAll, Archive, Unarchive}
-import jobs.single.{Add, Remove}
+import jobs.single.Single
 import conversions.Edge._
 import shards.Shard
 import thrift.{FlockException, Page, Results}
@@ -51,7 +50,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "add" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Normal, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
@@ -63,7 +62,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "add_at" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = Add(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Normal, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
@@ -75,7 +74,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "remove" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Removed, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
@@ -87,7 +86,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "remove_at" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = Remove(bob, FOLLOWS, mary, Time.now.inMillis, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Removed, Time.now, null, null)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
