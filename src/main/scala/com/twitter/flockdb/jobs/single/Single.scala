@@ -62,7 +62,7 @@ extends JsonJobParser {
   }
 }
 
-case class Single(
+class Single(
   sourceId: Long,
   graphId: Int,
   destinationId: Long,
@@ -131,5 +131,10 @@ extends JsonJob {
 
       shardId
     }
+  }
+
+  override def equals(o: Any) = o match {
+    case o: Single => this.toMap == o.toMap
+    case _         => false
   }
 }
