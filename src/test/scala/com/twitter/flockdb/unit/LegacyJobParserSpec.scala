@@ -111,13 +111,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
 
       val job = new Multi(22, 1, Direction.Forward, State.Archived, updatedAt, Priority.Low, 500, null, null)
 
-      println(job)
-
-      val inf = codec.inflate(map)
-
-      println(inf)
-
-      inf mustEqual job
+      codec.inflate(map) mustEqual job
     }
 
     "correctly generate a new style job from an old serialized Unarchive job" in {
