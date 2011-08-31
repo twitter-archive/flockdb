@@ -37,13 +37,16 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSe
   }
 
   def toJob(tableId: Int, forwardingManager: ForwardingManager) = {
-    val job = state match {
-      case State.Normal => Add
-      case State.Removed => Remove
-      case State.Archived => Archive
-      case State.Negative => Negate
-    }
-    job(sourceId, tableId, destinationId, OrderedUuidGenerator.unapply(position).get, updatedAt, forwardingManager, OrderedUuidGenerator)
+    new Single(
+      sourceId,
+      tableId,
+      destinationId,
+      OrderedUuidGenerator.unapply(position).get,
+      state,
+      updatedAt,
+      forwardingManager,
+      OrderedUuidGenerator
+    )
   }
 
   def similar(other:Edge) = {

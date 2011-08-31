@@ -109,7 +109,7 @@ class SqlShard(
   queryEvaluator: QueryEvaluator,
   lowLatencyQueryEvaluator: QueryEvaluator,
   deadlockRetries: Int)
-extends Shard with Optimism {
+extends Shard {
 
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random

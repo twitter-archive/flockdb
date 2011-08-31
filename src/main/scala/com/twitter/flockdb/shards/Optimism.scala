@@ -1,9 +1,9 @@
 package com.twitter.flockdb
 package shards
 
-import com.twitter.gizzard.shards.ShardException
-import com.twitter.util.Time
+import com.twitter.util.{Time, Try, Return, Throw}
 import com.twitter.logging.Logger
+import com.twitter.gizzard.shards.{ShardException, RoutingNode}
 
 class OptimisticLockException(message: String) extends ShardException(message)
 
@@ -53,7 +53,12 @@ class OptimisticLockException(message: String) extends ShardException(message)
  * Also, in the short term, it's worth understanding (2), so that you can realize that adding
  * replicas doesn't screw things up.
  */
-trait Optimism extends Shard {
+trait OptimisticStateMonitor {
+
+  def getMetadatas(sourceId: Long): Seq[Try[Option[Metadata]]]
+
+  // implementation
+
   private val log = Logger.get(getClass.getName)
 
   def optimistically(sourceId: Long)(f: State => Unit) = {
@@ -99,11 +104,19 @@ trait Optimism extends Shard {
     var exceptions: List[Throwable] = Nil
 
     getMetadatas(sourceId).foreach {
-      case Left(ex)              => exceptions = ex :: exceptions
-      case Right(Some(metadata)) => winning    = winning.map(_ max metadata).orElse(Some(metadata))
-      case Right(None)           => ()
+      case Throw(ex)              => exceptions = ex :: exceptions
+      case Return(Some(metadata)) => winning    = winning.map(_ max metadata).orElse(Some(metadata))
+      case Return(None)           => ()
     }
 
     (winning.map(_.state), exceptions.headOption)
   }
+}
+
+object LockingRoutingNode {
+  implicit def asLockingRoutingNode(n: RoutingNode[Shard]) = new LockingRoutingNode(n)
+}
+
+class LockingRoutingNode(node: RoutingNode[Shard]) extends OptimisticStateMonitor {
+  def getMetadatas(id: Long) = node.read.all { _.getMetadataForWrite(id) }
 }

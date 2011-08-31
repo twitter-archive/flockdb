@@ -24,7 +24,12 @@ import com.twitter.flockdb.shards.{Shard, ReadWriteShardAdapter}
 class ForwardingManager(val forwarder: MultiForwarder[Shard]) {
   @throws(classOf[ShardException])
   def find(sourceId: Long, graphId: Int, direction: Direction): Shard = {
-    new ReadWriteShardAdapter(forwarder.find(translate(graphId, direction), sourceId))
+    new ReadWriteShardAdapter(findNode(sourceId, graphId, direction))
+  }
+
+  @throws(classOf[ShardException])
+  def findNode(sourceId: Long, graphId: Int, direction: Direction)= {
+    forwarder.find(translate(graphId, direction), sourceId)
   }
 
   private def translate(graphId: Int, direction: Direction) = {
