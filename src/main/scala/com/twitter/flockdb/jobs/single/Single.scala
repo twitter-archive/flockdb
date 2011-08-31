@@ -121,7 +121,7 @@ extends JsonJob {
   }
 
   def writeToShard(shards: NodeSet[Shard], sourceId: Long, destinationId: Long, uuid: Long, state: State) = {
-    shards.all { (shardId, shard) =>
+    shards.skip(successes) all { (shardId, shard) =>
       state match {
         case State.Normal   => shard.add(sourceId, destinationId, uuid, updatedAt)
         case State.Removed  => shard.remove(sourceId, destinationId, uuid, updatedAt)
