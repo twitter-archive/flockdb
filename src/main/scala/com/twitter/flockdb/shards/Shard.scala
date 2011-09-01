@@ -28,12 +28,6 @@ trait Shard {
   @throws(classOf[shards.ShardException]) def getMetadata(sourceId: Long): Option[Metadata]
   @throws(classOf[shards.ShardException]) def getMetadataForWrite(sourceId: Long): Option[Metadata]
 
-  @throws(classOf[shards.ShardException]) def getMetadatas(sourceId: Long): Seq[Either[Throwable,Option[Metadata]]] = {
-    Seq(try { Right(getMetadataForWrite(sourceId)) } catch { case e => Left(e) })
-  }
-
-  @throws(classOf[shards.ShardException]) def optimistically(sourceId: Long)(f: State => Unit)
-
   @throws(classOf[shards.ShardException]) def count(sourceId: Long, states: Seq[State]): Int
 
   @throws(classOf[shards.ShardException]) def selectAll(cursor: (Cursor, Cursor), count: Int): (Seq[Edge], (Cursor, Cursor))

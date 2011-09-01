@@ -27,8 +27,6 @@ import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
 import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
-import jobs.multi.{Archive, RemoveAll, Unarchive}
-import jobs.single.{Add, Remove}
 import shards.{Shard, SqlShard}
 import thrift._
 

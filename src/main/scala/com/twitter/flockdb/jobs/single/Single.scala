@@ -14,131 +14,127 @@
  * limitations under the License.
  */
 
-package com.twitter.flockdb
-package jobs.single
+package com.twitter.flockdb.jobs.single
 
-import com.twitter.gizzard.scheduler.{JsonJob, JsonJobParser}
-import com.twitter.gizzard.shards.{ShardException, ShardBlackHoleException, ShardRejectedOperationException}
-import com.twitter.util.Time
+import com.twitter.logging.Logger
+import com.twitter.util.{Time, Return, Throw}
+import com.twitter.gizzard.scheduler._
+import com.twitter.gizzard.shards._
 import com.twitter.conversions.time._
-import conversions.Numeric._
-import shards.Shard
+import com.twitter.flockdb.{State, ForwardingManager, Cursor, UuidGenerator, Direction}
+import com.twitter.flockdb.conversions.Numeric._
+import com.twitter.flockdb.shards.Shard
+import com.twitter.flockdb.shards.LockingRoutingNode._
 
-case class NodePair(sourceId: Long, destinationId: Long)
 
+class SingleJobParser(
+  forwardingManager: ForwardingManager,
+  uuidGenerator: UuidGenerator)
+extends JsonJobParser {
 
-abstract class SingleJobParser extends JsonJobParser {
+  def log = Logger.get
+
   def apply(attributes: Map[String, Any]): JsonJob = {
+    val writeSuccesses = try {
+      attributes.get("write_successes") map {
+        _.asInstanceOf[Seq[Seq[String]]] map { case Seq(h, tp) => ShardId(h, tp) }
+      } getOrElse Nil
+    } catch {
+      case e => {
+        log.warning("Error parsing write successes. falling back to non-memoization", e)
+        Nil
+      }
+    }
+
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
-    createJob(
+
+    new Single(
       casted("source_id").toLong,
       casted("graph_id").toInt,
       casted("destination_id").toLong,
       casted("position").toLong,
-      Time.fromSeconds(casted("updated_at").toInt))
-  }
-
-  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time): Single
-}
-
-class AddParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
-  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Add(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
+      State(casted("state").toInt),
+      Time.fromSeconds(casted("updated_at").toInt),
+      forwardingManager,
+      uuidGenerator,
+      writeSuccesses.toList
+    )
   }
 }
 
-class RemoveParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
-  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Remove(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
-  }
-}
-
-class ArchiveParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
-  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Archive(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
-  }
-}
-
-class NegateParser(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) extends SingleJobParser {
-  protected def createJob(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time) = {
-    new Negate(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator)
-  }
-}
-
-abstract class Single(sourceId: Long, graphId: Int, destinationId: Long, position: Long,
-                      updatedAt: Time, forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
+class Single(
+  sourceId: Long,
+  graphId: Int,
+  destinationId: Long,
+  position: Long,
+  preferredState: State,
+  updatedAt: Time,
+  forwardingManager: ForwardingManager,
+  uuidGenerator: UuidGenerator,
+  var successes: List[ShardId] = Nil)
 extends JsonJob {
-  def toMap = {
-    Map("source_id" -> sourceId, "graph_id" -> graphId, "destination_id" -> destinationId, "position" -> position, "updated_at" -> updatedAt.inSeconds)
-  }
 
+  def toMap = {
+    val base =  Map(
+      "source_id" -> sourceId,
+      "graph_id" -> graphId,
+      "destination_id" -> destinationId,
+      "position" -> position,
+      "state" -> preferredState.id,
+      "updated_at" -> updatedAt.inSeconds
+    )
+
+    if (successes.isEmpty) {
+      base
+    } else {
+      base + ("write_successes" -> (successes map { case ShardId(h, tp) => Seq(h, tp) }))
+    }
+  }
 
   def apply() = {
-    val forwardShard = forwardingManager.find(sourceId, graphId, Direction.Forward)
-    val backwardShard = forwardingManager.find(destinationId, graphId, Direction.Backward)
-    val uuid = uuidGenerator(position)
+    val forward  = forwardingManager.findNode(sourceId, graphId, Direction.Forward)
+    val backward = forwardingManager.findNode(destinationId, graphId, Direction.Backward)
+    val uuid     = uuidGenerator(position)
 
-    forwardShard.optimistically(sourceId) { left =>
-      backwardShard.optimistically(destinationId) { right =>
-        write(forwardShard, backwardShard, uuid, left max right max preferredState)
+    var currSuccesses: List[ShardId] = Nil
+    var currErrs: List[Throwable]    = Nil
+
+    forward.optimistically(sourceId) { left =>
+      backward.optimistically(destinationId) { right =>
+        val state           = left max right max preferredState
+        val forwardResults  = writeToShard(forward.write, sourceId, destinationId, uuid, state)
+        val backwardResults = writeToShard(backward.write, destinationId, sourceId, uuid, state)
+
+        List(forwardResults, backwardResults) foreach {
+          _ foreach {
+            case Return(id) => currSuccesses = id :: currSuccesses
+            case Throw(e)   => currErrs = e :: currErrs
+          }
+        }
       }
     }
 
+    // add successful writes here, since we are only successful if an optimistic lock exception is not raised.
+    successes = successes ++ currSuccesses
+
+    currErrs.headOption foreach { e => throw e }
   }
 
-  def writeToShard(shard: Shard, sourceId: Long, destinationId: Long, uuid: Long, state: State) = {
-    try {
+  def writeToShard(shards: NodeSet[Shard], sourceId: Long, destinationId: Long, uuid: Long, state: State) = {
+    shards.skip(successes) all { (shardId, shard) =>
       state match {
-        case State.Normal =>
-          shard.add(sourceId, destinationId, uuid, updatedAt)
-        case State.Removed =>
-          shard.remove(sourceId, destinationId, uuid, updatedAt)
-        case State.Archived =>
-          shard.archive(sourceId, destinationId, uuid, updatedAt)
-        case State.Negative =>
-          shard.negate(sourceId, destinationId, uuid, updatedAt)
+        case State.Normal   => shard.add(sourceId, destinationId, uuid, updatedAt)
+        case State.Removed  => shard.remove(sourceId, destinationId, uuid, updatedAt)
+        case State.Archived => shard.archive(sourceId, destinationId, uuid, updatedAt)
+        case State.Negative => shard.negate(sourceId, destinationId, uuid, updatedAt)
       }
 
-      None
-    } catch {
-      case e => Some(e)
+      shardId
     }
   }
 
-  def write(forwardShard: Shard, backwardShard: Shard, uuid: Long, state: State) {
-    val forwardErr  = writeToShard(forwardShard, sourceId, destinationId, uuid, state)
-    val backwardErr = writeToShard(backwardShard, destinationId, sourceId, uuid, state)
-
-    // just eat ShardBlackHoleExceptions for either way, but throw any other
-    List(forwardErr, backwardErr).flatMap(_.toList).foreach {
-      case e: ShardBlackHoleException => ()
-      case e => throw e
-    }
+  override def equals(o: Any) = o match {
+    case o: Single => this.toMap == o.toMap
+    case _         => false
   }
-
-  protected def preferredState: State
-}
-
-case class Add(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
-               forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
-           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
-  def preferredState = State.Normal
-}
-
-case class Remove(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
-                  forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
-           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
-  def preferredState = State.Removed
-}
-
-case class Archive(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
-                   forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
-           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
-  def preferredState = State.Archived
-}
-
-case class Negate(sourceId: Long, graphId: Int, destinationId: Long, position: Long, updatedAt: Time,
-                  forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator)
-           extends Single(sourceId, graphId, destinationId, position, updatedAt, forwardingManager, uuidGenerator) {
-  def preferredState = State.Negative
 }
