@@ -1,5 +1,6 @@
 import com.twitter.flockdb.config._
 import com.twitter.gizzard.config._
+import com.twitter.gizzard.TransactionalStatsProvider
 import com.twitter.querulous.config._
 import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.query.QueryFactory
@@ -138,6 +139,13 @@ new FlockDB {
   }
 
   loggers = List(new LoggerConfig {
-    level = Some(Level.FATAL)
+    level = Some(Level.INFO)
+    handlers = List(new FileHandlerConfig { filename = "test.log" })
   })
+
+  queryStats.consumers = Seq(new AuditingTransactionalStatsConsumer {
+    names = Set("execute")
+    override def apply() = { new com.twitter.gizzard.AuditingTransactionalStatsConsumer(new com.twitter.gizzard.LoggingTransactionalStatsConsumer("audit_log") {
+      def transactionToString(t: TransactionalStatsProvider) = { t.get("job").asInstanceOf[String] }
+    }, names)}})
 }

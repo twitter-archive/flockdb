@@ -18,6 +18,7 @@ package com.twitter.flockdb
 package queries
 
 import scala.collection.mutable
+import com.twitter.gizzard.Stats
 import com.twitter.gizzard.scheduler.{JsonJob, JsonNestedJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards.ShardException
 import com.twitter.gizzard.thrift.conversions.Sequences._
@@ -78,6 +79,7 @@ class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: Fo
       }
     }
 
+    Stats.transaction.set("job", results.map { _.toJson }.mkString(", "))
     scheduler.put(program.priority.id, new JsonNestedJob(results))
   }
 

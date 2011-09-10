@@ -116,6 +116,7 @@ class EdgesService(
 
   def execute(operations: ExecuteOperations) {
     rethrowExceptionsAsThrift {
+      Stats.transaction.name = "execute"
       executeCompiler(operations)
     }
   }
