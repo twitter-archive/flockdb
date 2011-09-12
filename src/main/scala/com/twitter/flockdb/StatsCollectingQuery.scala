@@ -34,8 +34,8 @@ class TransactionStatsCollectingQuery(query: Query, queryClass: QueryClass, quer
 }
 
 class TransactionStatsCollectingDatabaseFactory(databaseFactory: DatabaseFactory) extends DatabaseFactory {
-  def apply(dbhosts: List[String], dbname: String, username: String, password: String, urlOptions: Map[String, String]) = {
-    new TransactionStatsCollectingDatabase(databaseFactory(dbhosts, dbname, username, password, urlOptions), dbhosts)
+  def apply(dbhosts: List[String], dbname: String, username: String, password: String, urlOptions: Map[String, String], driverName: String) = {
+    new TransactionStatsCollectingDatabase(databaseFactory(dbhosts, dbname, username, password, urlOptions, driverName), dbhosts)
   }
 }
 
