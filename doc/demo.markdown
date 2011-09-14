@@ -1,4 +1,3 @@
-
 # Flock demo
 
 This demo will walk through setting up a local development flockdb instance and interacting with it
@@ -56,7 +55,7 @@ in your `.gizzmorc` to make the rest of the demo easier:
 
     $ cat ~/.gizzmorc
     host: localhost
-    port: 7917
+    port: 7920
 
 Then:
 
