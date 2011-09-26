@@ -28,6 +28,7 @@ import flockdb.Direction._
 import flockdb.State._
 import shards.{Shard, SqlShard, ReadWriteShardAdapter, OptimisticLockException}
 import jobs.single.Single
+import jobs.multi.Multi
 
 class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val FOLLOWS = 1
@@ -143,5 +144,23 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     test("normal archive",     Archived, Normal, Normal,    Normal, Normal,   Archived, _.apply)
     test("archive removed",    Archived, Normal, Removed,   Normal, Removed,  Removed, _.apply)
     test("archive removed",    Archived, Removed, Normal,   Removed, Normal,  Removed, _.apply)
+  }
+
+
+  "Multi" should {
+    "toJson" in {
+      Time.withCurrentTimeFrozen { time =>
+        val job = new Multi(bob, FOLLOWS, Direction.Forward, State.Normal, Time.now, Priority.Low, 500, null, null)
+        val json = job.toJson
+        json mustMatch "Multi"
+        json mustMatch "\"source_id\":" + bob
+        json mustMatch "\"updated_at\":" + Time.now.inSeconds
+        json mustMatch "\"graph_id\":" + FOLLOWS
+        json mustMatch "\"direction\":" + Direction.Forward.id
+        json mustMatch "\"priority\":" + Priority.Low.id
+        json mustMatch "\"state\":" + State.Normal.id
+        json mustMatch "\"cursor\":" + Cursor.Start.position
+      }
+    }
   }
 }

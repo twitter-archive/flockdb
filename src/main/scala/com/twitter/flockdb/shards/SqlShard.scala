@@ -366,8 +366,6 @@ extends Shard {
   }
 
 
-  private class MissingMetadataRow extends Exception("Missing Count Row")
-
   private def insertEdge(transaction: Transaction, metadata: Metadata, edge: Edge): Int = {
     val insertedRows =
       transaction.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, " +
@@ -574,36 +572,44 @@ extends Shard {
   }
 
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
-    try {
-      queryEvaluator.transaction { transaction =>
-        transaction.selectOne(SelectModify,
-                              "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ? FOR UPDATE", sourceId) { row =>
-          f(transaction, new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
-        } getOrElse(throw new MissingMetadataRow)
-      }
-    } catch {
-      case e: MissingMetadataRow =>
-        populateMetadata(sourceId, Normal)
-        atomically(sourceId)(f)
-    }
+    atomically(Seq(sourceId)) { (t, map) => f(t, map(sourceId)) }
   }
 
-  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, collection.Map[Long, Metadata]) => A): A = {
-    try {
-      val metadataMap = mutable.Map[Long, Metadata]()
-      queryEvaluator.transaction { transaction =>
-        transaction.select(SelectModify,
-                           "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE", sourceIds) { row =>
-          metadataMap.put(row.getLong("source_id"), new Metadata(row.getLong("source_id"), State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at"))))
-        }
-        if (metadataMap.size < sourceIds.length)
-          throw new MissingMetadataRow
-        f(transaction, metadataMap)
+  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, Map[Long, Metadata]) => A): A = {
+    val rv = queryEvaluator.transaction { transaction =>
+
+      val mdMapBuilder = Map.newBuilder[Long, Metadata]
+
+      transaction.select(
+        SelectModify,
+        "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id in (?) FOR UPDATE",
+        sourceIds
+      ) { row =>
+        val md = new Metadata(
+          row.getLong("source_id"),
+          State(row.getInt("state")),
+          row.getInt("count"),
+          Time.fromSeconds(row.getInt("updated_at"))
+        )
+
+        mdMapBuilder += (row.getLong("source_id") -> md)
       }
-    } catch {
-      case e: MissingMetadataRow =>
-        sourceIds.foreach { sourceId => populateMetadata(sourceId, Normal) }
+
+      val mdMap = mdMapBuilder.result
+
+      if (mdMap.size < sourceIds.length) {
+        Left(sourceIds filterNot { mdMap contains _ })
+      } else {
+        Right(f(transaction, mdMap))
+      }
+    }
+
+    rv match {
+      case Left(missingMeta) => {
+        missingMeta foreach { populateMetadata(_, Normal) }
         atomically(sourceIds)(f)
+      }
+      case Right(rv) => rv
     }
   }
 
