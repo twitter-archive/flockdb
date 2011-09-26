@@ -75,7 +75,7 @@ new FlockDB {
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
-    val database = "edges_test"
+    val database = "edges_development"
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 

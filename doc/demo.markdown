@@ -277,49 +277,48 @@ What shard is user 123456 on?
       localhost/edges_99_0008_forward_1
 
 Hm, but localhost has been behaving strangely lately. Let's move that shard to 127.0.0.1, which is
-really lightly loaded. First, create the new shard:
+really lightly loaded. To move individual shards we'll take a look at the current topology and then run a `transform-tree` operation to move things where we want them.
 
-    $ gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" 127.0.0.1 edges_99_0008_new com.twitter.flockdb.SqlShard
-    127.0.0.1/edges_99_0008_new
+To see the current topology of graph 99:
 
-Then, setup a migration:
+    $ gizzmo -T 99 topology
+	10 com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
 
-    $ gizzmo setup-migrate localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
-    localhost/edges_99_0008_new_migrate_replica
+As we expect, graph 99 is made up of 10 shards, all of which are replicating to just one server, which is also `localhost` for all them. To see all the tables you have in Flock, you can run `gizzmo tables`.
 
-If you look at the replication subtree for `localhost/edges_99_0008_forward_replicating`, you can
-see that it's added a layer of replication between the old shard and the new one, and the new one is
-behind a write-only barrier:
+Now let's modify shard 8 to replicate only to the new host we want, 127.0.0.1. We'll specify the new topology template we want, and which shard that should apply to:
 
-    $ gizzmo subtree localhost/edges_99_0008_forward_replicating
-    localhost/edges_99_0008_forward_replicating
-      localhost/edges_99_0008_new_migrate_replica
-        localhost/edges_99_0008_forward_1
-        localhost/edges_99_0008_new_migrate_write_only
-          127.0.0.1/edges_99_0008_new
+    $ gizzmo transform-tree "com.twitter.gizzard.shards.ReplicatingShard(1) -> (com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED))" localhost/edges_99_0008_forward_replicating
 
-So let's reload the forwarding table to make sure everyone starts using this replication:
+    com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED) => com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED) :
+	  PREPARE
+	    create_shard(com.twitter.flockdb.SqlShard/127.0.0.1)
+	    create_shard(WriteOnlyShard)
+	    add_link(WriteOnlyShard -> com.twitter.flockdb.SqlShard/127.0.0.1)
+	    add_link(com.twitter.gizzard.shards.ReplicatingShard -> WriteOnlyShard)
+	  COPY
+	    copy_shard(com.twitter.flockdb.SqlShard/127.0.0.1)
+	  CLEANUP
+	    add_link(com.twitter.gizzard.shards.ReplicatingShard -> com.twitter.flockdb.SqlShard/127.0.0.1)
+	    remove_link(com.twitter.gizzard.shards.ReplicatingShard -> com.twitter.flockdb.SqlShard/localhost)
+	    remove_link(WriteOnlyShard -> com.twitter.flockdb.SqlShard/127.0.0.1)
+	    remove_link(com.twitter.gizzard.shards.ReplicatingShard -> WriteOnlyShard)
+	    delete_shard(com.twitter.flockdb.SqlShard/localhost)
+	    delete_shard(WriteOnlyShard)
 
-    $ gizzmo reload
+	Continue? (y/n)
 
-Now, all writes are going to both places and we can start the copy:
-
-    $ gizzmo copy localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
-
-The destination shard will be marked "busy" during the copy, but because we only had 3 edges in it,
-the copy will probably be done before we can even check:
+gizzmo gives us the plan for this transformation so we can approve it before it makes any changes. This looks good so put in `y` and let it run. The destination shard will be marked "busy" during the copy, if you're quick you might be able to see it marked such by checking with:
 
     $ gizzmo busy
 
-Yep, no busy shards. We can finish the migration, then, to remove the replication layer and the
-source shard.
+After the operation has finished, you can check to see that it did what we expect:
 
-    $ gizzmo finish-migrate localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
     $ gizzmo subtree localhost/edges_99_0008_forward_replicating
     localhost/edges_99_0008_forward_replicating
-      127.0.0.1/edges_99_0008_new
-
-Sweet! Reload to tell flockdb to stop writing to the old shard.
+	  127.0.0.1/edges_99_0008
+	
+Sweet! Reload to make sure flockdb knows about the right topology.
 
     $ gizzmo reload
 
