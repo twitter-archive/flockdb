@@ -52,16 +52,17 @@ abstract class ConfiguredSpecification extends Specification {
 }
 
 abstract class IntegrationSpecification extends ConfiguredSpecification with NameServerDatabase {
-  val flock        = new FlockDB(config)
-  val flockService = flock.flockService
-
-  flock.jobScheduler.start()
-
-  def reset(config: flockdb.config.FlockDB): Unit = {
-    reset(config, 1)
+  lazy val flock = {
+    val f = new FlockDB(config)
+    f.jobScheduler.start()
+    f
   }
 
-  def reset(config: flockdb.config.FlockDB, count: Int): Unit = {
+  lazy val flockService = flock.flockService
+
+  def reset(config: flockdb.config.FlockDB) { reset(config, 1) }
+
+  def reset(config: flockdb.config.FlockDB, count: Int) {
     materialize(config)
     flock.nameServer.reload()
 
