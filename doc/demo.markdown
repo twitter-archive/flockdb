@@ -302,7 +302,7 @@ To see the current topology of graph 99:
 
 As we expect, graph 99 is made up of 10 shards, all of which are replicating to just one server, which is also `localhost` for all them. To see all the tables you have in Flock, you can run `gizzmo tables`.
 
-Now let's that shard to replicate only to the new host we want, 127.0.0.1. We'll specify the new topology template we want, and which shard that should apply to:
+Now let's change that shard to replicate only to the new host we want, 127.0.0.1. We'll specify the new topology template we want, and which shard that should apply to:
 
     $ gizzmo transform-tree "com.twitter.gizzard.shards.ReplicatingShard(1) -> (com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED))" localhost/edges_99_0005_replicating
 
