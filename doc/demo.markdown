@@ -235,27 +235,43 @@ runs out.)
 As a last demo, let's create a few shards for a new graph "99", add some data, and then migrate it
 to a new database.
 
+We create graphs as a pair of tables, one in the positive (forward) direction and one in the negative (backward) direction. This way we can query for relationships in either direction, such as "Who does Bob love?" and "Who loves Alice?"
+
 To create 10 shards for the new graph:
 
-    $ ./src/scripts/mkshards.rb -n 10 99
-    Creating bins..........Done.
+    $ gizzmo -T -99,99 create-table --base-name=edges --shards=10 1 "com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)"
+	Create tables -99, 99:
+	  com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	  for 10 base ids:
+	    115292150460684697
+	    807045053224792879
+	    230584300921369394
+	    1037629354146162273
+	    922337203685477576
+	    345876451382054091
+	    0
+	    461168601842738788
+	    576460752303423485
+	    691752902764108182
+
+	Continue? (y/n) 
+	y
+
 
 And to verify that they were created:
 
     $ gizzmo forwardings -t 99
-    99	0	localhost/edges_99_0000_forward_replicating
-    99	115292150460684697	localhost/edges_99_0001_forward_replicating
-    99	230584300921369394	localhost/edges_99_0002_forward_replicating
-    99	345876451382054091	localhost/edges_99_0003_forward_replicating
-    99	461168601842738788	localhost/edges_99_0004_forward_replicating
-    99	576460752303423485	localhost/edges_99_0005_forward_replicating
-    99	691752902764108182	localhost/edges_99_0006_forward_replicating
-    99	807045053224792879	localhost/edges_99_0007_forward_replicating
-    99	922337203685477576	localhost/edges_99_0008_forward_replicating
-    99	1037629354146162273	localhost/edges_99_0009_forward_replicating
+    99	0	localhost/edges_99_0003_replicating
+	99	115292150460684697	localhost/edges_99_0009_replicating
+	99	230584300921369394	localhost/edges_99_0007_replicating
+	99	345876451382054091	localhost/edges_99_0004_replicating
+	99	461168601842738788	localhost/edges_99_0002_replicating
+	99	576460752303423485	localhost/edges_99_0001_replicating
+	99	691752902764108182	localhost/edges_99_0000_replicating
+	99	807045053224792879	localhost/edges_99_0008_replicating
+	99	922337203685477576	localhost/edges_99_0005_replicating
+	99	1037629354146162273	localhost/edges_99_0006_replicating
 
-(`mkshards.rb` assumes that most shards will be replicated, so when creating shards manually, it
-always puts them behind a replicating shard.)
 
 Make sure the local flockdb instance reloads the forwarding tables:
 
@@ -273,8 +289,8 @@ Make a client with our new graph, and add some edges:
 What shard is user 123456 on?
 
     $ gizzmo --subtree lookup 99 123456
-    localhost/edges_99_0008_forward_replicating
-      localhost/edges_99_0008_forward_1
+    localhost/edges_99_0005_replicating
+	  localhost/edges_99_0005
 
 Hm, but localhost has been behaving strangely lately. Let's move that shard to 127.0.0.1, which is
 really lightly loaded. To move individual shards we'll take a look at the current topology and then run a `transform-tree` operation to move things where we want them.
@@ -286,9 +302,9 @@ To see the current topology of graph 99:
 
 As we expect, graph 99 is made up of 10 shards, all of which are replicating to just one server, which is also `localhost` for all them. To see all the tables you have in Flock, you can run `gizzmo tables`.
 
-Now let's modify shard 8 to replicate only to the new host we want, 127.0.0.1. We'll specify the new topology template we want, and which shard that should apply to:
+Now let's that shard to replicate only to the new host we want, 127.0.0.1. We'll specify the new topology template we want, and which shard that should apply to:
 
-    $ gizzmo transform-tree "com.twitter.gizzard.shards.ReplicatingShard(1) -> (com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED))" localhost/edges_99_0008_forward_replicating
+    $ gizzmo transform-tree "com.twitter.gizzard.shards.ReplicatingShard(1) -> (com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED))" localhost/edges_99_0005_replicating
 
     com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED) => com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED) :
 	  PREPARE
@@ -314,9 +330,9 @@ gizzmo gives us the plan for this transformation so we can approve it before it 
 
 After the operation has finished, you can check to see that it did what we expect:
 
-    $ gizzmo subtree localhost/edges_99_0008_forward_replicating
+    $ gizzmo subtree localhost/edges_99_0005_replicating
     localhost/edges_99_0008_forward_replicating
-	  127.0.0.1/edges_99_0008
+	  127.0.0.1/edges_99_0005
 	
 Sweet! Reload to make sure flockdb knows about the right topology.
 
