@@ -71,7 +71,7 @@ but there are some pre-requisites. You need:
 
 - java 1.6
 - sbt 0.7.4
-- thrift 0.2.0
+- thrift 0.5.0
 
 If you haven't used sbt before, this page has a quick setup:
 [http://code.google.com/p/simple-build-tool/wiki/Setup](http://code.google.com/p/simple-build-tool/wiki/Setup).
@@ -80,14 +80,12 @@ My `~/bin/sbt` looks like this:
     #!/bin/bash
     java -server -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx1024m -jar `dirname $0`/sbt-launch-0.7.4.jar "$@"
 
-Apache Thrift 0.2.0 is pre-requisite for building java stubs of the thrift
+Apache Thrift 0.5.0 is pre-requisite for building java stubs of the thrift
 IDL. It can't be installed via jar, so you'll need to install it separately
-before you build. It can be found on the apache incubator site:
-[http://incubator.apache.org/thrift/](http://incubator.apache.org/thrift/).
-This project is still getting its legs, so it can be hard to find the right
-version. If you have trouble with the mirrors, version 0.2.0 should be hosted
-here:
-[http://www.apache.org/dist/incubator/thrift/0.2.0-incubating/](http://www.apache.org/dist/incubator/thrift/0.2.0-incubating/).
+before you build. It can be found on the apache thrift site:
+[http://thrift.apache.org/](http://thrift.apache.org/).
+You can find the download for 0.5.0 here: 
+[http://archive.apache.org/dist/incubator/thrift/0.5.0-incubating/](http://archive.apache.org/dist/incubator/thrift/0.5.0-incubating/).
 
 In addition, the tests require a local mysql instance to be running, and for
 `DB_USERNAME` and `DB_PASSWORD` env vars to contain login info for it. You can
