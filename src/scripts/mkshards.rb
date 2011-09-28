@@ -23,6 +23,8 @@ options = {
   :count => 500,
 }
 
+$stderr.puts "WARNING: This script is deprecated. Use 'gizzmo create-table' instead."
+
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options] <graph_id>"
   opts.separator "Example: #{$0} -f shards.yml 11"
