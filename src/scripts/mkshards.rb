@@ -23,6 +23,8 @@ options = {
   :count => 500,
 }
 
+$stderr.puts "WARNING: This script is deprecated. Use 'gizzmo create-table' instead."
+
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options] <graph_id>"
   opts.separator "Example: #{$0} -f shards.yml 11"
@@ -47,7 +49,7 @@ end
 config = YAML.load_file(options[:config_filename]) rescue {}
 
 app_host, app_port = (config['app_host'] || 'localhost').split(':')
-app_port ||= 7917
+app_port ||= 7920
 
 namespace = config['namespace'] || nil
 db_trees = Array(config['databases'] || 'localhost')
@@ -67,13 +69,13 @@ options[:count].times do |i|
   types = "-s 'INT UNSIGNED' -d 'INT UNSIGNED'"
 
   [ "forward", "backward" ].each do |direction|
-    gizzmo.call "create localhost #{table_name}_#{direction}_replicating com.twitter.gizzard.shards.ReplicatingShard"
+    gizzmo.call "create com.twitter.gizzard.shards.ReplicatingShard localhost/#{table_name}_#{direction}_replicating"
 
     distinct = 1
     hosts.each do |host|
       host, weight = host.split(':')
-      weight ||= 4
-      gizzmo.call "create #{types} #{host} #{table_name}_#{direction}_#{distinct} com.twitter.flockdb.SqlShard"
+      weight ||= 1
+      gizzmo.call "create #{types} com.twitter.flockdb.SqlShard #{host}/#{table_name}_#{direction}_#{distinct}"
       gizzmo.call "addlink localhost/#{table_name}_#{direction}_replicating #{host}/#{table_name}_#{direction}_#{distinct} #{weight}"
       distinct += 1
     end

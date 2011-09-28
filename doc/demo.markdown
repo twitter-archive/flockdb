@@ -57,15 +57,46 @@ in your `.gizzmorc` to make the rest of the demo easier:
     host: localhost
     port: 7920
 
-Then:
+Then, let's see what tables we have in our system:
 
-    $ gizzmo forwardings
-    1	0	localhost/forward_1
-    -1 0 localhost/backward_1
-    2	0	localhost/forward_2
-    ...
-    15 0 localhost/forward_15
-    -15	0	localhost/backward_15
+	$ gizzmo tables
+	-15 -14 -13 -12 -11 -10 -9 -8 -7 -6 -5 -4 -3 -2 -1 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+	
+Notice that we create graphs as a pair of tables, one in the positive (forward) direction and one in the negative (backward) direction. This way we can query for relationships in either direction, such as "Who does Bob follow?" and "Who follows Alice?"
+
+Now let's query the forwardings for those tables: 
+
+    $ gizzmo -T -15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 topology --forwardings
+	[-10] 0 = localhost/backward_10	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-11] 0 = localhost/backward_11	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-12] 0 = localhost/backward_12	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-13] 0 = localhost/backward_13	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-14] 0 = localhost/backward_14	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-15] 0 = localhost/backward_15	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-1] 0 = localhost/backward_1	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-2] 0 = localhost/backward_2	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-3] 0 = localhost/backward_3	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-4] 0 = localhost/backward_4	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-5] 0 = localhost/backward_5	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-6] 0 = localhost/backward_6	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-7] 0 = localhost/backward_7	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-8] 0 = localhost/backward_8	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[-9] 0 = localhost/backward_9	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[10] 0 = localhost/forward_10	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[11] 0 = localhost/forward_11	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[12] 0 = localhost/forward_12	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[13] 0 = localhost/forward_13	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[14] 0 = localhost/forward_14	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[15] 0 = localhost/forward_15	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[1] 0 = localhost/forward_1	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[2] 0 = localhost/forward_2	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[3] 0 = localhost/forward_3	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[4] 0 = localhost/forward_4	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[5] 0 = localhost/forward_5	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[6] 0 = localhost/forward_6	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[7] 0 = localhost/forward_7	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[8] 0 = localhost/forward_8	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[9] 0 = localhost/forward_9	com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
 
 The shard config is necessary so that flockdb knows where to write edges for a graph. If no
 forwarding info is provided for a graph, any operation on that graph will throw an exception.
@@ -235,27 +266,41 @@ runs out.)
 As a last demo, let's create a few shards for a new graph "99", add some data, and then migrate it
 to a new database.
 
-To create 10 shards for the new graph:
+Remember, we create graphs in pairs of positive and negative tables. To create 10 shards for the new graph:
 
-    $ ./src/scripts/mkshards.rb -n 10 99
-    Creating bins..........Done.
+    $ gizzmo -T -99,99 create-table --base-name=edges --shards=10 1 "com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)"
+	Create tables -99, 99:
+	  com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	  for 10 base ids:
+	    115292150460684697
+	    807045053224792879
+	    230584300921369394
+	    1037629354146162273
+	    922337203685477576
+	    345876451382054091
+	    0
+	    461168601842738788
+	    576460752303423485
+	    691752902764108182
+
+	Continue? (y/n) 
+	y
+
 
 And to verify that they were created:
 
-    $ gizzmo forwardings -t 99
-    99	0	localhost/edges_99_0000_forward_replicating
-    99	115292150460684697	localhost/edges_99_0001_forward_replicating
-    99	230584300921369394	localhost/edges_99_0002_forward_replicating
-    99	345876451382054091	localhost/edges_99_0003_forward_replicating
-    99	461168601842738788	localhost/edges_99_0004_forward_replicating
-    99	576460752303423485	localhost/edges_99_0005_forward_replicating
-    99	691752902764108182	localhost/edges_99_0006_forward_replicating
-    99	807045053224792879	localhost/edges_99_0007_forward_replicating
-    99	922337203685477576	localhost/edges_99_0008_forward_replicating
-    99	1037629354146162273	localhost/edges_99_0009_forward_replicating
+    $ gizzmo -T 99 topology --forwardings
+	[99] 0 = localhost/edges_99_0003_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] 199999999999999 = localhost/edges_99_0009_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] 333333333333332 = localhost/edges_99_0007_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] 4cccccccccccccb = localhost/edges_99_0004_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] 666666666666664 = localhost/edges_99_0002_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] 7fffffffffffffd = localhost/edges_99_0001_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] 999999999999996 = localhost/edges_99_0000_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] b3333333333332f = localhost/edges_99_0008_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] cccccccccccccc8 = localhost/edges_99_0005_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	[99] e66666666666661 = localhost/edges_99_0006_replicating	com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
 
-(`mkshards.rb` assumes that most shards will be replicated, so when creating shards manually, it
-always puts them behind a replicating shard.)
 
 Make sure the local flockdb instance reloads the forwarding tables:
 
@@ -273,53 +318,55 @@ Make a client with our new graph, and add some edges:
 What shard is user 123456 on?
 
     $ gizzmo --subtree lookup 99 123456
-    localhost/edges_99_0008_forward_replicating
-      localhost/edges_99_0008_forward_1
+    localhost/edges_99_0005_replicating
+	  localhost/edges_99_0005
 
 Hm, but localhost has been behaving strangely lately. Let's move that shard to 127.0.0.1, which is
-really lightly loaded. First, create the new shard:
+really lightly loaded. To move individual shards we'll take a look at the current topology and then run a `transform-tree` operation to move things where we want them.
 
-    $ gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" 127.0.0.1 edges_99_0008_new com.twitter.flockdb.SqlShard
-    127.0.0.1/edges_99_0008_new
+To see the current overall topology of graph 99:
 
-Then, setup a migration:
+    $ gizzmo -T 99 topology
+	10 com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
 
-    $ gizzmo setup-migrate localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
-    localhost/edges_99_0008_new_migrate_replica
+As we already knew, graph 99 is made up of 10 shards, all of which are replicating to just one server, which is also `localhost` for all them.
 
-If you look at the replication subtree for `localhost/edges_99_0008_forward_replicating`, you can
-see that it's added a layer of replication between the old shard and the new one, and the new one is
-behind a write-only barrier:
+Now let's change that shard to replicate only to the new host we want, 127.0.0.1. We'll specify the new topology template we want, and which shard that should apply to:
 
-    $ gizzmo subtree localhost/edges_99_0008_forward_replicating
-    localhost/edges_99_0008_forward_replicating
-      localhost/edges_99_0008_new_migrate_replica
-        localhost/edges_99_0008_forward_1
-        localhost/edges_99_0008_new_migrate_write_only
-          127.0.0.1/edges_99_0008_new
+    $ gizzmo transform-tree "com.twitter.gizzard.shards.ReplicatingShard(1) -> (com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED))" localhost/edges_99_0005_replicating
 
-So let's reload the forwarding table to make sure everyone starts using this replication:
+    com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED) => com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED) :
+	  PREPARE
+	    create_shard(com.twitter.flockdb.SqlShard/127.0.0.1)
+	    create_shard(WriteOnlyShard)
+	    add_link(WriteOnlyShard -> com.twitter.flockdb.SqlShard/127.0.0.1)
+	    add_link(com.twitter.gizzard.shards.ReplicatingShard -> WriteOnlyShard)
+	  COPY
+	    copy_shard(com.twitter.flockdb.SqlShard/127.0.0.1)
+	  CLEANUP
+	    add_link(com.twitter.gizzard.shards.ReplicatingShard -> com.twitter.flockdb.SqlShard/127.0.0.1)
+	    remove_link(com.twitter.gizzard.shards.ReplicatingShard -> com.twitter.flockdb.SqlShard/localhost)
+	    remove_link(WriteOnlyShard -> com.twitter.flockdb.SqlShard/127.0.0.1)
+	    remove_link(com.twitter.gizzard.shards.ReplicatingShard -> WriteOnlyShard)
+	    delete_shard(com.twitter.flockdb.SqlShard/localhost)
+	    delete_shard(WriteOnlyShard)
 
-    $ gizzmo reload
+	Continue? (y/n)
 
-Now, all writes are going to both places and we can start the copy:
-
-    $ gizzmo copy localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
-
-The destination shard will be marked "busy" during the copy, but because we only had 3 edges in it,
-the copy will probably be done before we can even check:
+gizzmo gives us the plan for this transformation so we can approve it before it makes any changes. This looks good so put in `y` and let it run. The destination shard will be marked "busy" during the copy, if you're quick you might be able to see it marked such by checking with:
 
     $ gizzmo busy
 
-Yep, no busy shards. We can finish the migration, then, to remove the replication layer and the
-source shard.
+After the operation has finished, you can check to see that it did what we expect:
 
-    $ gizzmo finish-migrate localhost/edges_99_0008_forward_1 127.0.0.1/edges_99_0008_new
-    $ gizzmo subtree localhost/edges_99_0008_forward_replicating
+    $ gizzmo subtree localhost/edges_99_0005_replicating
     localhost/edges_99_0008_forward_replicating
-      127.0.0.1/edges_99_0008_new
-
-Sweet! Reload to tell flockdb to stop writing to the old shard.
+	  127.0.0.1/edges_99_0005
+	$ gizzmo -T 99 topology
+	   9 com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(localhost,1,INT UNSIGNED,INT UNSIGNED)
+	   1 com.twitter.gizzard.shards.ReplicatingShard(1) -> com.twitter.flockdb.SqlShard(127.0.0.1,1,INT UNSIGNED,INT UNSIGNED)
+	
+Sweet! Reload to make sure flockdb knows about the right topology.
 
     $ gizzmo reload
 
