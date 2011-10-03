@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS %s (
   PRIMARY KEY (source_id, state, position),
 
   UNIQUE unique_source_id_destination_id (source_id, destination_id)
-) TYPE=INNODB"""
+) ENGINE=INNODB"""
 
   val METADATA_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS %s (
   updated_at            INT UNSIGNED             NOT NULL,
 
   PRIMARY KEY (source_id)
-) TYPE=INNODB
+) ENGINE=INNODB
 """
 
   def instantiate(shardInfo: ShardInfo, weight: Int) = {
