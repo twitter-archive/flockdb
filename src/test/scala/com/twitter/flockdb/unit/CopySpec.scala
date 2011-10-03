@@ -17,9 +17,9 @@
 package com.twitter.flockdb
 package unit
 
-import com.twitter.gizzard.nameserver.NameServer
+import com.twitter.gizzard.nameserver.{NameServer, ShardManager}
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo, ShardTimeoutException}
+import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo, ShardTimeoutException, RoutingNode}
 import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
@@ -30,110 +30,117 @@ import shards.{Shard}
 class CopySpec extends ConfiguredSpecification with JMocker with ClassMocker {
   val shard1Id = ShardId("test", "shard1")
   val shard2Id = ShardId("test", "shard2")
+  val shardIds = Seq(shard1Id, shard2Id)
   val shard1Info = new ShardInfo("TestShard", "shard1", "test")
   val shard2Info = new ShardInfo("TestShard", "shard2", "test")
   val count = 2300
 
-  // "Copy" should {
-  //   val cursor1 = Cursor(337L)
-  //   val cursor2 = Cursor(555L)
-  //   val nameServer = mock[NameServer]
-  //   val scheduler = mock[JobScheduler]
-  //   val shard1 = mock[Shard]
-  //   val shard2 = mock[Shard]
+  "Copy" should {
+    val cursor1 = Cursor(337L)
+    val cursor2 = Cursor(555L)
+    val nameServer = mock[NameServer]
+    val shardManager = mock[ShardManager]
+    val scheduler = mock[JobScheduler]
+    val shard1 = mock[RoutingNode[Shard]]
+    val shard2 = mock[RoutingNode[Shard]]
 
-  //   "apply" in {
-  //     val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count, nameServer, scheduler)
-  //     val edge = new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)
+    "apply" in {
+      val job = new Copy(shardIds, (cursor1, cursor2), count, nameServer, scheduler)
+      val edge = new Edge(1L, 2L, 3L, Time.now, 5, State.Normal)
 
-  //     "continuing work" >> {
-  //       expect {
-  //         one(nameServer).getShard(shard2Id) willReturn shard2Info
-  //         one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-  //         one(nameServer).findShardById(shard1Id) willReturn shard1
-  //         one(nameServer).findShardById(shard2Id) willReturn shard2
-  //         one(shard1).selectAll((cursor1, cursor2), count) willReturn (List(edge), (cursor1, Cursor(cursor2.position + 1)))
-  //         one(shard2).writeCopies(List(edge))
-  //       }
-  //       job.apply()
-  //     }
+      // "continuing work" >> {
+      //   expect {
+      //     allowing(nameServer).shardManager() willReturn shardManager
+      //     one(shardManager).getShard(shard1Id) willReturn shard1Info
+      //     one(shardManager).getShard(shard2Id) willReturn shard2Info          
+      //     one(nameServer).findShardById(shard1Id) willReturn shard1
+      //     one(nameServer).findShardById(shard2Id) willReturn shard2
+      //     one(shardManager).markShardBusy(shard1Id, Busy.Busy)
+      //     one(shardManager).markShardBusy(shard2Id, Busy.Busy)
+      //     one(shard1).readOperation(f: T => A) willReturn (List(edge), (cursor1, Cursor(cursor2.position + 1)))
+      //     one(shard2).readOperation(_.selectAll((cursor1, cursor2), count)) willReturn (List(edge), (cursor1, Cursor(cursor2.position + 1)))
+      //     // one(shard1).writeCopies(List(edge))
+      //     // one(shard2).writeCopies(List(edge))
+      //   }
+      //   job.apply()
+      // }
 
-  //     "try again on timeout" >> {
-  //       expect {
-  //         one(nameServer).getShard(shard2Id) willReturn shard2Info
-  //         one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-  //         one(nameServer).findShardById(shard1Id) willReturn shard1
-  //         one(nameServer).findShardById(shard2Id) willReturn shard2
-  //         one(shard1).selectAll((cursor1, cursor2), count) willThrow new ShardTimeoutException(100.milliseconds, null)
-  //         one(scheduler).put(new Copy(shard1Id, shard2Id, (cursor1, cursor2), (count.toFloat * 0.9).toInt, nameServer, scheduler))
-  //       }
-  //       job.apply()
-  //    }
+     //  "try again on timeout" >> {
+     //    expect {
+     //      // one(nameServer).getShard(shard2Id) willReturn shard2Info
+     //      // one(nameServer).markShardBusy(shard2Id, Busy.Busy)
+     //      // one(nameServer).findShardById(shard1Id) willReturn shard1
+     //      // one(nameServer).findShardById(shard2Id) willReturn shard2
+     //      // one(shard1).selectAll((cursor1, cursor2), count) willThrow new ShardTimeoutException(100.milliseconds, null)
+     //      // one(scheduler).put(new Copy(shard1Id, shard2Id, (cursor1, cursor2), (count.toFloat * 0.9).toInt, nameServer, scheduler))
+     //    }
+     //    job.apply()
+     // }
 
-  //     "finished" >> {
-  //       expect {
-  //         one(nameServer).getShard(shard2Id) willReturn shard2Info
-  //         one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-  //         one(nameServer).findShardById(shard1Id) willReturn shard1
-  //         one(nameServer).findShardById(shard2Id) willReturn shard2
-  //         one(shard1).selectAll((cursor1, cursor2), count) willReturn (List(edge), (Cursor.End, Cursor.End))
-  //         one(shard2).writeCopies(List(edge))
-  //         one(nameServer).markShardBusy(shard2Id, Busy.Normal)
-  //       }
-  //       job.apply()
-  //     }
+     //  "finished" >> {
+     //    expect {
+     //      // one(nameServer).getShard(shard2Id) willReturn shard2Info
+     //      // one(nameServer).markShardBusy(shard2Id, Busy.Busy)
+     //      // one(nameServer).findShardById(shard1Id) willReturn shard1
+     //      // one(nameServer).findShardById(shard2Id) willReturn shard2
+     //      // one(shard1).selectAll((cursor1, cursor2), count) willReturn (List(edge), (Cursor.End, Cursor.End))
+     //      // one(shard2).writeCopies(List(edge))
+     //      // one(nameServer).markShardBusy(shard2Id, Busy.Normal)
+     //    }
+     //    job.apply()
+     //  }
 
-  //   }
+    }
 
-  //   "toJson" in {
-  //     val job = new Copy(shard1Id, shard2Id, (cursor1, cursor2), count, nameServer, scheduler)
-  //     val json = job.toJson
-  //     json mustMatch "Copy"
-  //     json mustMatch "\"cursor1\":" + cursor1.position
-  //     json mustMatch "\"cursor2\":" + cursor2.position
-  //   }
-  // }
+    "toJson" in {
+      val job = new Copy(shardIds, (cursor1, cursor2), count, nameServer, scheduler)
+      val json = job.toJson
+      json mustMatch "Copy"
+      json mustMatch "\"cursor1\":" + cursor1.position
+      json mustMatch "\"cursor2\":" + cursor2.position
+    }
+  }
 
-  // "MetadataCopy" should {
-  //   val cursor = Cursor(1L)
-  //   val nameServer = mock[NameServer]
-  //   val scheduler = mock[JobScheduler]
-  //   val shard1 = mock[Shard]
-  //   val shard2 = mock[Shard]
-  //   val job = new MetadataCopy(shard1Id, shard2Id, cursor, count, nameServer, scheduler)
+  "MetadataCopy" should {
+    val cursor = Cursor(1L)
+    val nameServer = mock[NameServer]
+    val scheduler = mock[JobScheduler]
+    val shard1 = mock[Shard]
+    val shard2 = mock[Shard]
+    val job = new MetadataCopy(shardIds, cursor, count, nameServer, scheduler)
 
-  //   "apply" in {
-  //     "continuing work" >> {
-  //       val metadata = new Metadata(1, State.Normal, 2, Time.now)
-  //       expect {
-  //         one(nameServer).getShard(shard2Id) willReturn shard2Info
-  //         one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-  //         one(nameServer).findShardById(shard1Id) willReturn shard1
-  //         one(nameServer).findShardById(shard2Id) willReturn shard2
-  //         one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor(cursor.position + 1))
-  //         one(shard2).writeMetadata(List(metadata))
-  //       }
-  //       job.apply()
-  //     }
+    // "apply" in {
+    //   "continuing work" >> {
+    //     val metadata = new Metadata(1, State.Normal, 2, Time.now)
+    //     expect {
+    //       // one(nameServer).getShard(shard2Id) willReturn shard2Info
+    //       // one(nameServer).markShardBusy(shard2Id, Busy.Busy)
+    //       // one(nameServer).findShardById(shard1Id) willReturn shard1
+    //       // one(nameServer).findShardById(shard2Id) willReturn shard2
+    //       // one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor(cursor.position + 1))
+    //       // one(shard2).writeMetadata(List(metadata))
+    //     }
+    //     job.apply()
+    //   }
 
-  //     "finished" >> {
-  //       val metadata = new Metadata(1, State.Normal, 2, Time.now)
-  //       expect {
-  //         one(nameServer).getShard(shard2Id) willReturn shard2Info
-  //         one(nameServer).findShardById(shard1Id) willReturn shard1
-  //         one(nameServer).findShardById(shard2Id) willReturn shard2
-  //         one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
-  //         one(shard2).writeMetadata(List(metadata))
-  //         one(nameServer).markShardBusy(shard2Id, Busy.Busy)
-  //       }
-  //       job.apply()
-  //     }
-  //   }
+    //   "finished" >> {
+    //     val metadata = new Metadata(1, State.Normal, 2, Time.now)
+    //     expect {
+    //       // one(nameServer).getShard(shard2Id) willReturn shard2Info
+    //       // one(nameServer).findShardById(shard1Id) willReturn shard1
+    //       // one(nameServer).findShardById(shard2Id) willReturn shard2
+    //       // one(shard1).selectAllMetadata(cursor, count) willReturn (List(metadata), Cursor.End)
+    //       // one(shard2).writeMetadata(List(metadata))
+    //       // one(nameServer).markShardBusy(shard2Id, Busy.Busy)
+    //     }
+    //     job.apply()
+    //   }
+    // }
 
-  //   "toJson" in {
-  //     val json = job.toJson
-  //     json mustMatch "MetadataCopy"
-  //     json mustMatch "\"cursor\":" + cursor.position
-  //   }
-  // }
+    "toJson" in {
+      val json = job.toJson
+      json mustMatch "MetadataCopy"
+      json mustMatch "\"cursor\":" + cursor.position
+    }
+  }
 }
