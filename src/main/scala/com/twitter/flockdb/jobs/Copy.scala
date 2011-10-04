@@ -56,63 +56,63 @@ class CopyParser(nameServer: NameServer, scheduler: JobScheduler)
 case class CopyState(var pos: Int, items: Seq[Edge], cursor: (Cursor, Cursor), total: Int, val diffs: mutable.ArrayBuffer[Edge])
 
 
-class Copy(shardIds: Seq[ShardId], cursor: Copy.CopyCursor,
+class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
            count: Int, nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJob[Shard](shardIds, count, nameServer, scheduler) {
 
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {
     val shards = nodes map { new ReadWriteShardAdapter(_) }
     
-    val shardStates = shards map { shard => 
-      val (edges, nextCursor) = shard.selectAll(cursor, count)
-      shard -> CopyState(0, edges, nextCursor, edges.size, mutable.ArrayBuffer[Edge]())
-    } toMap
+    var cursors = Array(cursor)
 
-    while (shardStates.find { case (shard, state) => state.pos < state.total }.isDefined) {
-      val edges = shardStates.map { case (shard, state) =>
-        val edge = if (state.pos < state.total) state.items(state.pos) else Edge.Max
-        (shard, edge)
-      }
+    while (!cursors.isEmpty) {
       
-      val (minShard, minEdge) = edges.foldLeft(edges.head) { case (min, pair) =>
-        val minEdge = min._2
-        val pairEdge = pair._2
+      cursor = cursors.min
+      val shardStates = shards map { shard => 
+        val (edges, nextCursor) = shard.selectAll(cursor, count)
+        shard -> CopyState(0, edges, nextCursor, edges.size, mutable.ArrayBuffer[Edge]())
+      } toMap
+
+      while (shardStates.find { case (shard, state) => state.pos < state.total }.isDefined) {
+        val edges = shardStates.map { case (shard, state) =>
+          val edge = if (state.pos < state.total) state.items(state.pos) else Edge.Max
+          (shard, edge)
+        }
         
-        if (pairEdge.similar(minEdge) < 0) pair else min
-      }
-      
-      val sameEdges = edges.filter { case (shard, edge) => edge.similar(minEdge) == 0 }
+        val (minShard, minEdge) = edges.foldLeft(edges.head) { case (min, pair) =>
+          val minEdge = min._2
+          val pairEdge = pair._2
+          
+          if (pairEdge.similar(minEdge) < 0) pair else min
+        }
+        
+        val sameEdges = edges.filter { case (shard, edge) => edge.similar(minEdge) == 0 }
 
-      val (bestShard, bestEdge) = sameEdges.foldLeft((minShard, minEdge)) { case (newest, pair) => 
-        if (pair._2.position > newest._2.position) pair else newest 
-      }
-      
-      edges.foreach { case (shard, edge) =>
-        if (bestEdge.similar(edge) < 0) {
-          shardStates(shard).diffs += bestEdge
-        } else if (bestEdge.similar(edge) == 0) {
-          if (bestEdge.position > edge.position) {
+        val (bestShard, bestEdge) = sameEdges.foldLeft((minShard, minEdge)) { case (newest, pair) => 
+          if (pair._2.updatedAt > newest._2.updatedAt) pair else newest 
+        }
+        
+        edges.foreach { case (shard, edge) =>
+          if (bestEdge.similar(edge) < 0) {
             shardStates(shard).diffs += bestEdge
+          } else if (bestEdge.similar(edge) == 0) {
+            if (bestEdge.updatedAt > edge.updatedAt) {
+              shardStates(shard).diffs += bestEdge
+            }
+            shardStates(shard).pos += 1
           }
-          shardStates(shard).pos += 1
         }
       }
+      
+      shardStates.foreach { case (shard, state) =>
+        shard.writeCopies(state.diffs)
+        Stats.incr("edges-copy", state.diffs.size)
+      }
+      
+      cursors = shardStates.map { case (shard, state) => state.cursor}.filterNot{ _ == Copy.END}.toArray
     }
-    
-    shardStates.foreach { case (shard, state) =>
-      shard.writeCopies(state.diffs)
-      Stats.incr("edges-copy", state.diffs.size)
-    }
-    
-    val cursors = shardStates.map { case (shard, state) => state.cursor}.filterNot{ _ == Copy.END } 
 
-    
-    if (cursors.isEmpty) {
-      None
-    } else {
-      val minCursor = cursors.min
-      Some(new Copy(shardIds, minCursor, count, nameServer, scheduler))
-    }
+    None     
   }
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
@@ -134,61 +134,64 @@ class MetadataCopyParser(nameServer: NameServer, scheduler: JobScheduler)
 
 case class MetadataCopyState(var pos: Int, items: Seq[Metadata], cursor: Cursor, total: Int, val diffs: mutable.ArrayBuffer[Metadata])
 
-class MetadataCopy(shardIds: Seq[ShardId], cursor: MetadataCopy.CopyCursor,
+class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
                    count: Int, nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJob[Shard](shardIds, count, nameServer, scheduler) {
 
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {    
     val shards = nodes.map { new ReadWriteShardAdapter(_) }
     
-    val shardStates = Map(shards.map { shard => 
-      val (items, nextCursor) = shard.selectAllMetadata(cursor, count)
-      (shard, MetadataCopyState(0, items, nextCursor, items.size, mutable.ArrayBuffer[Metadata]()))
-    }: _*)
-    
-    while (shardStates.find{case (shard, state) => state.pos < state.total}.isDefined) {
-      val items = shardStates.map { case (shard, state) => 
-        val item = if (state.pos < state.total) state.items(state.pos) else Metadata.Max
-        (shard, item)
-      }
-    
-      val (minShard, minItem) = items.foldLeft(items.head) { case (min, pair) => 
-        val minItem = min._2
-        val pairItem = pair._2
-        
-        if (pairItem.similar(minItem) < 0) pair else min
-      }
+    var cursors = Array(cursor)
 
-      val sameItems = items.filter { case (shard, item) => item.similar(minItem) == 0 }
+    while(!cursors.isEmpty) {
 
-      val (bestShard, bestItem) = sameItems.foldLeft((minShard, minItem)) { case (newest, pair) => 
-        if (pair._2.updatedAt > newest._2.updatedAt) pair else newest }
+      cursor = cursors.min
+
+      val shardStates = Map(shards.map { shard => 
+        val (items, nextCursor) = shard.selectAllMetadata(cursor, count)
+        (shard, MetadataCopyState(0, items, nextCursor, items.size, mutable.ArrayBuffer[Metadata]()))
+      }: _*)
       
-      items.foreach { case (shard, item) => 
-        if (bestItem.similar(item) < 0) {
-          shardStates(shard).diffs += bestItem  
-        } else if (minItem.similar(item) == 0) {
-          if (bestItem.updatedAt > item.updatedAt) {
-            shardStates(shard).diffs += bestItem
+      while (shardStates.find{case (shard, state) => state.pos < state.total}.isDefined) {
+        val items = shardStates.map { case (shard, state) => 
+          val item = if (state.pos < state.total) state.items(state.pos) else Metadata.Max
+          (shard, item)
+        }
+      
+        val (minShard, minItem) = items.foldLeft(items.head) { case (min, pair) => 
+          val minItem = min._2
+          val pairItem = pair._2
+          
+          if (pairItem.similar(minItem) < 0) pair else min
+        }
+
+        val sameItems = items.filter { case (shard, item) => item.similar(minItem) == 0 }
+
+        val (bestShard, bestItem) = sameItems.foldLeft((minShard, minItem)) { case (newest, pair) => 
+          if (pair._2.updatedAt > newest._2.updatedAt) pair else newest }
+        
+        items.foreach { case (shard, item) => 
+          if (bestItem.similar(item) < 0) {
+            shardStates(shard).diffs += bestItem  
+          } else if (minItem.similar(item) == 0) {
+            if (bestItem.updatedAt > item.updatedAt) {
+              shardStates(shard).diffs += bestItem
+            }
+            shardStates(shard).pos += 1
           }
-          shardStates(shard).pos += 1
         }
       }
+      
+      shardStates.foreach { case (shard, state) =>
+        shard.writeMetadata(state.diffs)
+        Stats.incr("edges-copy", state.diffs.size)
+      }
+      
+      cursors = shardStates.map { case (shard, state) => state.cursor }.filterNot{ _ == MetadataCopy.END }.toArray
     }
     
-    shardStates.foreach { case (shard, state) =>
-      shard.writeMetadata(state.diffs)
-      Stats.incr("edges-copy", state.diffs.size)
-    }
+    Some(new Copy(shardIds, Copy.START, Copy.COUNT, nameServer, scheduler))
     
-    val cursors = shardStates.map { case (shard, state) => state.cursor }.filterNot{ _ == MetadataCopy.END }
-    
-    if (cursors.isEmpty) {
-      Some(new Copy(shardIds, Copy.START, Copy.COUNT, nameServer, scheduler))
-    } else {
-      val minCursor = cursors.min
-      Some(new MetadataCopy(shardIds, minCursor, count, nameServer, scheduler))
-    }
   }
 
   def serialize = Map("cursor" -> cursor.position)
