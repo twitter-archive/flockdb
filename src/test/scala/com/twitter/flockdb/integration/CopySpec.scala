@@ -26,6 +26,7 @@ import com.twitter.gizzard.shards.{ShardInfo, ShardId, Busy, RoutingNode}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
+import org.specs.util.{Duration => SpecsDuration}
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
 import com.twitter.flockdb.Edge
@@ -47,6 +48,14 @@ class CopySpec extends IntegrationSpecification {
     val time = Time.now
 
     doBefore {
+      val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
+
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_edges")
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_metadata")
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_edges")
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_metadata")
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_edges")
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_metadata")
       flock.nameServer.reload()
       flock.shardManager.createAndMaterializeShard(sourceShardInfo)
       flock.shardManager.createAndMaterializeShard(destinationShardInfo)
@@ -75,67 +84,52 @@ class CopySpec extends IntegrationSpecification {
     }
 
     def getEdges(shard: RoutingNode[Shard], num: Int) {
-      shard.readOperation(_.count(1L, Seq(State.Normal))) must eventually(be_==(num))
+      shard.readOperation(_.count(1L, Seq(State.Normal))) must eventually(100, new SpecsDuration(60000))(be_==(num))
     }
 
     def validateEdges(shards: Seq[RoutingNode[Shard]], num: Int) {
-      Thread.sleep(20000)
       shards.foreach { getEdges(_, num) }
       val shardsEdges = shards map { _.readOperation(_.selectAll((Cursor.Start, Cursor.Start), 2*num))._1}
-      var i = 1
-      shardsEdges.foreach { edges =>
-        println("checking "+i+": "+ (edges.length))
-        i+=1
-
-      }
       shardsEdges.foreach { 
         _.length must eventually(be_==(num)) }
       (0 until num).foreach { idx => 
-        var j = 1
         shardsEdges.foldLeft(shardsEdges(0)) { case (lastEdges, edges) => 
-          j+=1
           lastEdges(idx) must be_==(edges(idx))
-          if (edges(idx).updatedAt.inSeconds != time.inSeconds) {
-            println("DANGER WILL ROBINSON shard " + j + " row " + (idx+1))
-            println("shard 1: "+ shardsEdges(0)(idx))
-            println("shard 2: "+ shardsEdges(1)(idx))
-            println("shard 3: "+ shardsEdges(2)(idx))
-
-          }
           edges(idx).updatedAt.inSeconds must be_==(time.inSeconds)
           edges
         }
       }
     }
 
-    // "copy" in {
-    //   val numData = 20000
-    //   val sourceShard = flock.nameServer.findShardById[Shard](sourceShardId)
-    //   val destinationShard = flock.nameServer.findShardById[Shard](destinationShardId)
-    //   writeEdges(sourceShard, numData, 1, 1, false)
-    //   getEdges(sourceShard, numData)
-    //   getEdges(destinationShard, 0)
+    "copy" in {
+      val numData = 20000
+      val sourceShard = flock.nameServer.findShardById[Shard](sourceShardId)
+      val destinationShard = flock.nameServer.findShardById[Shard](destinationShardId)
+      writeEdges(sourceShard, numData, 1, 1, false)
+      getEdges(sourceShard, numData)
+      getEdges(destinationShard, 0)
 
-    //   flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
+      flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
 
-    //   getEdges(destinationShard, numData)
+      getEdges(destinationShard, numData)
 
-    // }
+    }
 
-    // "repair by merging" in {
-    //   val numData = 20000
-    //   val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
-    //   val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
-    //   writeEdges(shard1, numData, 1, 2, false)
-    //   writeEdges(shard2, numData, 2, 2, false)
+    "repair by merging" in {
+      val numData = 20000
+      val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
+      val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
+      writeEdges(shard1, numData, 1, 2, false)
+      writeEdges(shard2, numData, 2, 2, false)
 
-    //   flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
+      flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
 
-    //   validateEdges(Seq(shard1, shard2), numData)
-    // }
+      validateEdges(Seq(shard1, shard2), numData)
+    }
 
-    "repair out of date" in {
-      val numData = 25000
+
+    "repair and fill out of date" in {
+      val numData = 50000
       
       val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
       val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
@@ -143,11 +137,11 @@ class CopySpec extends IntegrationSpecification {
 
       writeEdges(shard1, numData, 1, 2, false)
       writeEdges(shard2, numData/2, 2, 2, false)
+      writeEdges(shard2, numData/2, 1, 2, true)
       writeEdges(shard2, numData, numData/2, 1, false)
       writeEdges(shard3, numData, 1, 3, true)
 
       flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id, shard3Info.toThrift.id))
-
       validateEdges(Seq(shard1, shard2, shard3), numData)
 
     }

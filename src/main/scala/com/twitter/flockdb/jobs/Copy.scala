@@ -59,19 +59,20 @@ case class CopyState(var pos: Int, items: Seq[Edge], cursor: (Cursor, Cursor), t
 class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
            count: Int, nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJob[Shard](shardIds, count, nameServer, scheduler) {
+        var badedges = 0;
 
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {
     val shards = nodes map { new ReadWriteShardAdapter(_) }
     
-    var cursors = Array(cursor)
+    var cursors = Seq(cursor)
 
     while (!cursors.isEmpty) {
-      
       cursor = cursors.min
       val shardStates = shards map { shard => 
         val (edges, nextCursor) = shard.selectAll(cursor, count)
         shard -> CopyState(0, edges, nextCursor, edges.size, mutable.ArrayBuffer[Edge]())
       } toMap
+
 
       while (shardStates.find { case (shard, state) => state.pos < state.total }.isDefined) {
         val edges = shardStates.map { case (shard, state) =>
@@ -91,7 +92,6 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
         val (bestShard, bestEdge) = sameEdges.foldLeft((minShard, minEdge)) { case (newest, pair) => 
           if (pair._2.updatedAt > newest._2.updatedAt) pair else newest 
         }
-        
         edges.foreach { case (shard, edge) =>
           if (bestEdge.similar(edge) < 0) {
             shardStates(shard).diffs += bestEdge
@@ -109,7 +109,7 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
         Stats.incr("edges-copy", state.diffs.size)
       }
       
-      cursors = shardStates.map { case (shard, state) => state.cursor}.filterNot{ _ == Copy.END}.toArray
+      cursors = shardStates.toSeq.map { case (shard, state) => state.cursor}.filterNot{ _ == Copy.END }
     }
 
     None     
@@ -141,10 +141,9 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {    
     val shards = nodes.map { new ReadWriteShardAdapter(_) }
     
-    var cursors = Array(cursor)
+    var cursors = Seq(cursor)
 
     while(!cursors.isEmpty) {
-
       cursor = cursors.min
 
       val shardStates = Map(shards.map { shard => 
@@ -187,7 +186,7 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
         Stats.incr("edges-copy", state.diffs.size)
       }
       
-      cursors = shardStates.map { case (shard, state) => state.cursor }.filterNot{ _ == MetadataCopy.END }.toArray
+      cursors = shardStates.toSeq.map { case (shard, state) => state.cursor }.filterNot{ _ == MetadataCopy.END }
     }
     
     Some(new Copy(shardIds, Copy.START, Copy.COUNT, nameServer, scheduler))
