@@ -111,6 +111,7 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
       shardStates.foreach { case (shard, state) =>
         shard.writeCopies(state.diffs)
         Stats.incr("edges-copy", state.diffs.size)
+        state.diffs.clear
       }
       
       cursors = shardStates.toSeq.map { case (shard, state) => state.cursor}.filterNot{ _ == Copy.END }
@@ -188,6 +189,7 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
       shardStates.foreach { case (shard, state) =>
         shard.writeMetadata(state.diffs)
         Stats.incr("edges-copy", state.diffs.size)
+        state.diffs.clear
       }
       
       cursors = shardStates.toSeq.map { case (shard, state) => state.cursor }.filterNot{ _ == MetadataCopy.END }
