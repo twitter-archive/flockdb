@@ -73,8 +73,12 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
         shard -> CopyState(0, edges, nextCursor, edges.size, mutable.ArrayBuffer[Edge]())
       } toMap
 
-
-      while (shardStates.find { case (shard, state) => state.pos < state.total }.isDefined) {
+      /*
+       * Loop through the edges we got and add diffs to each. Stop when we either run out of edges to process or we get through 
+       * one shard's batch of edges but haven't reached its END. Stopping in the latter case saves cycles that we'll
+       * repeat on the next iteration anyway and potentially saves us from recording useless diffs.
+      */
+      while (shardStates.find { case (shard, state) => state.pos < state.total }.isDefined && shardStates.find { case (shard, state) => state.pos >= state.total && state.cursor != Copy.END}.isEmpty ) {
         val edges = shardStates.map { case (shard, state) =>
           val edge = if (state.pos < state.total) state.items(state.pos) else Edge.Max
           (shard, edge)
@@ -151,7 +155,7 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
         (shard, MetadataCopyState(0, items, nextCursor, items.size, mutable.ArrayBuffer[Metadata]()))
       }: _*)
       
-      while (shardStates.find{case (shard, state) => state.pos < state.total}.isDefined) {
+      while (shardStates.find{case (shard, state) => state.pos < state.total}.isDefined && shardStates.find{case (shard, state) => state.pos >= state.total && state.cursor != MetadataCopy.END}.isEmpty) {
         val items = shardStates.map { case (shard, state) => 
           val item = if (state.pos < state.total) state.items(state.pos) else Metadata.Max
           (shard, item)
