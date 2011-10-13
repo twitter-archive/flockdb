@@ -62,9 +62,13 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
         var badedges = 0;
 
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {
+
+    val diffLog = new java.io.BufferedWriter(new java.io.FileWriter("diff_log", true))
+
     val shards = nodes map { new ReadWriteShardAdapter(_) }
     
     var cursors = Seq(cursor)
+
 
     while (!cursors.isEmpty) {
       cursor = cursors.min
@@ -111,12 +115,15 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
       shardStates.foreach { case (shard, state) =>
         shard.writeCopies(state.diffs)
         Stats.incr("edges-copy", state.diffs.size)
+        state.diffs foreach { diff => 
+        diffLog.write(shard.getString + ":\t" + diff.toString() + "\n")
+        }
         state.diffs.clear
       }
       
       cursors = shardStates.toSeq.map { case (shard, state) => state.cursor}.filterNot{ _ == Copy.END }
     }
-
+    diffLog.close()
     None     
   }
 
@@ -144,6 +151,8 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
       extends CopyJob[Shard](shardIds, count, nameServer, scheduler) {
 
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {    
+    val diffLog = new java.io.BufferedWriter(new java.io.FileWriter("diff_log", true))
+
     val shards = nodes.map { new ReadWriteShardAdapter(_) }
     
     var cursors = Seq(cursor)
@@ -180,21 +189,24 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
           } else if (minItem.similar(item) == 0) {
             if (bestItem.updatedAt > item.updatedAt) {
               shardStates(shard).diffs += bestItem
+
             }
             shardStates(shard).pos += 1
           }
         }
       }
-      
       shardStates.foreach { case (shard, state) =>
         shard.writeMetadata(state.diffs)
         Stats.incr("edges-copy", state.diffs.size)
+        state.diffs foreach { diff => 
+          diffLog.write(shard.getString + ":\t" + diff.toString() + "\n")
+        }
         state.diffs.clear
       }
       
       cursors = shardStates.toSeq.map { case (shard, state) => state.cursor }.filterNot{ _ == MetadataCopy.END }
     }
-    
+    diffLog.close()
     Some(new Copy(shardIds, Copy.START, Copy.COUNT, nameServer, scheduler))
     
   }

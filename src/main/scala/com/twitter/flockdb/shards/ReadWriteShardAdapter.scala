@@ -52,4 +52,8 @@ class ReadWriteShardAdapter(shard: RoutingNode[Shard])
   def negate(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                   = shard.writeOperation(_.negate(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)                  = shard.writeOperation(_.archive(sourceId, destinationId, position, updatedAt))
   def archive(sourceId: Long, updatedAt: Time)                                                       = shard.writeOperation(_.archive(sourceId, updatedAt))
+
+  def getString = {
+    shard.shardInfo.id.toString()
+  }
 }
