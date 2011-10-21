@@ -37,8 +37,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
     flock.nameServer.reload()
 
     val rootQueryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection.withoutDatabase)
-    //rootQueryEvaluator.execute("DROP DATABASE IF EXISTS " + config.databaseConnection.database)
-    val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
+    val queryEvaluator     = config.edgesQueryEvaluator()(config.databaseConnection)
 
     for (graph <- (1 until 10)) {
       Seq("forward", "backward").foreach { direction =>
@@ -130,7 +129,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
 
       val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
       val errors = scheduler.errorQueue
-      errors.size must eventually(be(10))
+      alicesFollowings.size must eventually(be(10))
     }
   }
 
