@@ -19,5 +19,5 @@ with SubversionPublisher {
   val objenesis = "org.objenesis"           % "objenesis"    % "1.1"   % "test"
   val specs     = "org.scala-tools.testing" % "specs_2.8.1"  % "1.6.6" % "test"
 
-  override def subversionRepository = Some("http://svn.local.twitter.com/maven-public/")
+  override def subversionRepository = Some("https://svn.twitter.biz/maven-public/")
 }
