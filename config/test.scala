@@ -19,29 +19,19 @@ trait Credentials extends Connection {
   val env = System.getenv().toMap
   val username = env.get("DB_USERNAME").getOrElse("root")
   val password = env.get("DB_PASSWORD").getOrElse("")
+  urlOptions = Map("connectTimeout" -> "0")
 }
 
 class TestQueryEvaluator(label: String) extends QueryEvaluator {
-  autoDisable = new AutoDisablingQueryEvaluator {
-    val errorCount = 100
-    val interval = 60.seconds
-  }
-
 //  query.debug = DebugLog
   database.memoize = true
   database.pool = new ApachePoolingDatabase {
     sizeMin = 8
     sizeMax = 8
-    maxWait = 1.second
+//    maxWait = 0.seconds
     minEvictableIdle = 60.seconds
     testIdle = 1.second
     testOnBorrow = false
-  }
-
-  database.timeout = new TimingOutDatabase {
-    poolSize = 10
-    queueSize = 10000
-    open = 1.second
   }
 
   query.timeouts = Map(
@@ -56,7 +46,9 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
   )
 
   override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {
-    MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats, dbStatsFactory, queryStatsFactory) } )
+    try {
+      MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats, dbStatsFactory, queryStatsFactory) } )
+    } catch { case e: Throwable => e.printStackTrace(); throw e }
   }
 }
 
@@ -98,7 +90,6 @@ new FlockDB {
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
     val database = "edges_test"
-    urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
   val edgesQueryEvaluator = new TestQueryEvaluator("edges")
