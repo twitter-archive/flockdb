@@ -57,6 +57,7 @@ extends JsonJobParser {
       Time.fromSeconds(casted("updated_at").toInt),
       forwardingManager,
       uuidGenerator,
+      casted.get("wrote_forward_direction") map { case b: Boolean => b == true } getOrElse(false),
       writeSuccesses.toList
     )
   }
@@ -71,27 +72,22 @@ class Single(
   updatedAt: Time,
   forwardingManager: ForwardingManager,
   uuidGenerator: UuidGenerator,
-  var successes: List[ShardId] = Nil)
+  var wroteForwardDirection: Boolean = false,
+  var successes: List[ShardId] = Nil
+)
 extends JsonJob {
+  def toMap = Map(
+    "source_id" -> sourceId,
+    "graph_id" -> graphId,
+    "destination_id" -> destinationId,
+    "position" -> position,
+    "state" -> preferredState.id,
+    "updated_at" -> updatedAt.inSeconds,
+    "wrote_forward_direction" -> wroteForwardDirection,
+    "write_successes" -> (successes map { case ShardId(h, tp) => Seq(h, tp) })
+  )
 
-  def toMap = {
-    val base =  Map(
-      "source_id" -> sourceId,
-      "graph_id" -> graphId,
-      "destination_id" -> destinationId,
-      "position" -> position,
-      "state" -> preferredState.id,
-      "updated_at" -> updatedAt.inSeconds
-    )
-
-    if (successes.isEmpty) {
-      base
-    } else {
-      base + ("write_successes" -> (successes map { case ShardId(h, tp) => Seq(h, tp) }))
-    }
-  }
-
-  def apply() = {
+  def apply() {
     val forward  = forwardingManager.findNode(sourceId, graphId, Direction.Forward).write
     val backward = forwardingManager.findNode(destinationId, graphId, Direction.Backward).write
     val uuid     = uuidGenerator(position)
@@ -99,18 +95,29 @@ extends JsonJob {
     var currSuccesses: List[ShardId] = Nil
     var currErrs: List[Throwable]    = Nil
 
-    forward.optimistically(sourceId) { left =>
+    // skip if we've successfully done this before.
+    if (!wroteForwardDirection) {
       backward.optimistically(destinationId) { right =>
-        val state           = left max right max preferredState
-        val forwardResults  = writeToShard(forward, sourceId, destinationId, uuid, state)
-        val backwardResults = writeToShard(backward, destinationId, sourceId, uuid, state)
-
-        List(forwardResults, backwardResults) foreach {
-          _ foreach {
-            case Return(id) => currSuccesses = id :: currSuccesses
-            case Throw(e)   => currErrs = e :: currErrs
-          }
+        writeToShard(forward, sourceId, destinationId, uuid, preferredState max right) foreach {
+          case Return(id) => currSuccesses = id :: currSuccesses
+          case Throw(e)   => currErrs = e :: currErrs
         }
+      }
+    }
+
+    // add successful writes here, since we are only successful if an optimistic lock exception is not raised.
+    successes = successes ++ currSuccesses
+
+    // if there were no errors, then do not attempt a forward write again in the case of failure below.
+    if (currErrs.isEmpty) wroteForwardDirection = true
+
+    // reset for next direction
+    currSuccesses = Nil
+
+    forward.optimistically(sourceId) { left =>
+      writeToShard(backward, destinationId, sourceId, uuid, preferredState max left) foreach {
+        case Return(id) => currSuccesses = id :: currSuccesses
+        case Throw(e)   => currErrs = e :: currErrs
       }
     }
 

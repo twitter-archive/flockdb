@@ -478,10 +478,20 @@ extends Shard {
   private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
     try {
       atomically(edge.sourceId) { (transaction, metadata) =>
-        val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
+        // set the edge's state to the max of self and the local metadata.
+        val countDelta = writeEdge(
+          transaction,
+          metadata,
+          edge.copy(state = edge.state max metadata.state),
+          predictExistence
+        )
+
         if (countDelta != 0) {
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
-                              "WHERE source_id = ?", countDelta, edge.sourceId)
+          transaction.execute(
+            "UPDATE "+ tablePrefix +"_metadata SET count = GREATEST(count + ?, 0) WHERE source_id = ?",
+            countDelta,
+            edge.sourceId
+          )
         }
       }
     } catch {

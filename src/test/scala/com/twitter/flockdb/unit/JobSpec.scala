@@ -106,18 +106,21 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
         json mustMatch "\"destination_id\":" + mary
         json mustMatch "\"state\":"
         json mustMatch "\"updated_at\":" + Time.now.inSeconds
+        json mustMatch "\"wrote_forward_direction\":false"
+        json must include("\"write_successes\":[]")
       }
     }
 
     "toJson with successes" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator, List(ShardId("host", "prefix")))
+        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator, true, List(ShardId("host", "prefix")))
         val json = job.toJson
         json mustMatch "Single"
         json mustMatch "\"source_id\":" + bob
         json mustMatch "\"graph_id\":" + FOLLOWS
         json mustMatch "\"destination_id\":" + mary
         json mustMatch "\"updated_at\":" + Time.now.inSeconds
+        json mustMatch "\"wrote_forward_direction\":true"
         json must include("\"write_successes\":[[\"host\",\"prefix\"]]")
       }
     }

@@ -3,7 +3,7 @@ package shards
 
 import com.twitter.util.{Time, Try, Return, Throw}
 import com.twitter.logging.Logger
-import com.twitter.gizzard.shards.{ShardException, NodeSet}
+import com.twitter.gizzard.shards.{ShardException, ShardBlackHoleException, NodeSet}
 
 class OptimisticLockException(message: String) extends ShardException(message)
 
@@ -55,7 +55,7 @@ class OptimisticLockException(message: String) extends ShardException(message)
  */
 trait OptimisticStateMonitor {
 
-  def getMetadatas(sourceId: Long): Seq[Try[Option[Metadata]]]
+  def getMeta(sourceId: Long): Try[Option[Metadata]]
 
   // implementation
 
@@ -65,24 +65,14 @@ trait OptimisticStateMonitor {
     try {
       log.debug("Optimistic Lock: starting optimistic lock for " + sourceId)
 
-      val (beforeStateOpt, beforeEx) = getDominantState(sourceId)
-      val beforeState = beforeStateOpt.getOrElse(State.Normal)
+      val before = getDominantState(sourceId) getOrElse State.Normal
 
-      if (beforeStateOpt.isEmpty) beforeEx.foreach(throw _)
+      f(before)
 
-      f(beforeState)
+      val after = getDominantState(sourceId) getOrElse State.Normal
 
-      // We didn't do this immediately if we got a result from one shard, because we still want to propagate writes with best effort.
-      // We should reenqueue if the optimistic lock only covers a subset of the intended targets.
-      beforeEx.foreach(throw _)
-
-      val (afterStateOpt, afterEx) = getDominantState(sourceId)
-      val afterState = afterStateOpt.getOrElse(State.Normal)
-
-      afterEx.foreach(throw _)
-
-      if(beforeState != afterState) {
-        val msg = "Optimistic Lock: lost optimistic lock for " + sourceId + ": was " + beforeState +", now " + afterState
+      if(before != after) {
+        val msg = "Optimistic Lock: lost optimistic lock for "+ sourceId +": was "+ before +", now "+ after
 
         log.debug(msg)
         throw new OptimisticLockException(msg)
@@ -99,17 +89,11 @@ trait OptimisticStateMonitor {
   }
 
   def getDominantState(sourceId: Long) = {
-    // The default metadata
-    var winning: Option[Metadata]   = None
-    var exceptions: List[Throwable] = Nil
-
-    getMetadatas(sourceId).foreach {
-      case Throw(ex)              => exceptions = ex :: exceptions
-      case Return(Some(metadata)) => winning    = winning.map(_ max metadata).orElse(Some(metadata))
-      case Return(None)           => ()
+    getMeta(sourceId) match {
+      case Throw(e: ShardBlackHoleException) => None
+      case Throw(e)                          => throw e
+      case Return(rv)                        => rv map { _.state }
     }
-
-    (winning.map(_.state), exceptions.headOption)
   }
 }
 
@@ -118,5 +102,5 @@ object LockingNodeSet {
 }
 
 class LockingNodeSet(node: NodeSet[Shard]) extends OptimisticStateMonitor {
-  def getMetadatas(id: Long) = node.all { _.getMetadataForWrite(id) }
+  def getMeta(id: Long) = node.tryAny { n => Try(n.getMetadataForWrite(id)) }
 }
