@@ -32,8 +32,8 @@ object MemoizedQueryEvaluators {
   val evaluators = mutable.Map[String,QueryEvaluatorFactory]()
 }
 
-abstract class ConfiguredSpecification extends Specification {
-  lazy val config = {
+object Config {
+  val config = {
     val c = Eval[flockdb.config.FlockDB](new File("config/test.scala"))
     try {
       c.loggers.foreach { _() }
@@ -45,7 +45,10 @@ abstract class ConfiguredSpecification extends Specification {
       }
     }
   }
+}
 
+abstract class ConfiguredSpecification extends Specification {
+  val config = Config.config
   def jsonMatching(list1: Iterable[JsonJob], list2: Iterable[JsonJob]) = {
     list1 must eventually(verify(l1 => { l1.map(_.toJson).sameElements(list2.map(_.toJson))}))
   }
