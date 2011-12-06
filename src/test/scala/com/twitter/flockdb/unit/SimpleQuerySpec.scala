@@ -17,12 +17,8 @@
 package com.twitter.flockdb
 package unit
 
-import scala.collection.mutable
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import org.specs.mock.JMocker
-import conversions.Results._
 import shards.Shard
-import thrift.Results
 
 object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
   "SimpleQuery" should {
@@ -69,7 +65,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
         allowing(shard).selectByPosition(sourceId, List(State.Normal), count, cursor) willReturn new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor)
       }
       simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
-      simpleQuery.selectPage(count, cursor).toThrift mustEqual new Results(edges.pack, Cursor.End.position, Cursor.End.position)
+      simpleQuery.selectPage(count, cursor).toTuple mustEqual (edges, Cursor.End, Cursor.End)
     }
 
     "selectPageByDestinationId" in {
@@ -80,7 +76,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
         allowing(shard).selectByDestinationId(sourceId, List(State.Normal), count, cursor) willReturn new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor)
       }
       simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
-      simpleQuery.selectPageByDestinationId(count, cursor).toThrift mustEqual new Results(edges.pack, Cursor.End.position, Cursor.End.position)
+      simpleQuery.selectPageByDestinationId(count, cursor).toTuple mustEqual (edges, Cursor.End, Cursor.End)
     }
   }
 }

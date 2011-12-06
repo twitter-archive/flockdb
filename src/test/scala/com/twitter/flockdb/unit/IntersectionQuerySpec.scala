@@ -17,12 +17,7 @@
 package com.twitter.flockdb
 package unit
 
-import scala.util.Sorting
-import scala.collection.mutable
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import org.specs.mock.JMocker
-import conversions.Results._
-import thrift.{Results, Page}
 
 object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
   "IntersectionQuery" should {
@@ -43,7 +38,7 @@ object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
 
     "selectPage" in {
       val intersectionQuery = queryConfig.intersect(query1, query2)
-      intersectionQuery.selectPage(5, Cursor.Start).toThrift mustEqual new Results(List[Long](4, 3, 2, 1).pack, Cursor.End.position, Cursor.End.position)
+      intersectionQuery.selectPage(5, Cursor.Start).toTuple mustEqual (List(4, 3, 2, 1), Cursor.End, Cursor.End)
     }
   }
 }

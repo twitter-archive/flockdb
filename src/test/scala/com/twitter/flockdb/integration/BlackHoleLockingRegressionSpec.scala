@@ -17,18 +17,15 @@
 package com.twitter.flockdb
 package integration
 
-import scala.collection.JavaConversions._
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.{ShardInfo, ShardId, Busy}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
 import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 import shards.{Shard, SqlShard}
-import thrift._
 
 
 class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
@@ -85,12 +82,11 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
   val pageSize = 100
 
   def alicesFollowings() = {
-    val term = new QueryTerm(alice, FOLLOWS, true)
-    term.setState_ids(List[Int](State.Normal.id))
-    val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flockService.select_edges(List[EdgeQuery](query)).toList
+    val term = QueryTerm(alice, FOLLOWS, true, None, List(State.Normal))
+    val query = EdgeQuery(term, new Page(pageSize, Cursor.Start))
+    val resultsList = flockService.selectEdges(List(query))
     resultsList.size mustEqual 1
-    resultsList(0).edges
+    resultsList(0).toList
   }
 
   "select results" should {
@@ -98,7 +94,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       reset(config, "com.twitter.gizzard.shards.BlackHoleShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
-        flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        execute(Select(alice, FOLLOWS, i).add)
       }
 
       alicesFollowings.size must eventually(be(10))
@@ -110,7 +106,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       reset(config, "com.twitter.gizzard.shards.ReadOnlyShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
-        flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        execute(Select(alice, FOLLOWS, i).add)
       }
 
       val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
@@ -124,7 +120,7 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
       reset(config, "com.twitter.gizzard.shards.WriteOnlyShard")  // I don't know why this isn't working in doBefore
 
       for(i <- 0 until 10) {
-        flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
+        execute(Select(alice, FOLLOWS, i).add)
       }
 
       val scheduler = flock.jobScheduler(flockdb.Priority.High.id)

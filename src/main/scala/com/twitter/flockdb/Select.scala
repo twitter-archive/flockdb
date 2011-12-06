@@ -47,6 +47,7 @@ object Select {
 trait Select {
   def toList: List[SelectOperation]
   def intersect(that: Select): Select = new CompoundSelect(Intersection, this, that)
+  def difference(that: Select): Select = new CompoundSelect(Difference, this, that)
 }
 
 trait Execute {

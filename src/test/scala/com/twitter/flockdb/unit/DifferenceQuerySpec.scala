@@ -17,12 +17,7 @@
 package com.twitter.flockdb
 package unit
 
-import scala.collection.mutable
-import scala.util.Sorting
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import org.specs.mock.JMocker
-import conversions.Results._
-import thrift.{Results, Page}
 
 class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
   "DifferenceQuery" should {
@@ -42,9 +37,10 @@ class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
 
     "selectPage" in {
       val differenceQuery = queryConfig.difference(query1, query2)
-      differenceQuery.selectPage(5, Cursor.Start).toThrift mustEqual new Results(List[Long](12,10,9,8,6).pack, 6, Cursor.End.position)
-      differenceQuery.selectPage(10, Cursor(12L)).toThrift mustEqual new Results(List[Long](10,9,8,6,5,2,1).pack, Cursor.End.position, -10)
-      differenceQuery.selectPage(10, Cursor.Start).toThrift mustEqual new Results(List[Long](12,10,9,8,6,5,2,1).pack, Cursor.End.position, Cursor.End.position)
+
+      differenceQuery.selectPage(5, Cursor.Start).toTuple  mustEqual (List(12,10,9,8,6), Cursor(6), Cursor.End)
+      differenceQuery.selectPage(10, Cursor(12L)).toTuple  mustEqual (List(10,9,8,6,5,2,1), Cursor.End, Cursor(-10))
+      differenceQuery.selectPage(10, Cursor.Start).toTuple mustEqual (List(12,10,9,8,6,5,2,1), Cursor.End, Cursor.End)
     }
   }
 }

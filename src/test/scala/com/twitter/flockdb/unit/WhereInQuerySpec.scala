@@ -17,17 +17,12 @@
 package com.twitter.flockdb
 package unit
 
-import scala.collection.mutable
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import org.specs.mock.JMocker
-import conversions.Results._
 import shards.Shard
-import thrift.Results
 
 class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
   "WhereInQuery" should {
     var shard: Shard = null
-    var whereInQuery: queries.WhereInQuery = null
     val sourceId = 900
     val destinationIds = List(55L, 60L, 65L, 70L, 75L, 80L, 85L)
 
@@ -36,7 +31,7 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
     }
 
     "sizeEstimate" in {
-      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
+      val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
       whereInQuery.sizeEstimate() mustEqual destinationIds.size
     }
 
@@ -45,7 +40,7 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
       expect {
         one(shard).intersect(sourceId, List(State.Normal), List(60L, 65L)) willReturn List(60L)
       }
-      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
+      val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
       whereInQuery.selectWhereIn(page).toList mustEqual List(60L)
     }
 
@@ -54,10 +49,11 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
         allowing(shard).intersect(sourceId, List(State.Normal), destinationIds) willReturn List(85L, 75L, 65L, 55L)
       }
 
-      whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
-      whereInQuery.selectPage(10, Cursor(90L)).toThrift mustEqual new Results(List[Long](85L, 75L, 65L, 55L).pack, Cursor.End.position, Cursor.End.position)
-      whereInQuery.selectPage(10, Cursor(75L)).toThrift mustEqual new Results(List[Long](65L, 55L).pack, Cursor.End.position, -65L)
-      whereInQuery.selectPage(2, Cursor(-65L)).toThrift mustEqual new Results(List[Long](85L, 75L).pack, 75L, Cursor.End.position)
+      val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
+
+      whereInQuery.selectPage(10, Cursor(90L)).toTuple mustEqual (List(85L, 75L, 65L, 55L), Cursor.End, Cursor.End)
+      whereInQuery.selectPage(10, Cursor(75L)).toTuple mustEqual (List(65L, 55L), Cursor.End, Cursor(-65L))
+      whereInQuery.selectPage(2, Cursor(-65L)).toTuple mustEqual (List(85L, 75L), Cursor(75L), Cursor.End)
     }
   }
 }

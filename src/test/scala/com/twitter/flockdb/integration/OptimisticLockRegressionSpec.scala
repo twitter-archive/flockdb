@@ -17,22 +17,17 @@
 package com.twitter.flockdb
 package integration
 
-import scala.collection._
-import scala.collection.mutable.ArrayBuffer
 import org.specs.mock.{ClassMocker, JMocker}
 import org.specs.util.{Duration => SpecsDuration}
 import org.specs.matcher.Matcher
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards._
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
-import com.twitter.flockdb
-import com.twitter.flockdb.{SelectQuery, Metadata}
+import com.twitter.conversions.time._
+import com.twitter.flockdb.operations._
 import jobs.single._
 import shards.{Shard, SqlShard}
-import thrift._
 
 
 class OptimisticLockRegressionSpec extends IntegrationSpecification() {
@@ -49,13 +44,13 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
     "recover via the optimistic lock" in {
       reset(config)
 
-      val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
+      val scheduler = flock.jobScheduler(Priority.High.id)
       val errors = scheduler.errorQueue
 
       // No thrift api for this, so this is the best I know how to do.
       scheduler.put(new Single(1, FOLLOWS, 5106, 123456, State.Normal, Time.now, flock.forwardingManager, OrderedUuidGenerator))
 
-      flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
+      execute(Select(1, FOLLOWS, ()).archive)
 
       jobSchedulerMustDrain
 
@@ -74,7 +69,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
 
       found mustEqual true
 
-      flockService.get(1, FOLLOWS, 5106).state_id must eventually(be_==(State.Archived.id))
+      flockService.get(1, FOLLOWS, 5106).state must eventually(be_==(State.Archived))
     }
 
 
@@ -82,32 +77,32 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
       // println("gogo")
       reset(config)
 
-      val scheduler = flock.jobScheduler(flockdb.Priority.High.id)
+      val scheduler = flock.jobScheduler(Priority.High.id)
       val errors = scheduler.errorQueue
 
       // println("spamming edges")
       for(i <- 1 to 500) {
         (i % 2) match {
-          case 0 => flockService.execute(Select(1, FOLLOWS, i).add.toThrift)
-          case 1 => flockService.execute(Select(1, FOLLOWS, i).archive.toThrift)
+          case 0 => execute(Select(1, FOLLOWS, i).add)
+          case 1 => execute(Select(1, FOLLOWS, i).archive)
         }
       }
 
       // println("spamming removes")
       for(i <- 1 to 50) {
-        flockService.execute(Select((), FOLLOWS, i * 10).remove.toThrift)
+        execute(Select((), FOLLOWS, i * 10).remove)
       }
 
       // println("spamming bulks")
       for(i <- 1 to 10) {
         (i % 2) match {
-          case 0 => flockService.execute(Select(1, FOLLOWS, ()).add.toThrift)
-          case 1 => flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
+          case 0 => execute(Select(1, FOLLOWS, ()).add)
+          case 1 => execute(Select(1, FOLLOWS, ()).archive)
         }
       }
 
       // println("final state")
-      flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
+      execute(Select(1, FOLLOWS, ()).archive)
 
       // println("draining")
 
@@ -139,15 +134,20 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
 
       Thread.sleep(1000)
 
-      val selectArchived =     new SimpleSelect(new operations.SelectOperation(operations.SelectOperationType.SimpleQuery, Some(new flockdb.QueryTerm(alice, FOLLOWS, true, None, List(State.Archived)))))
+      val selectArchived = SimpleSelect(
+        SelectOperation(
+          SelectOperationType.SimpleQuery,
+          Some(QueryTerm(alice, FOLLOWS, true, None, List(State.Archived)))
+        )
+      )
 
-      flockService.count(selectArchived.toThrift) must eventually(be_==(450))
-      flockService.count(Select(1, FOLLOWS, ()).toThrift) mustEqual 0
+      count(selectArchived) must eventually(be_==(450))
+      count(Select(1, FOLLOWS, ())) mustEqual 0
 
       for(i <- 1 to 500) {
         (i % 10) match {
           case 0 => ()
-          case _ => flockService.get(1, FOLLOWS, i).state_id mustEqual State.Archived.id
+          case _ => flockService.get(1, FOLLOWS, i).state mustEqual State.Archived
         }
       }
     }

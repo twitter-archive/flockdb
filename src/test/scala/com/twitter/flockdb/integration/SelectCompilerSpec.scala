@@ -17,13 +17,9 @@
 package com.twitter.flockdb
 package integration
 
-import scala.collection.JavaConversions._
-import scala.collection.mutable
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import org.specs.mock.{ClassMocker, JMocker}
-import thrift._
 
 object SelectCompilerSpec extends IntegrationSpecification with JMocker with ClassMocker {
   "SelectCompiler integration" should {
@@ -35,79 +31,53 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
     val darcy = 4L
 
     def setup1() {
-      flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-      flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-      flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-      flockService.execute(Select(carl, FOLLOWS, bob).add.toThrift)
-      flockService.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
+      execute(Select(alice, FOLLOWS, bob).add)
+      execute(Select(alice, FOLLOWS, carl).add)
+      execute(Select(alice, FOLLOWS, darcy).add)
+      execute(Select(carl, FOLLOWS, bob).add)
+      execute(Select(carl, FOLLOWS, darcy).add)
+
       flockService.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
     }
 
     def setup2() {
-      for (i <- 1 until 11) flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
-      for (i <- 1 until 7) flockService.execute(Select(bob, FOLLOWS, i * 2).add.toThrift)
-      flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
-      flockService.count(Select(bob, FOLLOWS, ()).toThrift) must eventually(be_==(6))
+      for (i <- 1 until 11) execute(Select(alice, FOLLOWS, i).add)
+      for (i <- 1 until 7) execute(Select(bob, FOLLOWS, i * 2).add)
+
+      count(Select(alice, FOLLOWS, ())) must eventually(be_==(10))
+      count(Select(bob, FOLLOWS, ())) must eventually(be_==(6))
     }
 
     "pagination" in {
       reset(config)
       setup1()
-      val term1 = new QueryTerm(alice, FOLLOWS, true)
-      term1.setState_ids(List[Int](State.Normal.id))
-      val term2 = new QueryTerm(carl, FOLLOWS, true)
-      term2.setState_ids(List[Int](State.Normal.id))
-      val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
-      op1.setTerm(term1)
-      val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
-      op2.setTerm(term2)
-      var program = op1 :: op2 ::
-        new SelectOperation(SelectOperationType.Intersection) :: Nil
 
-      var result = new Results(List[Long](darcy).pack, darcy, Cursor.End.position)
-      flockService.select(program, new Page(1, Cursor.Start.position)) mustEqual result
+      val program = Select(alice, FOLLOWS, ()) intersect Select(carl, FOLLOWS, ())
 
-      result = new Results(List[Long](bob).pack, Cursor.End.position, -bob)
-      flockService.select(program, new Page(1, darcy)) mustEqual result
-
-      result = new Results(List[Long](darcy, bob).pack, Cursor.End.position, Cursor.End.position)
-      flockService.select(program, new Page(2, Cursor.Start.position)) mustEqual result
+      select(program, Page(1, Cursor.Start)) mustEqual ((List(darcy), Cursor(darcy), Cursor.End))
+      select(program, new Page(1, Cursor(darcy))) mustEqual ((List(bob), Cursor.End, Cursor(-bob)))
+      select(program, Page(2, Cursor.Start)) mustEqual ((List(darcy, bob), Cursor.End, Cursor.End))
     }
 
     "one list is empty" in {
       reset(config)
       setup2()
-      var result = new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
-      val term1 = new QueryTerm(alice, FOLLOWS, true)
-      term1.setState_ids(List[Int](State.Normal.id))
-      val term2 = new QueryTerm(carl, FOLLOWS, true)
-      term2.setState_ids(List[Int](State.Normal.id))
-      val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
-      op1.setTerm(term1)
-      val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
-      op2.setTerm(term2)
-      var program = op1 :: op2 ::
-        new SelectOperation(SelectOperationType.Intersection) :: Nil
-      flockService.select(program, new Page(10, Cursor.Start.position)) mustEqual result
+
+      val program = Select(alice, FOLLOWS, ()) intersect Select(carl, FOLLOWS, ())
+
+      select(program, new Page(10, Cursor.Start)) mustEqual ((List(), Cursor.End, Cursor.End))
     }
 
     "difference" in {
       reset(config)
       setup2()
-      val term1 = new QueryTerm(alice, FOLLOWS, true)
-      term1.setState_ids(List[Int](State.Normal.id))
-      val term2 = new QueryTerm(bob, FOLLOWS, true)
-      term2.setState_ids(List[Int](State.Normal.id))
-      val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
-      op1.setTerm(term1)
-      val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
-      op2.setTerm(term2)
-      var program = op1 :: op2 ::
-        new SelectOperation(SelectOperationType.Difference) :: Nil
-      flockService.select(program, new Page(10, Cursor.Start.position)) mustEqual new Results(List[Long](9,7,5,3,1).pack, Cursor.End.position, Cursor.End.position)
-      flockService.select(program, new Page(2, Cursor.Start.position)) mustEqual new Results(List[Long](9,7).pack, 7, Cursor.End.position)
-      flockService.select(program, new Page(2, 7)) mustEqual new Results(List[Long](5,3).pack, 3, -5)
-      flockService.select(program, new Page(2, 3)) mustEqual new Results(List[Long](1).pack, Cursor.End.position, -1)
+
+      val program = Select(alice, FOLLOWS, ()) difference Select(bob, FOLLOWS, ())
+
+      select(program, new Page(10, Cursor.Start)) mustEqual ((List(9,7,5,3,1), Cursor.End, Cursor.End))
+      select(program, new Page(2, Cursor.Start))  mustEqual ((List(9,7), Cursor(7), Cursor.End))
+      select(program, new Page(2, Cursor(7)))     mustEqual ((List(5,3), Cursor(3), Cursor(-5)))
+      select(program, new Page(2, Cursor(3)))     mustEqual ((List(1), Cursor.End, Cursor(-1)))
     }
   }
 }

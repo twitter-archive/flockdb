@@ -22,11 +22,12 @@ import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.test.NameServerDatabase
-import com.twitter.util.Eval
+import com.twitter.util.{Eval, Time}
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import com.twitter.logging.Logger
 import scala.collection.mutable
 import com.twitter.flockdb
+import com.twitter.flockdb.operations._
 
 object MemoizedQueryEvaluators {
   val evaluators = mutable.Map[String,QueryEvaluatorFactory]()
@@ -49,6 +50,7 @@ object Config {
 
 abstract class ConfiguredSpecification extends Specification {
   val config = Config.config
+
   def jsonMatching(list1: Iterable[JsonJob], list2: Iterable[JsonJob]) = {
     list1 must eventually(verify(l1 => { l1.map(_.toJson).sameElements(list2.map(_.toJson))}))
   }
@@ -62,6 +64,18 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
   }
 
   lazy val flockService = flock.flockService
+
+  def execute(e: Execute, t: Option[Time] = None) = {
+    flockService.execute(ExecuteOperations(e.toOperations, t map { _.inSeconds }, Priority.High))
+  }
+
+  def count(s: Select) = {
+    flockService.count(Seq(s.toList)).head
+  }
+
+  def select(s: Select, page: Page) = {
+    flockService.select(SelectQuery(s.toList, page)).toTuple
+  }
 
   def reset(config: flockdb.config.FlockDB) { reset(config, 1) }
 

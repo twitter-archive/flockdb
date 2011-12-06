@@ -18,20 +18,14 @@ package com.twitter.flockdb
 package unit
 
 import java.sql.SQLException
-import scala.collection.JavaConversions._
 import scala.collection.mutable
 import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, StandardQueryEvaluatorFactory, Transaction}
 import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
+import com.twitter.conversions.time._
 import org.specs.mock.JMocker
-import conversions.Edge._
-import conversions.EdgeResults._
-import conversions.Results._
 import shards.{Shard, SqlShard, SqlShardFactory}
-import thrift.{Results, EdgeResults}
 
 class SqlShardSpec extends IntegrationSpecification with JMocker {
   "Edge SqlShard" should {
@@ -229,27 +223,27 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.add(alice, carl, 5, now)
           shard.add(carl, darcy, 1, now)
 
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](carl).pack, 5, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Normal), 5, Cursor.Start).toThrift mustEqual new Results(List[Long](carl, bob).pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(5)).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, -3)
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(4)).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, -3)
-          shard.selectByPosition(alice, List(State.Normal), 3, Cursor(4)).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, -3)
-          shard.selectByPosition(bob, List(State.Normal), 5, Cursor.Start).toThrift mustEqual new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor.Start).toTuple mustEqual (List(carl), Cursor(5), Cursor.End)
+          shard.selectByPosition(alice, List(State.Normal), 5, Cursor.Start).toTuple mustEqual (List(carl, bob), Cursor.End, Cursor.End)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(5)).toTuple    mustEqual (List(bob), Cursor.End, Cursor(-3))
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(4)).toTuple    mustEqual (List(bob), Cursor.End, Cursor(-3))
+          shard.selectByPosition(alice, List(State.Normal), 3, Cursor(4)).toTuple    mustEqual (List(bob), Cursor.End, Cursor(-3))
+          shard.selectByPosition(bob, List(State.Normal), 5, Cursor.Start).toTuple   mustEqual (List(), Cursor.End, Cursor.End)
 
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-5)).toThrift mustEqual new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-3)).toThrift mustEqual new Results(List[Long](carl).pack, 5, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-4)).toThrift mustEqual new Results(List[Long](carl).pack, 5, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-2)).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, -3)
-          shard.selectByPosition(alice, List(State.Normal), 3, Cursor(-2)).toThrift mustEqual new Results(List[Long](carl, bob).pack, Cursor.End.position, Cursor.End.position)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-5)).toTuple   mustEqual (List(), Cursor.End, Cursor.End)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-3)).toTuple   mustEqual (List(carl), Cursor(5), Cursor.End)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-4)).toTuple   mustEqual (List(carl), Cursor(5), Cursor.End)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor(-2)).toTuple   mustEqual (List(bob), Cursor.End, Cursor(-3))
+          shard.selectByPosition(alice, List(State.Normal), 3, Cursor(-2)).toTuple   mustEqual (List(carl, bob), Cursor.End, Cursor.End)
         }
 
         "when the state is given" >> {
           shard.add(alice, bob, 1, now)
           shard.remove(alice, carl, 2, now)
           shard.archive(alice, darcy, 3, now)
-          shard.selectByPosition(alice, List(State.Normal), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Removed), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](carl).pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByPosition(alice, List(State.Archived), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](darcy).pack, Cursor.End.position, Cursor.End.position)
+          shard.selectByPosition(alice, List(State.Normal), 1, Cursor.Start).toTuple mustEqual (List(bob), Cursor.End, Cursor.End)
+          shard.selectByPosition(alice, List(State.Removed), 1, Cursor.Start).toTuple mustEqual (List(carl), Cursor.End, Cursor.End)
+          shard.selectByPosition(alice, List(State.Archived), 1, Cursor.Start).toTuple mustEqual (List(darcy), Cursor.End, Cursor.End)
         }
 
         "with multiple allowed states" >> {
@@ -269,10 +263,10 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.add(alice, carl, 2, now)
           shard.add(carl, darcy, 1, now)
 
-          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](carl).pack, carl, Cursor.End.position)
-          shard.selectByDestinationId(alice, List(State.Normal), 5, Cursor.Start).toThrift mustEqual new Results(List[Long](carl, bob).pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor(carl)).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, -bob)
-          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor(-bob)).toThrift mustEqual new Results(List[Long](carl).pack, carl, Cursor.End.position)
+          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor.Start).toTuple mustEqual (List(carl), Cursor(carl), Cursor.End)
+          shard.selectByDestinationId(alice, List(State.Normal), 5, Cursor.Start).toTuple mustEqual (List(carl, bob), Cursor.End, Cursor.End)
+          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor(carl)).toTuple mustEqual (List(bob), Cursor.End, Cursor(-bob))
+          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor(-bob)).toTuple mustEqual (List(carl), Cursor(carl), Cursor.End)
         }
 
         "when the state is given" >> {
@@ -280,9 +274,9 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.remove(alice, carl, 2, now)
           shard.archive(alice, darcy, 3, now)
 
-          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](bob).pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByDestinationId(alice, List(State.Removed), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](carl).pack, Cursor.End.position, Cursor.End.position)
-          shard.selectByDestinationId(alice, List(State.Archived), 1, Cursor.Start).toThrift mustEqual new Results(List[Long](darcy).pack, Cursor.End.position, Cursor.End.position)
+          shard.selectByDestinationId(alice, List(State.Normal), 1, Cursor.Start).toTuple mustEqual (List(bob), Cursor.End, Cursor.End)
+          shard.selectByDestinationId(alice, List(State.Removed), 1, Cursor.Start).toTuple mustEqual (List(carl), Cursor.End, Cursor.End)
+          shard.selectByDestinationId(alice, List(State.Archived), 1, Cursor.Start).toTuple mustEqual (List(darcy), Cursor.End, Cursor.End)
         }
       }
 
@@ -292,27 +286,28 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.add(carl, darcy, 1, now)
         shard.archive(alice, earl, 1, now)
 
-        shard.selectIncludingArchived(alice, 5, Cursor.Start).toThrift mustEqual new Results(List[Long](earl, carl, bob).pack, Cursor.End.position, Cursor.End.position)
+        shard.selectIncludingArchived(alice, 5, Cursor.Start).toTuple mustEqual (List(earl, carl, bob), Cursor.End, Cursor.End)
       }
 
       "get edge objects" >> {
         shard.add(alice, bob, 3, now)
         shard.add(alice, carl, 5, now)
 
-        val aliceBob = new Edge(alice, bob, 3, now, 0, State.Normal).toThrift
-        val aliceCarl = new Edge(alice, carl, 5, now, 0, State.Normal).toThrift
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob), Cursor.End.position, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
-        shard.selectEdges(alice, List(State.Normal), 3, Cursor(4)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
-        shard.selectEdges(bob, List(State.Normal), 5, Cursor.Start).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge](), Cursor.End.position, Cursor.End.position)
+        val aliceBob  = new Edge(alice, bob, 3, now, 0, State.Normal)
+        val aliceCarl = new Edge(alice, carl, 5, now, 0, State.Normal)
 
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-5)).toEdgeResults mustEqual new EdgeResults(List[thrift.Edge](), Cursor.End.position, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-3)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-4)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl), 5, Cursor.End.position)
-        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceBob), Cursor.End.position, -3)
-        shard.selectEdges(alice, List(State.Normal), 3, Cursor(-2)).toEdgeResults mustEqual new EdgeResults(List(aliceCarl, aliceBob), Cursor.End.position, Cursor.End.position)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor.Start).toTuple mustEqual (List(aliceCarl), Cursor(5), Cursor.End)
+        shard.selectEdges(alice, List(State.Normal), 5, Cursor.Start).toTuple mustEqual (List(aliceCarl, aliceBob), Cursor.End, Cursor.End)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(5)).toTuple    mustEqual (List(aliceBob), Cursor.End, Cursor(-3))
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(4)).toTuple    mustEqual (List(aliceBob), Cursor.End, Cursor(-3))
+        shard.selectEdges(alice, List(State.Normal), 3, Cursor(4)).toTuple    mustEqual (List(aliceBob), Cursor.End, Cursor(-3))
+        shard.selectEdges(bob, List(State.Normal), 5, Cursor.Start).toTuple   mustEqual (Nil, Cursor.End, Cursor.End)
+
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-5)).toTuple   mustEqual (Nil, Cursor.End, Cursor.End)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-3)).toTuple   mustEqual (List(aliceCarl), Cursor(5), Cursor.End)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-4)).toTuple   mustEqual (List(aliceCarl), Cursor(5), Cursor.End)
+        shard.selectEdges(alice, List(State.Normal), 1, Cursor(-2)).toTuple   mustEqual (List(aliceBob), Cursor.End, Cursor(-3))
+        shard.selectEdges(alice, List(State.Normal), 3, Cursor(-2)).toTuple   mustEqual (List(aliceCarl, aliceBob), Cursor.End, Cursor.End)
       }
     }
 
@@ -322,9 +317,9 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       shard.remove(darcy, alice, 3, now)
 
       shard.get(bob, alice) mustEqual None
-      shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Normal))
-      shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 2, now, 0, State.Archived))
-      shard.get(darcy, alice) mustEqual Some(new Edge(darcy, alice, 3, now, 0, State.Removed))
+      shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Normal))
+      shard.get(carl, darcy) mustEqual Some(Edge(carl, darcy, 2, now, 0, State.Archived))
+      shard.get(darcy, alice) mustEqual Some(Edge(darcy, alice, 3, now, 0, State.Removed))
     }
 
     "add" in {
@@ -332,7 +327,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         "when the row does not already exist" >> {
           shard.get(bob, alice) mustEqual None
           shard.add(bob, alice, 1, now)
-          shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 0, State.Normal))
+          shard.get(bob, alice) mustEqual Some(Edge(bob, alice, 1, now, 0, State.Normal))
         }
 
         "when the row already exists" >> {
@@ -343,21 +338,21 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
               shard.add(alice, bob, 1, now)
 
               shard.add(alice, bob, 2, now + 10.seconds)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
             }
 
             "when the already existing row is not archived" >> {
               shard.archive(alice, bob, 1, now)
 
               shard.add(alice, bob, 2, now + 10.seconds)
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
+              shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 10.seconds, 0, State.Normal))
             }
           }
 
           "when the already-existing row is newer than the row to be inserted" >> {
             shard.add(alice, bob, 1, now)
             shard.add(alice, bob, 1, now - 1.second)
-            shard.get(alice, bob).get mustEqual new Edge(alice, bob, 1, now, 0, State.Normal)
+            shard.get(alice, bob).get mustEqual Edge(alice, bob, 1, now, 0, State.Normal)
           }
 
           "when the already-existing row is the same age as the row to be inserted" >> {
@@ -365,21 +360,21 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
               shard.remove(alice, bob, 1, now)
               shard.add(alice, bob, 1, now)
 
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Removed))
+              shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Removed))
             }
 
             "when the already-existing row is archived" >> {
               shard.archive(alice, bob, 1, now)
               shard.add(alice, bob, 1, now)
 
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Archived))
+              shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Archived))
             }
 
             "when the already-existing row is negative" >> {
               shard.negate(alice, bob, 1, now)
               shard.add(alice, bob, 1, now)
 
-              shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Negative))
+              shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Negative))
             }
           }
         }
@@ -419,7 +414,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     "remove" in {
       "when the row does not exist" >> {
         shard.remove(bob, alice, 1, now)
-        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 0, State.Removed))
+        shard.get(bob, alice) mustEqual Some(Edge(bob, alice, 1, now, 0, State.Removed))
       }
 
       "when the row exists" >> {
@@ -427,14 +422,14 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           "when the already existing row is not deleted" >> {
             shard.add(alice, bob, 1, now)
             shard.remove(alice, bob, 2, now + 10.seconds)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 10.seconds, 0, State.Removed))
+            shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 10.seconds, 0, State.Removed))
           }
         }
 
         "when the already-existing row is newer than the row to be deleted" >> {
           shard.add(carl, darcy, 1, now)
           shard.remove(carl, darcy, 1, now - 1.second)
-          shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now, 0, State.Normal))
+          shard.get(carl, darcy) mustEqual Some(Edge(carl, darcy, 1, now, 0, State.Normal))
         }
 
       }
@@ -463,29 +458,29 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     "remove & add" in {
       "incremements the count when deleting then re-inserting a row" >> {
         shard.remove(carl, darcy, 1, now)
-        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now, 0, State.Removed))
+        shard.get(carl, darcy) mustEqual Some(Edge(carl, darcy, 1, now, 0, State.Removed))
         shard.add(carl, darcy, 1, now + 1.second)
-        shard.get(carl, darcy) mustEqual Some(new Edge(carl, darcy, 1, now + 1.second, 0, State.Normal))
+        shard.get(carl, darcy) mustEqual Some(Edge(carl, darcy, 1, now + 1.second, 0, State.Normal))
       }
 
       "when the remove is applied before the add, but its updatedAt is greater than the add" >> {
         shard.remove(carl, earl, 1, now)
         shard.add(carl, earl, 1, now - 1.second)
-        shard.get(carl, earl) mustEqual Some(new Edge(carl, earl, 1, now, 0, State.Removed))
+        shard.get(carl, earl) mustEqual Some(Edge(carl, earl, 1, now, 0, State.Removed))
       }
 
       "when the deleting an already deleted row" >> {
         shard.remove(alice, bob, 1, now)
         shard.remove(alice, bob, 1, now + 2.second)
         shard.add(alice, bob, 1, now + 1.seconds)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 2.second, 0, State.Removed))
+        shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 2.second, 0, State.Removed))
       }
     }
 
     "archive" in {
       "when the row does not exist" >> {
         shard.archive(bob, alice, 1, now)
-        shard.get(bob, alice) mustEqual Some(new Edge(bob, alice, 1, now, 0, State.Archived))
+        shard.get(bob, alice) mustEqual Some(Edge(bob, alice, 1, now, 0, State.Archived))
       }
 
       "when the row exists" >> {
@@ -493,27 +488,27 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           "when the already existing row is not archived or deleted" >> {
             shard.add(alice, bob, 1, now)
             shard.archive(alice, bob, 1, now + 1.second)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 1.second, 0, State.Archived))
+            shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 1.second, 0, State.Archived))
           }
         }
 
         "when the already-existing row is newer than the row to be archived" >> {
           shard.add(alice, bob, 1, now)
           shard.archive(alice, bob, 1, now - 1.second)
-          shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Normal))
+          shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Normal))
         }
 
         "when the already-existing row is the same age as the row to be archived" >> {
           "when the already-existing row is removed" >> {
             shard.remove(alice, bob, 1, now)
             shard.archive(alice, bob, 1, now)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Removed))
+            shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Removed))
           }
 
           "when the already-existing row is removed" >> {
             shard.remove(alice, bob, 1, now)
             shard.archive(alice, bob, 1, now)
-            shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Removed))
+            shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Removed))
           }
         }
       }
@@ -538,21 +533,21 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       "incremements the count when archiving then re-inserting a row" >> {
         shard.add(alice, bob, 1, now)
         shard.archive(alice, bob, 1, now + 1.second)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 1.second, 0, State.Archived))
+        shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 1.second, 0, State.Archived))
         shard.add(alice, bob, 1, now + 2.seconds)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now + 2.seconds, 0, State.Normal))
+        shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now + 2.seconds, 0, State.Normal))
       }
 
       "when the archive is applied before the add, but its updatedAt is greater than the add" >> {
         shard.archive(alice, bob, 1, now)
         shard.add(alice, bob, 1, now - 1.second)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Archived))
+        shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Archived))
       }
 
       "when the archive an already archived row" >> {
         shard.add(alice, bob, 1, now)
         shard.archive(alice, bob, 1, now)
-        shard.get(alice, bob) mustEqual Some(new Edge(alice, bob, 1, now, 0, State.Archived))
+        shard.get(alice, bob) mustEqual Some(Edge(alice, bob, 1, now, 0, State.Archived))
       }
     }
 
@@ -633,8 +628,8 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       }
 
       "write always creates" in {
-        val metadata = new Metadata(alice, State.Normal, 0, now - 10.seconds)
-        val olderMetadata = new Metadata(alice, State.Normal, 0, now - 20.seconds)
+        val metadata = Metadata(alice, State.Normal, 0, now - 10.seconds)
+        val olderMetadata = Metadata(alice, State.Normal, 0, now - 20.seconds)
 
         shard.writeMetadata(metadata)
         shard.getMetadata(alice) mustEqual Some(metadata)
@@ -643,8 +638,8 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
       }
 
       "write can also update" in {
-        val metadata = new Metadata(bob, State.Normal, 0, now - 10.seconds)
-        val olderMetadata = new Metadata(bob, State.Normal, 0, now - 20.seconds)
+        val metadata = Metadata(bob, State.Normal, 0, now - 10.seconds)
+        val olderMetadata = Metadata(bob, State.Normal, 0, now - 20.seconds)
 
         shard.writeMetadata(olderMetadata)
         shard.getMetadata(bob) mustEqual Some(olderMetadata)
@@ -655,18 +650,18 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
 
     "writeCopies" in {
       "simple" in {
-        val edge = new Edge(alice, bob, 1, now, 1, State.Normal)
+        val edge = Edge(alice, bob, 1, now, 1, State.Normal)
         shard.writeCopies(List(edge))
         shard.get(alice, bob) mustEqual Some(edge)
       }
 
       "multiple" in {
-        val edges = new Edge(alice, bob, 1, now, 1, State.Normal) ::
-          new Edge(alice, darcy, 2, now, 1, State.Normal) ::
-          new Edge(bob, carl, 3, now, 1, State.Normal) ::
-          new Edge(frank, bob, 4, now, 1, State.Normal) ::
-          new Edge(frank, carl, 5, now, 1, State.Normal) ::
-          new Edge(frank, darcy, 6, now, 1, State.Normal) ::
+        val edges = Edge(alice, bob, 1, now, 1, State.Normal) ::
+          Edge(alice, darcy, 2, now, 1, State.Normal) ::
+          Edge(bob, carl, 3, now, 1, State.Normal) ::
+          Edge(frank, bob, 4, now, 1, State.Normal) ::
+          Edge(frank, carl, 5, now, 1, State.Normal) ::
+          Edge(frank, darcy, 6, now, 1, State.Normal) ::
           Nil
 
         "no conflicts" in {
