@@ -16,6 +16,7 @@
 
 package com.twitter.flockdb
 
+import com.twitter.util.Future
 import com.twitter.util.Duration
 import com.twitter.ostrich.admin.Service
 import com.twitter.querulous.StatsCollector
@@ -94,108 +95,167 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
   jobCodec += ("multi.RemoveAll".r, LegacyMultiJobParser.RemoveAll(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
   jobCodec += ("multi.Negate".r,    LegacyMultiJobParser.Negate(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
 
-  val flockService = {
-    val edges = new EdgesService(
-      forwardingManager,
-      jobScheduler,
-      config.readFuture("readFuture"),
-      config.intersectionQuery,
-      config.aggregateJobsPageSize
-    )
+  val flockService = new EdgesService(
+    forwardingManager,
+    jobScheduler,
+    config.intersectionQuery,
+    config.aggregateJobsPageSize
+  )
 
-    new FlockDBThriftAdapter(edges, jobScheduler)
-  }
-
-  private val loggingProxy = makeLoggingProxy[thrift.FlockDB.Iface]()
-  lazy val loggingFlockService = loggingProxy(flockService)
-
-  lazy val flockThriftServer = {
-    val processor = new thrift.FlockDB.Processor(
-      FlockExceptionWrappingProxyFactory(
-        loggingFlockService))
-
-    config.server(processor)
-  }
+  val flockThriftServer = new FlockDBThriftAdapter(
+    config.server.name,
+    config.server.port,
+    flockService
+  )
 
   // satisfy service
 
   def start() {
     startGizzard()
-    val runnable = new Runnable { def run() { flockThriftServer.serve() } }
-    new Thread(runnable, "FlockDBServerThread").start()
+    flockThriftServer.start()
   }
 
   def shutdown() {
-    flockThriftServer.stop()
+    flockThriftServer.shutdown()
     shutdownGizzard(false)
   }
 
   override def quiesce() {
-    flockThriftServer.stop()
+    flockThriftServer.shutdown()
     shutdownGizzard(true)
   }
 }
 
-class FlockDBThriftAdapter(val edges: EdgesService, val scheduler: PrioritizingJobScheduler) extends thrift.FlockDB.Iface {
-  import java.util.{List => JList}
-  import scala.collection.JavaConversions._
-  import com.twitter.gizzard.thrift.conversions.Sequences._
-  import com.twitter.flockdb.conversions.Edge._
-  import com.twitter.flockdb.conversions.Metadata._
-  import com.twitter.flockdb.conversions.EdgeQuery._
-  import com.twitter.flockdb.conversions.EdgeResults._
-  import com.twitter.flockdb.conversions.ExecuteOperations._
-  import com.twitter.flockdb.conversions.Page._
-  import com.twitter.flockdb.conversions.Results._
-  import com.twitter.flockdb.conversions.SelectQuery._
-  import com.twitter.flockdb.conversions.SelectOperation._
-  import com.twitter.gizzard.shards.ShardException
-  import thrift.FlockException
 
-  def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
-    edges.contains(source_id, graph_id, destination_id)
+class FlockDBThriftAdapter(
+  val serverName: String,
+  val thriftPort: Int,
+  val edges: EdgesService)
+extends thrift.FlockDB.ThriftServer {
+  import com.twitter.flockdb.operations._
+  import java.nio.{BufferUnderflowException, ByteBuffer, ByteOrder}
+
+  def contains(sourceId: Long, graphId: Int, destinationId: Long) = {
+    Future(edges.contains(sourceId, graphId, destinationId))
   }
 
-  def get(source_id: Long, graph_id: Int, destination_id: Long) = {
-    edges.get(source_id, graph_id, destination_id).toThrift
+  def get(sourceId: Long, graphId: Int, destinationId: Long) = {
+    Future(edges.get(sourceId, graphId, destinationId)) map { edgeToThrift(_) }
   }
 
-  def get_metadata(source_id: Long, graph_id: Int) = {
-    edges.getMetadata(source_id, graph_id).toThrift
+  def getMetadata(sourceId: Long, graphId: Int) = {
+    Future(edges.getMetadata(sourceId, graphId)) map { metadataToThrift(_) }
   }
 
-  def contains_metadata(source_id: Long, graph_id: Int) = {
-    edges.containsMetadata(source_id, graph_id)
+  def containsMetadata(sourceId: Long, graphId: Int) = {
+    Future(edges.containsMetadata(sourceId, graphId))
   }
 
   @deprecated("Use `select2` instead")
-  def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
-    edges.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift)).toThrift
+  def select(operations: Seq[thrift.SelectOperation], page: thrift.Page) = {
+    select2(Seq(thrift.SelectQuery(operations, page))) map { _.head }
   }
 
-  def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {
-    edges.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }
+  def select2(queries: Seq[thrift.SelectQuery]) = {
+    Future(edges.select(queries map { selectQueryFromThrift(_) }) map { longResultsToThrift(_) })
   }
 
-  def select_edges(queries: JList[thrift.EdgeQuery]) = {
-    edges.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }
+  def selectEdges(queries: Seq[thrift.EdgeQuery]) = {
+    Future(edges.selectEdges(queries map { edgeQueryFromThrift(_) }) map { edgeResultsToThrift(_) })
   }
 
   def execute(operations: thrift.ExecuteOperations) = {
-    try {
-      edges.execute(operations.fromThrift)
-    } catch {
-      case e: ShardException =>
-        throw new FlockException(e.toString)
-    }
+    Future(edges.execute(executeOpsFromThrift(operations)))
   }
 
   @deprecated("Use `count2` instead")
-  def count(query: JList[thrift.SelectOperation]) = {
-    edges.count(List(query.toSeq.map { _.fromThrift })).first
+  def count(query: Seq[thrift.SelectOperation]) = {
+    Future(edges.count(List(query map { selectOpFromThrift(_) }))) map { _.head }
   }
 
-  def count2(queries: JList[JList[thrift.SelectOperation]]) = {
-    edges.count(queries.toSeq.map { _.toSeq.map { _.fromThrift }}).pack
+  def count2(queries: Seq[Seq[thrift.SelectOperation]]) = {
+    Future(edges.count(queries map { _ map { selectOpFromThrift(_) } })) map { packInts(_) }
+  }
+
+  // conversions.
+  // TODO: these may be able to be removed, but the prevalence of using byte arrays in the current API makes this difficult.
+
+  private def queryTermFromThrift(t: thrift.QueryTerm) = QueryTerm(
+    t.sourceId,
+    t.graphId,
+    t.isForward,
+    t.destinationIds map { unpackLongs(_) },
+    (t.stateIds getOrElse Nil) map { State(_) }
+  )
+
+  private def pageFromThrift(p: thrift.Page) = {
+    Page(p.count, Cursor(p.cursor))
+  }
+
+  private def selectQueryFromThrift(q: thrift.SelectQuery) = {
+    SelectQuery(q.operations map { selectOpFromThrift(_) }, pageFromThrift(q.page))
+  }
+
+  private def selectOpFromThrift(op: thrift.SelectOperation) = {
+    SelectOperation(SelectOperationType(op.operationType.value), op.term map { queryTermFromThrift(_) })
+  }
+
+  private def edgeQueryFromThrift(q: thrift.EdgeQuery) = {
+    EdgeQuery(queryTermFromThrift(q.term), pageFromThrift(q.page))
+  }
+
+  private def executeOpsFromThrift(eo: thrift.ExecuteOperations) = {
+    val ops = eo.operations map { o =>
+      ExecuteOperation(ExecuteOperationType(o.operationType.value), queryTermFromThrift(o.term), o.position)
+    }
+
+    ExecuteOperations(ops, eo.executeAt, Priority(eo.priority.value))
+  }
+
+  private def edgeToThrift(e: Edge) = thrift.Edge(
+    e.sourceId,
+    e.destinationId,
+    e.position,
+    e.updatedAtSeconds,
+    e.count,
+    e.state.id
+  )
+
+  private def metadataToThrift(m: Metadata) = thrift.Metadata(
+    m.sourceId,
+    m.state.id,
+    m.count,
+    m.updatedAtSeconds
+  )
+
+  private def edgeResultsToThrift(r: ResultWindow[Edge]) = {
+    thrift.EdgeResults(r.toList map { edgeToThrift(_) }, r.nextCursor.position, r.prevCursor.position)
+  }
+
+  private def longResultsToThrift(r: ResultWindow[Long]) = {
+    thrift.Results(packLongs(r.toList), r.nextCursor.position, r.prevCursor.position)
+  }
+
+  private def packBuffer(size: Int)(f: ByteBuffer => Unit) = {
+    val buffer = new Array[Byte](size)
+    val byteBuffer = ByteBuffer.wrap(buffer)
+    byteBuffer.order(ByteOrder.LITTLE_ENDIAN)
+    f(byteBuffer)
+    byteBuffer.rewind
+    byteBuffer
+  }
+
+  private def packLongs(ls: Seq[Long]) = packBuffer(ls.size * 8) { b => ls foreach { b.putLong(_) } }
+
+  private def packInts(is: Seq[Int]) = packBuffer(is.size * 4) { b => is foreach { b.putInt(_) } }
+
+  private def unpackLongs(b: ByteBuffer) = {
+    b.order(ByteOrder.LITTLE_ENDIAN)
+
+    val longs   = b.asLongBuffer
+    val results = new Array[Long](longs.limit)
+
+    longs.get(results)
+    results
   }
 }

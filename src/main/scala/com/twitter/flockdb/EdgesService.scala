@@ -16,22 +16,18 @@
 
 package com.twitter.flockdb
 
+import com.twitter.logging.Logger
 import com.twitter.gizzard.Stats
-import com.twitter.gizzard.util.Future
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
-  ShardOfflineException, ShardTimeoutException}
-import com.twitter.gizzard.thrift.conversions.Sequences._
-import operations.{ExecuteOperations, SelectOperation}
-import com.twitter.logging.Logger
-import queries._
-import thrift.FlockException
+import com.twitter.gizzard.shards._
+import com.twitter.flockdb.operations.{ExecuteOperations, SelectOperation}
+import com.twitter.flockdb.queries._
+import com.twitter.flockdb.thrift.FlockException
 
 class EdgesService(
   forwardingManager: ForwardingManager,
   schedule: PrioritizingJobScheduler,
-  future: Future,
   intersectionQueryConfig: config.IntersectionQuery,
   aggregateJobsPageSize: Int) {
 
@@ -39,11 +35,6 @@ class EdgesService(
   private val exceptionLog = Logger.get("exception")
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
   private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
-
-  def shutdown() {
-    schedule.shutdown()
-    future.shutdown()
-  }
 
   def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
     rethrowExceptionsAsThrift {
@@ -83,7 +74,7 @@ class EdgesService(
 
   def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
     rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
+      queries map { query =>
         try {
           val queryTree = selectCompiler(query.operations)
           val rv = queryTree.select(query.page)
@@ -99,7 +90,7 @@ class EdgesService(
 
   def selectEdges(queries: Seq[EdgeQuery]): Seq[ResultWindow[Edge]] = {
     rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
+      queries map { query =>
         val term = query.term
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
@@ -123,7 +114,7 @@ class EdgesService(
 
   def count(queries: Seq[Seq[SelectOperation]]): Seq[Int] = {
     rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
+      queries map { query =>
         val queryTree = selectCompiler(query)
         val rv = queryTree.sizeEstimate
         Stats.transaction.record(queryTree.toString)
