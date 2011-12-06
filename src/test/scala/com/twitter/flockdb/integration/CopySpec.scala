@@ -74,6 +74,7 @@ class CopySpec extends IntegrationSpecification {
        queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_metadata")
     }
 
+
     def writeEdges(shard: RoutingNode[Shard], num: Int, start: Int, step: Int, outdated: Boolean, state: State = State.Normal) {
       val edges = mutable.ArrayBuffer[Edge]()
       (start to num by step).foreach { id => 
@@ -84,16 +85,11 @@ class CopySpec extends IntegrationSpecification {
     }
 
     def getEdges(shard: RoutingNode[Shard], num: Int) {
-      shard.readOperation(_.count(1L, Seq(State.Normal))) must eventually(100, new SpecsDuration(240))(be_==(num))
+      shard.readOperation(_.count(1L, Seq(State.Normal))) must eventually(100, new SpecsDuration(60000))(be_==(num))
     }
 
     def validateEdges(shards: Seq[RoutingNode[Shard]], num: Int) {
-      shards.foreach { s =>
-        getEdges(s, num)
-        val m = s.readOperation(_.getMetadata(1L))
-        m.isDefined must(be_==(true))
-        m.get.state must(be_==(State.Normal))
-      }
+      shards.foreach { getEdges(_, num) }
       val shardsEdges = shards map { _.readOperation(_.selectAll((Cursor.Start, Cursor.Start), 2*num))._1}
       shardsEdges.foreach { 
         _.length must eventually(be_==(num)) }
@@ -104,6 +100,19 @@ class CopySpec extends IntegrationSpecification {
           edges
         }
       }
+    }
+
+    "do nothing on equivalent shards" in {
+      val numData = 20000
+      val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
+      val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
+      writeEdges(shard1, numData, 1, 1, false)
+      writeEdges(shard2, numData, 1, 1, false)
+      
+      flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
+
+      validateEdges(Seq(shard1, shard2), numData)
+
     }
 
     "copy" in {
@@ -150,6 +159,8 @@ class CopySpec extends IntegrationSpecification {
       shard1.writeOperation(_.writeMetadata(Metadata(1L, State.Normal, time)))
       shard2.writeOperation(_.writeMetadata(Metadata(1L, State.Normal, time)))
       shard3.writeOperation(_.writeMetadata(Metadata(1L, State.Archived, (time - 1.seconds)) ))
+
+      
 
       flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id, shard3Info.toThrift.id))
       validateEdges(Seq(shard1, shard2, shard3), numData)
