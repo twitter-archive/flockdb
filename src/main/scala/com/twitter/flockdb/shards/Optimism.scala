@@ -3,7 +3,7 @@ package shards
 
 import com.twitter.util.{Time, Try, Return, Throw}
 import com.twitter.logging.Logger
-import com.twitter.gizzard.shards.{ShardException, RoutingNode}
+import com.twitter.gizzard.shards.{ShardException, NodeSet}
 
 class OptimisticLockException(message: String) extends ShardException(message)
 
@@ -113,10 +113,10 @@ trait OptimisticStateMonitor {
   }
 }
 
-object LockingRoutingNode {
-  implicit def asLockingRoutingNode(n: RoutingNode[Shard]) = new LockingRoutingNode(n)
+object LockingNodeSet {
+  implicit def asLockingNodeSet(n: NodeSet[Shard]) = new LockingNodeSet(n)
 }
 
-class LockingRoutingNode(node: RoutingNode[Shard]) extends OptimisticStateMonitor {
-  def getMetadatas(id: Long) = node.read.all { _.getMetadataForWrite(id) }
+class LockingNodeSet(node: NodeSet[Shard]) extends OptimisticStateMonitor {
+  def getMetadatas(id: Long) = node.all { _.getMetadataForWrite(id) }
 }

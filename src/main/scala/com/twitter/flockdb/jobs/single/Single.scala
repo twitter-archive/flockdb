@@ -24,7 +24,7 @@ import com.twitter.conversions.time._
 import com.twitter.flockdb.{State, ForwardingManager, Cursor, UuidGenerator, Direction}
 import com.twitter.flockdb.conversions.Numeric._
 import com.twitter.flockdb.shards.Shard
-import com.twitter.flockdb.shards.LockingRoutingNode._
+import com.twitter.flockdb.shards.LockingNodeSet._
 
 
 class SingleJobParser(
@@ -92,8 +92,8 @@ extends JsonJob {
   }
 
   def apply() = {
-    val forward  = forwardingManager.findNode(sourceId, graphId, Direction.Forward)
-    val backward = forwardingManager.findNode(destinationId, graphId, Direction.Backward)
+    val forward  = forwardingManager.findNode(sourceId, graphId, Direction.Forward).write
+    val backward = forwardingManager.findNode(destinationId, graphId, Direction.Backward).write
     val uuid     = uuidGenerator(position)
 
     var currSuccesses: List[ShardId] = Nil
@@ -102,8 +102,8 @@ extends JsonJob {
     forward.optimistically(sourceId) { left =>
       backward.optimistically(destinationId) { right =>
         val state           = left max right max preferredState
-        val forwardResults  = writeToShard(forward.write, sourceId, destinationId, uuid, state)
-        val backwardResults = writeToShard(backward.write, destinationId, sourceId, uuid, state)
+        val forwardResults  = writeToShard(forward, sourceId, destinationId, uuid, state)
+        val backwardResults = writeToShard(backward, destinationId, sourceId, uuid, state)
 
         List(forwardResults, backwardResults) foreach {
           _ foreach {
