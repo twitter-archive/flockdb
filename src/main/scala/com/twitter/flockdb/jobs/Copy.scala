@@ -57,8 +57,8 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cop
   def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
     val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
 
-    val (items, newCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.writeCopies(items)
+    val (items, newCursor) = sourceShard.selectAll(cursor, count)()
+    destinationShard.writeCopies(items)()
     Stats.incr("edges-copy", items.size)
     if (newCursor == Copy.END) {
       None
@@ -91,8 +91,8 @@ class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: 
   def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
     val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
 
-    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    destinationShard.writeMetadata(items)
+    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)()
+    destinationShard.writeMetadata(items)()
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataCopy.END)
       Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))

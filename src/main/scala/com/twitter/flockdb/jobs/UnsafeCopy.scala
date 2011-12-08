@@ -56,8 +56,8 @@ class UnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Un
   def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
     val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
 
-    val (items, newCursor) = sourceShard.selectAll(cursor, count)
-    destinationShard.bulkUnsafeInsertEdges(items)
+    val (items, newCursor) = sourceShard.selectAll(cursor, count)()
+    destinationShard.bulkUnsafeInsertEdges(items)()
     Stats.incr("edges-copy", items.size)
     if (newCursor == UnsafeCopy.END) {
       None
@@ -90,8 +90,8 @@ class MetadataUnsafeCopy(sourceShardId: ShardId, destinationShardId: ShardId,
   def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
     val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
 
-    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    destinationShard.bulkUnsafeInsertMetadata(items)
+    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)()
+    destinationShard.bulkUnsafeInsertMetadata(items)()
     Stats.incr("edges-copy", items.size)
     if (newCursor == MetadataUnsafeCopy.END)
       Some(new UnsafeCopy(sourceShardId, destinationShardId, UnsafeCopy.START, UnsafeCopy.COUNT,

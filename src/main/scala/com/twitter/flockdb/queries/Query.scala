@@ -17,20 +17,21 @@
 package com.twitter.flockdb
 package queries
 
-import com.twitter.util.{Time, Duration}
+import com.twitter.util.{Time, Duration, Future}
 
 trait Query {
-  def sizeEstimate(): Int
-  def selectWhereIn(page: Seq[Long]): Seq[Long]
+  def sizeEstimate(): Future[Int]
+  def selectWhereIn(page: Seq[Long]): Future[Seq[Long]]
   def select(page: Page) = selectPage(page.count, page.cursor)
-  def selectPageByDestinationId(count: Int, cursor: Cursor): ResultWindow[Long]
+  def selectPageByDestinationId(count: Int, cursor: Cursor): Future[ResultWindow[Long]]
 
-  protected def selectPage(count: Int, cursor: Cursor): ResultWindow[Long]
+  protected def selectPage(count: Int, cursor: Cursor): Future[ResultWindow[Long]]
 }
 
 trait Timed {
   var duration: Option[Duration] = None
 
+  // TODO: Fix this to work in async.
   protected def time[A](f: => A) = { 
     val start = Time.now
     try {

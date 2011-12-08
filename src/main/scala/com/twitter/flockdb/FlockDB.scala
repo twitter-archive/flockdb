@@ -1,4 +1,4 @@
-/*
+  /*
  * Copyright 2010 Twitter, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -136,19 +136,19 @@ extends thrift.FlockDB.ThriftServer {
   import java.nio.{BufferUnderflowException, ByteBuffer, ByteOrder}
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long) = {
-    Future(edges.contains(sourceId, graphId, destinationId))
+    edges.contains(sourceId, graphId, destinationId)
   }
 
   def get(sourceId: Long, graphId: Int, destinationId: Long) = {
-    Future(edges.get(sourceId, graphId, destinationId)) map { edgeToThrift(_) }
+    edges.get(sourceId, graphId, destinationId) map { edgeToThrift(_) }
   }
 
   def getMetadata(sourceId: Long, graphId: Int) = {
-    Future(edges.getMetadata(sourceId, graphId)) map { metadataToThrift(_) }
+    edges.getMetadata(sourceId, graphId) map { metadataToThrift(_) }
   }
 
   def containsMetadata(sourceId: Long, graphId: Int) = {
-    Future(edges.containsMetadata(sourceId, graphId))
+    edges.containsMetadata(sourceId, graphId)
   }
 
   @deprecated("Use `select2` instead")
@@ -157,24 +157,24 @@ extends thrift.FlockDB.ThriftServer {
   }
 
   def select2(queries: Seq[thrift.SelectQuery]) = {
-    Future(edges.select(queries map { selectQueryFromThrift(_) }) map { longResultsToThrift(_) })
+    edges.select(queries map { selectQueryFromThrift(_) }) map { _ map { longResultsToThrift(_) } }
   }
 
   def selectEdges(queries: Seq[thrift.EdgeQuery]) = {
-    Future(edges.selectEdges(queries map { edgeQueryFromThrift(_) }) map { edgeResultsToThrift(_) })
+    edges.selectEdges(queries map { edgeQueryFromThrift(_) }) map { _ map { edgeResultsToThrift(_) } }
   }
 
   def execute(operations: thrift.ExecuteOperations) = {
-    Future(edges.execute(executeOpsFromThrift(operations)))
+    edges.execute(executeOpsFromThrift(operations))
   }
 
   @deprecated("Use `count2` instead")
   def count(query: Seq[thrift.SelectOperation]) = {
-    Future(edges.count(List(query map { selectOpFromThrift(_) }))) map { _.head }
+    edges.count(List(query map { selectOpFromThrift(_) })) map { _.head }
   }
 
   def count2(queries: Seq[Seq[thrift.SelectOperation]]) = {
-    Future(edges.count(queries map { _ map { selectOpFromThrift(_) } })) map { packInts(_) }
+    edges.count(queries map { _ map { selectOpFromThrift(_) } }) map { packInts(_) }
   }
 
   // conversions.

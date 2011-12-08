@@ -108,7 +108,7 @@ extends JsonJob {
     }
 
     while (cursor != Cursor.End) {
-      val resultWindow = forwardShard.selectIncludingArchived(sourceId, aggregateJobPageSize, cursor)
+      val resultWindow = forwardShard.selectIncludingArchived(sourceId, aggregateJobPageSize, cursor)()
 
       val chunkOfTasks = resultWindow.map { destinationId =>
         val (a, b) = if (direction == Direction.Backward) (destinationId, sourceId) else (sourceId, destinationId)
