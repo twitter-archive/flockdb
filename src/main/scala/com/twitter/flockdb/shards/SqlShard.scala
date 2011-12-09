@@ -24,10 +24,11 @@ import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
 import com.twitter.gizzard.Stats
 import com.twitter.gizzard.shards._
 import com.twitter.querulous.config.Connection
-import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
+import com.twitter.querulous.async.{AsyncQueryEvaluator, AsyncQueryEvaluatorFactory}
+import com.twitter.querulous.evaluator.Transaction
 import com.twitter.querulous.query
 import com.twitter.querulous.query.{QueryClass => QuerulousQueryClass, SqlQueryTimeoutException}
-import com.twitter.util.Time
+import com.twitter.util.{Time, Future}
 import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
 import State._
@@ -44,9 +45,9 @@ object QueryClass {
 }
 
 class SqlShardFactory(
-  instantiatingQueryEvaluatorFactory: QueryEvaluatorFactory,
-  lowLatencyQueryEvaluatorFactory: QueryEvaluatorFactory,
-  materializingQueryEvaluatorFactory: QueryEvaluatorFactory,
+  instantiatingQueryEvaluatorFactory: AsyncQueryEvaluatorFactory,
+  lowLatencyQueryEvaluatorFactory: AsyncQueryEvaluatorFactory,
+  materializingQueryEvaluatorFactory: AsyncQueryEvaluatorFactory,
   connection: Connection)
 extends ShardFactory[Shard] {
 
@@ -92,9 +93,14 @@ CREATE TABLE IF NOT EXISTS %s (
     try {
       val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
 
-      queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database)
-      queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
-      queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
+      val futures = List(
+        queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database),
+        queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges",
+                                                     shardInfo.sourceType, shardInfo.destinationType)),
+        queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix
+                                                         + "_metadata", shardInfo.sourceType))
+      )
+      Future.join(futures).apply()
 
     } catch {
       case e: SQLException => throw new ShardException(e.toString)
@@ -106,8 +112,8 @@ CREATE TABLE IF NOT EXISTS %s (
 
 class SqlShard(
   shardInfo: ShardInfo,
-  queryEvaluator: QueryEvaluator,
-  lowLatencyQueryEvaluator: QueryEvaluator,
+  queryEvaluator: AsyncQueryEvaluator,
+  lowLatencyQueryEvaluator: AsyncQueryEvaluator,
   deadlockRetries: Int)
 extends Shard {
 
@@ -122,13 +128,13 @@ extends Shard {
     }
   }
 
-  def getMetadata(sourceId: Long): Option[Metadata] = {
+  def getMetadata(sourceId: Long) = {
     lowLatencyQueryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
   }
 
-  def getMetadataForWrite(sourceId: Long): Option[Metadata] = {
+  def getMetadataForWrite(sourceId: Long) = {
     queryEvaluator.selectOne(SelectMetadata, "SELECT * FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"), Time.fromSeconds(row.getInt("updated_at")))
     }
@@ -142,7 +148,8 @@ extends Shard {
     var i = 0
     val query = "SELECT * FROM " + tablePrefix +
       "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?"
-    queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
+    
+    val f = queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
         metadatas += new Metadata(sourceId, State(row.getInt("state")), row.getInt("count"),
@@ -153,33 +160,34 @@ extends Shard {
         returnedCursor = nextCursor
       }
     }
-
-    (metadatas, returnedCursor)
+    
+    f map { _ => (metadatas, returnedCursor) }
   }
 
-  def count(sourceId: Long, states: Seq[State]): Int = {
-    lowLatencyQueryEvaluator.selectOne(SelectMetadata, "SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
+  def count(sourceId: Long, states: Seq[State]) = {
+    val f = lowLatencyQueryEvaluator.selectOne(SelectMetadata, "SELECT state, `count` FROM " + tablePrefix + "_metadata WHERE source_id = ?", sourceId) { row =>
       states.foldLeft(0) { (result, state) =>
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
-    } getOrElse {
+    } 
+    
+    f map { _ getOrElse {
       populateMetadata(sourceId, Normal)
       count(sourceId, states)
     }
   }
 
-  private def populateMetadata(sourceId: Long, state: State) { populateMetadata(sourceId, state, Time.epoch) }
+  private def populateMetadata(sourceId: Long, state: State) = populateMetadata(sourceId, state, Time.epoch)
 
-  private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) {
-    try {
-      queryEvaluator.execute(
+  private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) = {
+    val f = queryEvaluator.execute(
         "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
         sourceId,
         computeCount(sourceId, state),
         state.id,
         updatedAt.inSeconds)
-    } catch {
-      case e: SQLIntegrityConstraintViolationException =>
+    f.unit handle { 
+      case e: SQLIntegrityConstraintViolationException => ()
     }
   }
 

@@ -56,6 +56,23 @@ abstract case class ComplexQueryNode(left: QueryTree, right: QueryTree) extends 
   val depth = (left.getDepth() max right.getDepth) + 1 
   def getComplexity(): Int = complexity
   def getDepth(): Int = depth
+  
+  def getSizeEstimates() = {
+    val f1 = left.sizeEstimate
+    val f2 = right.sizeEstimate
+    for (count1 <- f1; count2 <- f2) yield (count1, count2)
+  }
+  
+  def orderQueries() = {
+    getSizeEstimates() map { case (count1, count2) =>
+      if (count1 < count2) {
+        (left, right)
+      } else {
+        (right, left)
+      }
+    }
+  }
+  
 }
 
 abstract case class SimpleQueryNode() extends QueryTree {
