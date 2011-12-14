@@ -109,7 +109,11 @@ CREATE TABLE IF NOT EXISTS %s (
   }
 }
 
-
+/**
+ * All methods are externally asynchronous via Futures, but Transactions are only available in a
+ * context where it is safe to block (a FuturePool), so private methods may take Transactions, with
+ * the understanding that they will be executed in a blocking fashion.
+ */
 class SqlShard(
   shardInfo: ShardInfo,
   queryEvaluator: AsyncQueryEvaluator,
@@ -171,15 +175,20 @@ extends Shard {
       }
     } 
     
-    f map { _ getOrElse {
-      populateMetadata(sourceId, Normal)
-      count(sourceId, states)
+    f flatMap {
+      _ map (Future.value(_)) getOrElse {
+        // TODO: recursively retrying... do we get any guarantees that this terminates?
+        populateMetadata(sourceId, Normal)
+        count(sourceId, states)
+      }
     }
   }
 
-  private def populateMetadata(sourceId: Long, state: State) = populateMetadata(sourceId, state, Time.epoch)
+  private def populateMetadata(sourceId: Long, state: State): Future[Unit] =
+    populateMetadata(sourceId, state, Time.epoch)
 
-  private def populateMetadata(sourceId: Long, state: State, updatedAt: Time) = {
+  /** TODO: bulk insert? */
+  private def populateMetadata(sourceId: Long, state: State, updatedAt: Time): Future[Unit] = {
     val f = queryEvaluator.execute(
         "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
         sourceId,
@@ -238,13 +247,12 @@ extends Shard {
   }
 
   private def select(cursorName: String, index: String, count: Int,
-                     cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
+                     cursor: Cursor, conditions: String, args: Any*): Future[ResultWindow[Long]] = {
     select(QueryClass.Select, cursorName, index, count, cursor, conditions, args: _*)
   }
 
   private def select(queryClass: QuerulousQueryClass, cursorName: String, index: String, count: Int,
-                     cursor: Cursor, conditions: String, args: Any*): ResultWindow[Long] = {
-    var edges = new mutable.ArrayBuffer[(Long, Cursor)]
+                     cursor: Cursor, conditions: String, args: Any*): Future[ResultWindow[Long]] = {
     val order = if (cursor < Cursor.Start) "ASC" else "DESC"
     val inequality = if (order == "DESC") "<" else ">"
 
@@ -252,12 +260,12 @@ extends Shard {
     val (edgesQuery, args2) = query(cursorName, index, count + 1, cursor, order, inequality, conditions, args)
     val totalQuery = continueCursorQuery + " UNION ALL " + edgesQuery
     queryEvaluator.select(queryClass, totalQuery, args1 ++ args2: _*) { row =>
-      edges += (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
+      (row.getLong("destination_id") -> Cursor(row.getLong(cursorName)))
+    } map { edges =>
+      var page = edges.view
+      if (cursor < Cursor.Start) page = page.reverse
+      new ResultWindow(page, count, cursor)
     }
-
-    var page = edges.view
-    if (cursor < Cursor.Start) page = page.reverse
-    new ResultWindow(page, count, cursor)
   }
 
   def selectEdges(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor) = {
@@ -268,14 +276,13 @@ extends Shard {
     val (edgesQuery, args1) = query("*", "position", "PRIMARY", count + 1, cursor, order, inequality, conditions, args)
     val (continueCursorQuery, args2) = query("*", "position", "PRIMARY", 1, cursor, opposite(order), opposite(inequality), conditions, args)
 
-    val edges = new mutable.ArrayBuffer[(Edge, Cursor)]
     queryEvaluator.select(continueCursorQuery + " UNION ALL " + edgesQuery, args1 ++ args2: _*) { row =>
-      edges += (makeEdge(row) -> Cursor(row.getLong("position")))
+      (makeEdge(row) -> Cursor(row.getLong("position")))
+    } map { edges =>
+      var page = edges.view
+      if (cursor < Cursor.Start) page = page.reverse
+      new ResultWindow(page, count, cursor)
     }
-
-    var page = edges.view
-    if (cursor < Cursor.Start) page = page.reverse
-    new ResultWindow(page, count, cursor)
   }
 
   private def query(cursorName: String, index: String, count: Int, cursor: Cursor, order: String,
@@ -305,7 +312,7 @@ extends Shard {
   }
 
   def intersect(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
-    if (destinationIds.size == 0) Nil else {
+    if (destinationIds.size == 0) Future.value(Nil) else {
       val (evaluator, queryClass) = destinationIds.size match {
         case s if s == 1 => (lowLatencyQueryEvaluator, SelectSingle)
         case s if s <= 50 => (lowLatencyQueryEvaluator, SelectIntersectionSmall)
@@ -319,7 +326,7 @@ extends Shard {
   }
 
   def intersectEdges(sourceId: Long, states: Seq[State], destinationIds: Seq[Long]) = {
-    if (destinationIds.size == 0) Nil else {
+    if (destinationIds.size == 0) Future.value(Nil) else {
       val (evaluator, queryClass) = destinationIds.size match {
         case s if s == 1 => (lowLatencyQueryEvaluator, SelectSingle)
         case s if s <= 50 => (lowLatencyQueryEvaluator, SelectIntersectionSmall)
@@ -383,11 +390,13 @@ extends Shard {
     if (edge.state == metadata.state) insertedRows else 0
   }
 
-  def bulkUnsafeInsertEdges(edges: Seq[Edge]) {
-    bulkUnsafeInsertEdges(queryEvaluator, edges)
+  def bulkUnsafeInsertEdges(edges: Seq[Edge]): Future[Unit] = {
+    queryEvaluator.transaction { transaction =>
+      bulkUnsafeInsertEdges(transaction, edges)
+    }
   }
 
-  def bulkUnsafeInsertEdges(transaction: QueryEvaluator, edges: Seq[Edge]) = {
+  private def bulkUnsafeInsertEdges(transaction: Transaction, edges: Seq[Edge]) = {
     if (edges.size > 0) {
       val query = "INSERT INTO " + tablePrefix + "_edges (source_id, position, updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)"
       transaction.executeBatch(query) { batch =>
@@ -398,14 +407,16 @@ extends Shard {
     }
   }
 
-  def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]) = {
-    if (metadatas.length > 0) {
+  def bulkUnsafeInsertMetadata(metadatas: Seq[Metadata]): Future[Unit] = {
+    if (metadatas.length <= 0)
+        Future.Unit
+    else {
       val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)"
       queryEvaluator.executeBatch(query) { batch =>
         metadatas.foreach { metadata =>
           batch(metadata.sourceId, metadata.count, metadata.state.id, metadata.updatedAt.inSeconds)
         }
-      }
+      }.unit
     }
   }
 
@@ -479,11 +490,11 @@ extends Shard {
     if (edge.state == metadata.state) countDelta else -countDelta
   }
 
-  private def write(edge: Edge) {
+  private def write(edge: Edge): Future[Unit] = {
     write(edge, deadlockRetries, true)
   }
 
-  private def write(edge: Edge, tries: Int, predictExistence: Boolean) {
+  private def write(edge: Edge, tries: Int, predictExistence: Boolean): Future[Unit] = {
     try {
       atomically(edge.sourceId) { (transaction, metadata) =>
         val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
@@ -529,7 +540,7 @@ extends Shard {
     }
   }
 
-  private def updateCount(transaction: QueryEvaluator, sourceId: Long, countDelta: Int) = {
+  private def updateCount(transaction: Transaction, sourceId: Long, countDelta: Int) = {
     transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
                         "WHERE source_id = ?", countDelta, sourceId)
   }
@@ -579,12 +590,12 @@ extends Shard {
     }
   }
 
-  private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): A = {
+  private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): Future[A] = {
     atomically(Seq(sourceId)) { (t, map) => f(t, map(sourceId)) }
   }
 
-  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, Map[Long, Metadata]) => A): A = {
-    val rv = queryEvaluator.transaction { transaction =>
+  private def atomically[A](sourceIds: Seq[Long])(f: (Transaction, Map[Long, Metadata]) => A): Future[A] = {
+    queryEvaluator.transaction { transaction =>
 
       val mdMapBuilder = Map.newBuilder[Long, Metadata]
 
@@ -610,23 +621,21 @@ extends Shard {
       } else {
         Right(f(transaction, mdMap))
       }
-    }
-
-    rv match {
-      case Left(missingMeta) => {
-        missingMeta foreach { populateMetadata(_, Normal) }
-        atomically(sourceIds)(f)
-      }
-      case Right(rv) => rv
+    } flatMap {
+      case Left(missingMeta) =>
+        // insert metadata in parallel, then recurse to retry TODO: termination?
+        Future.join(missingMeta map { populateMetadata(_, Normal) }) flatMap { _ =>
+          atomically(sourceIds)(f)
+        }
+      case Right(rv) => Future.value(rv)
     }
   }
 
-  def writeMetadata(metadata: Metadata) {
-    try {
-      queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
-                             "updated_at) VALUES (?, ?, ?, ?)",
-                             metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds)
-    } catch {
+  def writeMetadata(metadata: Metadata): Future[Unit] = {
+    val insertFuture = queryEvaluator.execute("INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, " +
+      "updated_at) VALUES (?, ?, ?, ?)",
+      metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds).unit
+    insertFuture rescue {
       case e: SQLIntegrityConstraintViolationException =>
         atomically(metadata.sourceId) { (transaction, oldMetadata) =>
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
@@ -637,21 +646,21 @@ extends Shard {
     }
   }
 
-  def writeMetadata(metadatas: Seq[Metadata])  = {
-    if (!metadatas.isEmpty) {
-      try {
-        val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"
-        queryEvaluator.executeBatch(query) { batch =>
-          metadatas.foreach { metadata =>
-            batch(metadata.sourceId, metadata.state.id, metadata.updatedAt.inSeconds)
-          }
+  def writeMetadata(metadatas: Seq[Metadata]): Future[Unit] = {
+    if (metadatas.isEmpty)
+      Future.Unit
+    else {
+      val query = "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, 0, ?, ?)"
+      queryEvaluator.executeBatch(query) { batch =>
+        metadatas.foreach { metadata =>
+          batch(metadata.sourceId, metadata.state.id, metadata.updatedAt.inSeconds)
         }
-      } catch {
+      }.unit.rescue {
         case e: BatchUpdateException =>
-          e.getUpdateCounts.zip(metadatas).foreach { case (errorCode, metadata) =>
-            if (errorCode < 0)
-              writeMetadata(metadata)
+          val retryMetadata = e.getUpdateCounts.zip(metadatas).collect {
+            case (errorCode, metadata) if errorCode < 0 => metadata
           }
+          writeMetadata(retryMetadata)
       }
     }
   }
