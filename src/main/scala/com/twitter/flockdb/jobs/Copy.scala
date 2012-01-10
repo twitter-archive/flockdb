@@ -56,7 +56,7 @@ class CopyParser(nameServer: NameServer, scheduler: JobScheduler)
 case class CopyState(
   var pos: Int,
   items: Seq[Edge],
-  cursor: (Cursor, Cursor),
+  cursor: Copy.CopyCursor,
   total: Int,
   val diffs: mutable.ArrayBuffer[Edge]
 )
@@ -65,7 +65,6 @@ case class CopyState(
 class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
            count: Int, nameServer: NameServer, scheduler: JobScheduler)
       extends CopyJob[Shard](shardIds, count, nameServer, scheduler) {
-        var badedges = 0;
 
   def copyPage(nodes: Seq[RoutingNode[Shard]], count: Int) = {
     val shards = nodes map { new ReadWriteShardAdapter(_) }
@@ -146,7 +145,7 @@ class MetadataCopyParser(nameServer: NameServer, scheduler: JobScheduler)
 case class MetadataCopyState(
   var pos: Int,
   items: Seq[Metadata],
-  cursor: Cursor,
+  cursor: MetadataCopy.CopyCursor,
   total: Int,
   val diffs: mutable.ArrayBuffer[Metadata]
 )
