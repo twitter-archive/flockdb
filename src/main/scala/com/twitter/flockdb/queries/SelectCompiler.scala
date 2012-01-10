@@ -51,9 +51,11 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
     if (items != 1) throw new InvalidQueryException("Left " + items + " items on the stack instaed of 1")
 
     var stack = new mutable.Stack[QueryTree]
+    val graphIds = new mutable.HashSet[Int]
     for (op <- program) op.operationType match {
       case SelectOperationType.SimpleQuery =>
         val term = op.term.get
+        graphIds += term.graphId
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
         val query = if (term.destinationIds.isDefined) {
@@ -82,6 +84,11 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
         case query: WhereInQuery => if (query.sizeEstimate() == 1) "-single" else "-simple"
         case query: SimpleQuery  => if (program.head.term.get.states.size > 1) "-multistate" else ""
       })
+    }
+
+    // collect stats per graph
+    for (graphId <- graphIds) {
+      Stats.incr(name + "-graph_" + graphId);
     }
 
     Stats.transaction.record("Query Plan: "+rv.toString)
