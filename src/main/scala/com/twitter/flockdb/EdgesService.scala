@@ -109,7 +109,7 @@ class EdgesService(
     rethrowExceptionsAsThrift {
       queries.parallel(future).map { query =>
         val term = query.term
-        Stats.incr("select-edge-graph_" + term.graphId)
+        Stats.incr("select-edge-graph_" + (if (term.isForward) "" else "n") + term.graphId)
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
 
