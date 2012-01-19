@@ -118,5 +118,5 @@ object LockingNodeSet {
 }
 
 class LockingNodeSet(node: NodeSet[Shard]) extends OptimisticStateMonitor {
-  def getMetadatas(id: Long) = node.all { _.getMetadataForWrite(id) }
+  def getMetadatas(id: Long) = node.all { _.getMetadataForWrite(id)() }
 }

@@ -74,7 +74,7 @@ class Copy(shardIds: Seq[ShardId], var cursor: Copy.CopyCursor,
     while (!cursors.isEmpty) {
       cursor = cursors.min
       val shardStates = shards map { shard =>
-        val (edges, nextCursor) = shard.selectAll(cursor, count)
+        val (edges, nextCursor) = shard.selectAll(cursor, count)()
         shard -> CopyState(0, edges, nextCursor, edges.size, mutable.ArrayBuffer[Edge]())
       } toMap
 
@@ -163,7 +163,7 @@ class MetadataCopy(shardIds: Seq[ShardId], var cursor: MetadataCopy.CopyCursor,
       cursor = cursors.min
 
       val shardStates = Map(shards.map { shard =>
-        val (items, nextCursor) = shard.selectAllMetadata(cursor, count)
+        val (items, nextCursor) = shard.selectAllMetadata(cursor, count)()
         (shard, MetadataCopyState(0, items, nextCursor, items.size, mutable.ArrayBuffer[Metadata]()))
       }: _*)
 

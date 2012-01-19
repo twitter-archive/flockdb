@@ -204,7 +204,7 @@ extends Shard {
     queryEvaluator.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
   }
 
-  def selectAll(cursor: (Cursor, Cursor), count: Int): (Seq[Edge], (Cursor, Cursor)) = {
+  def selectAll(cursor: (Cursor, Cursor), count: Int) = {
     val edges = new mutable.ArrayBuffer[Edge]
     var nextCursor = (Cursor.Start, Cursor.Start)
     var returnedCursor = (Cursor.End, Cursor.End)
@@ -214,7 +214,7 @@ extends Shard {
       "USE INDEX (unique_source_id_destination_id) WHERE (source_id = ? AND destination_id > ?) " +
       "OR (source_id > ?) ORDER BY source_id, destination_id LIMIT ?"
     val (cursor1, cursor2) = cursor
-    queryEvaluator.select(SelectCopy, query, cursor1.position, cursor2.position, cursor1.position,
+    val f = queryEvaluator.select(SelectCopy, query, cursor1.position, cursor2.position, cursor1.position,
                           count + 1) { row =>
       if (i < count) {
         edges += makeEdge(row)
@@ -225,7 +225,7 @@ extends Shard {
       }
     }
 
-    (edges, returnedCursor)
+    f map { _ => (edges, returnedCursor) }
   }
 
   def selectByDestinationId(sourceId: Long, states: Seq[State], count: Int, cursor: Cursor) = {
@@ -343,7 +343,7 @@ extends Shard {
     write(new Edge(sourceId, destinationId, position, updatedAt, 0, Normal))
   }
 
-  def add(sourceId: Long, updatedAt: Time) {
+  def add(sourceId: Long, updatedAt: Time) = {
     updateMetadata(sourceId, Normal, updatedAt)
   }
 
@@ -351,7 +351,7 @@ extends Shard {
     write(new Edge(sourceId, destinationId, position, updatedAt, 0, Negative))
   }
 
-  def negate(sourceId: Long, updatedAt: Time) {
+  def negate(sourceId: Long, updatedAt: Time) = {
     updateMetadata(sourceId, Negative, updatedAt)
   }
 
@@ -359,7 +359,7 @@ extends Shard {
     write(new Edge(sourceId, destinationId, position, updatedAt, 0, Removed))
   }
 
-  def remove(sourceId: Long, updatedAt: Time) {
+  def remove(sourceId: Long, updatedAt: Time) = {
     updateMetadata(sourceId, Removed, updatedAt)
   }
 
@@ -367,7 +367,7 @@ extends Shard {
     write(new Edge(sourceId, destinationId, position, updatedAt, 0, Archived))
   }
 
-  def archive(sourceId: Long, updatedAt: Time) {
+  def archive(sourceId: Long, updatedAt: Time) = {
     updateMetadata(sourceId, Archived, updatedAt)
   }
 
@@ -545,7 +545,7 @@ extends Shard {
                         "WHERE source_id = ?", countDelta, sourceId)
   }
 
-  def writeCopies(edges: Seq[Edge]) {
+  def writeCopies(edges: Seq[Edge]) = {
     if (!edges.isEmpty) {
       Stats.addMetric("copy-burst", edges.size)
 
@@ -588,6 +588,9 @@ extends Shard {
         }
       }
     }
+    
+    // TODO: Fix this.
+    Future()
   }
 
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): Future[A] = {
@@ -665,16 +668,18 @@ extends Shard {
     }
   }
 
-  def updateMetadata(metadata: Metadata): Unit = updateMetadata(metadata.sourceId, metadata.state, metadata.updatedAt)
+  def updateMetadata(metadata: Metadata): Future[Unit] = updateMetadata(metadata.sourceId, metadata.state, metadata.updatedAt)
 
   // FIXME: computeCount could be really expensive. :(
-  def updateMetadata(sourceId: Long, state: State, updatedAt: Time) {
+  def updateMetadata(sourceId: Long, state: State, updatedAt: Time) = {    
     atomically(sourceId) { (transaction, metadata) =>
       if ((updatedAt.inSeconds != metadata.updatedAtSeconds) || ((metadata.state max state) == state)) {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
           state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
       }
     }
+    // TODO: Fix this.
+    Future()
   }
 
   private def makeEdge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, stateId: Int): Edge = {

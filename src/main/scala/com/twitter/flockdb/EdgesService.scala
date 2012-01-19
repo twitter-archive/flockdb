@@ -138,9 +138,9 @@ class EdgesService(
         log.error(e, "Invalid shard: %s", e)
       case e: FlockException =>
         Stats.incr(endpoint + "_normal_error_count")
-      case e: ShardTimeoutException =>
-        Stats.incr(endpoint + "_timeout_count")
       case e: ShardDatabaseTimeoutException =>
+          Stats.incr(endpoint + "_timeout_count")
+      case e: ShardTimeoutException =>
         Stats.incr(endpoint + "_timeout_count")
       case e: ShardOfflineException =>
         Stats.incr(endpoint + "_offline_count")
