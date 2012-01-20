@@ -33,7 +33,6 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
     materialize(config)
     flock.nameServer.reload()
 
-    val rootQueryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection.withoutDatabase)
     val queryEvaluator     = config.edgesQueryEvaluator()(config.databaseConnection)
 
     for (graph <- (1 until 10)) {
@@ -54,10 +53,10 @@ class BlackHoleLockingRegressionSpec extends IntegrationSpecification {
           flock.shardManager.addLink(replicatingShardId, shardId2, 1)
           flock.shardManager.setForwarding(Forwarding(tableId, 0, replicatingShardId))
 
-          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_edges")
-          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_metadata")
-          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_edges")
-          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_metadata")
+          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_edges")()
+          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_a_metadata")()
+          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_edges")()
+          queryEvaluator.execute("DELETE FROM " + direction + "_" + graph + "_b_metadata")()
         } else {
           val shardId1 = ShardId("localhost", direction + "_" + graph + "_replicating")
           val shardId2 = ShardId("localhost", direction + "_" + graph + "_a")

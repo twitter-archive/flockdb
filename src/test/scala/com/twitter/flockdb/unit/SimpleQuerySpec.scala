@@ -17,6 +17,7 @@
 package com.twitter.flockdb
 package unit
 
+import com.twitter.util.Future
 import org.specs.mock.JMocker
 import shards.Shard
 
@@ -33,25 +34,25 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
     "sizeEstimate" in {
       "when the state is normal" >> {
         expect {
-          one(shard).count(sourceId, List(State.Normal))() willReturn 10
+          one(shard).count(sourceId, List(State.Normal)) willReturn Future(10)
         }
         simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
-        simpleQuery.sizeEstimate() mustEqual 10
+        simpleQuery.sizeEstimate()() mustEqual 10
       }
 
       "when the state is abnormal" >> {
         expect {
-          one(shard).count(sourceId, List(State.Removed))() willReturn 10
+          one(shard).count(sourceId, List(State.Removed)) willReturn Future(10)
         }
         simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Removed))
-        simpleQuery.sizeEstimate() mustEqual 10
+        simpleQuery.sizeEstimate()() mustEqual 10
       }
     }
 
     "selectWhereIn" in {
       val page = List(1L, 2L, 3L, 4L)
       expect {
-        one(shard).intersect(sourceId, List(State.Normal), page)() willReturn List(1L, 2L)
+        one(shard).intersect(sourceId, List(State.Normal), page) willReturn Future(List(1L, 2L))
       }
       simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
       simpleQuery.selectWhereIn(page)().toList mustEqual List(1L, 2L)
@@ -62,7 +63,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
       val cursor = Cursor(102L)
       val count = 5
       expect {
-        allowing(shard).selectByPosition(sourceId, List(State.Normal), count, cursor)() willReturn new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor)
+        allowing(shard).selectByPosition(sourceId, List(State.Normal), count, cursor) willReturn Future(new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor))
       }
       simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
       simpleQuery.selectPage(count, cursor)().toTuple mustEqual (edges, Cursor.End, Cursor.End)
@@ -73,7 +74,7 @@ object SimpleQuerySpec extends ConfiguredSpecification with JMocker {
       val cursor = Cursor(102L)
       val count = 5
       expect {
-        allowing(shard).selectByDestinationId(sourceId, List(State.Normal), count, cursor)() willReturn new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor)
+        allowing(shard).selectByDestinationId(sourceId, List(State.Normal), count, cursor) willReturn Future(new ResultWindow(Cursor.cursorZip(edges), Cursor.End, Cursor.End, count, cursor))
       }
       simpleQuery = new queries.SimpleQuery(shard, sourceId, List(State.Normal))
       simpleQuery.selectPageByDestinationId(count, cursor)().toTuple mustEqual (edges, Cursor.End, Cursor.End)

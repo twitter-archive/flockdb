@@ -189,19 +189,25 @@ extends Shard {
 
   /** TODO: bulk insert? */
   private def populateMetadata(sourceId: Long, state: State, updatedAt: Time): Future[Unit] = {
-    val f = queryEvaluator.execute(
+    val f = computeCount(sourceId, state) flatMap { count =>
+      queryEvaluator.execute(
         "INSERT INTO " + tablePrefix + "_metadata (source_id, count, state, updated_at) VALUES (?, ?, ?, ?)",
         sourceId,
-        computeCount(sourceId, state),
+        count,
         state.id,
         updatedAt.inSeconds)
+    }
     f.unit handle { 
       case e: SQLIntegrityConstraintViolationException => ()
     }
   }
 
-  private def computeCount(sourceId: Long, state: State) = {
-    queryEvaluator.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
+  private def computeCount(transaction: Transaction, sourceId: Long, state: State): Int = {
+    transaction.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
+  }
+  
+  private def computeCount(sourceId: Long, state: State): Future[Int] = {
+    queryEvaluator.transaction { computeCount(_, sourceId, state) }
   }
 
   def selectAll(cursor: (Cursor, Cursor), count: Int) = {
@@ -640,7 +646,7 @@ extends Shard {
       metadata.sourceId, 0, metadata.state.id, metadata.updatedAt.inSeconds).unit
     insertFuture rescue {
       case e: SQLIntegrityConstraintViolationException =>
-        atomically(metadata.sourceId) { (transaction, oldMetadata) =>
+          atomically(metadata.sourceId) { (transaction, oldMetadata) =>
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ? " +
                               "WHERE source_id = ? AND updated_at <= ?",
                               metadata.state.id, metadata.updatedAt.inSeconds, metadata.sourceId,
@@ -649,7 +655,7 @@ extends Shard {
     }
   }
 
-  def writeMetadata(metadatas: Seq[Metadata]): Future[Unit] = {
+  def writeMetadatas(metadatas: Seq[Metadata]): Future[Unit] = {
     if (metadatas.isEmpty)
       Future.Unit
     else {
@@ -663,7 +669,14 @@ extends Shard {
           val retryMetadata = e.getUpdateCounts.zip(metadatas).collect {
             case (errorCode, metadata) if errorCode < 0 => metadata
           }
-          writeMetadata(retryMetadata)
+          
+          def loop(left: Seq[Metadata]): Future[Unit] = if (left.isEmpty) {
+            Future.Done
+          } else {
+            writeMetadata(left.head) flatMap { _ => loop(left.tail) }
+          }
+          
+          loop(retryMetadata)
       }
     }
   }
@@ -671,11 +684,11 @@ extends Shard {
   def updateMetadata(metadata: Metadata): Future[Unit] = updateMetadata(metadata.sourceId, metadata.state, metadata.updatedAt)
 
   // FIXME: computeCount could be really expensive. :(
-  def updateMetadata(sourceId: Long, state: State, updatedAt: Time) = {    
+  def updateMetadata(sourceId: Long, state: State, updatedAt: Time) = {
     atomically(sourceId) { (transaction, metadata) =>
       if ((updatedAt.inSeconds != metadata.updatedAtSeconds) || ((metadata.state max state) == state)) {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
-          state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
+          state.id, updatedAt.inSeconds, computeCount(transaction, sourceId, state), sourceId, updatedAt.inSeconds)
       }
     } map { _ => }
   }

@@ -36,7 +36,7 @@ trait Shard {
   def writeCopies(edge: Seq[Edge]): Future[Unit]
   def updateMetadata(metadata: Metadata): Future[Unit]
   def writeMetadata(metadata: Metadata): Future[Unit]
-  def writeMetadata(metadata: Seq[Metadata]): Future[Unit]
+  def writeMetadatas(metadata: Seq[Metadata]): Future[Unit]
 
   def bulkUnsafeInsertEdges(edge: Seq[Edge]): Future[Unit]
   def bulkUnsafeInsertMetadata(edge: Seq[Metadata]): Future[Unit]

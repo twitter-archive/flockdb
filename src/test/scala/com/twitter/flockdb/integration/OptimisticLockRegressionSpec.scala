@@ -38,8 +38,6 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
   val MAX = 100
   val errorLimit = 5
 
-  //override def eventually[T](nested: Matcher[T]): Matcher[T] = eventually(100, new SpecsDuration(2000))(nested)
-
   "Inserting conflicting items" should {
     "recover via the optimistic lock" in {
       reset(config)
@@ -52,10 +50,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
 
       execute(Select(1, FOLLOWS, ()).archive)
 
-      jobSchedulerMustDrain
-
-      //flockService.contains(1, FOLLOWS, 5106) must eventually(be_==(true))
-      //flockService.get(1, FOLLOWS, 5106).state_id must eventually(be_==(State.Normal.id))
+      playNormalJobs()
 
       var found = false
       while (errors.size > 0) {
@@ -65,7 +60,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
         }
         job()
       }
-      jobSchedulerMustDrain
+      playScheduledJobs()
 
       found mustEqual true
 
@@ -105,12 +100,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
       execute(Select(1, FOLLOWS, ()).archive)
 
       // println("draining")
-
-      while(scheduler.size > 0) {
-        // print(scheduler.size)
-        Thread.sleep(10)
-      }
-      jobSchedulerMustDrain
+      playNormalJobs()
 
       while (errors.size > 0) {
         // println("looping through the error queue")
@@ -129,7 +119,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
           }
         }
 
-        jobSchedulerMustDrain
+        playNormalJobs()
       }
 
       Thread.sleep(1000)

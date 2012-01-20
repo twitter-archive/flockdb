@@ -19,7 +19,7 @@ package unit
 
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardInfo
-import com.twitter.util.Time
+import com.twitter.util.{Future, Time}
 import com.twitter.conversions.time._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.single.Single
@@ -96,7 +96,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       Time.withCurrentTimeFrozen { time =>
         expect {
           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
-          one(shard).get(bob, mary)() willReturn Some(new Edge(bob, mary, 0, Time.now, 0, State.Normal))
+          one(shard).get(bob, mary) willReturn Future(Some(new Edge(bob, mary, 0, Time.now, 0, State.Normal)))
         }
         flock.contains(bob, FOLLOWS, mary)() must beTrue
       }

@@ -111,15 +111,22 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
 
     flock.nameServer.reload()
   }
+  
+  def playScheduledJobs() {
+    Thread.sleep(100)
+    val s = flock.jobScheduler
+    while (s.size > 0 || s.errorSize > 0 || s.activeThreads > 0) {
+      s.retryErrors()
 
-  def jobSchedulerMustDrain = {
-    var last = flock.jobScheduler.size
-    while(flock.jobScheduler.size > 0) {
-      flock.jobScheduler.size must eventually(be_<(last))
-      last = flock.jobScheduler.size
+      Thread.sleep(50)
     }
-    while(flock.jobScheduler.activeThreads > 0) {
-      Thread.sleep(10)
+  }
+  
+  def playNormalJobs() {
+    Thread.sleep(100)
+    val s = flock.jobScheduler
+    while (s.size > 0 || s.activeThreads > 0) {
+      Thread.sleep(50)
     }
   }
 

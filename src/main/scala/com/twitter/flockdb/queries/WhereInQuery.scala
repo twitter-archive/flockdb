@@ -25,13 +25,13 @@ class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destination
 
   def sizeEstimate() = Future(destinationIds.size)
 
-  def selectWhereIn(page: Seq[Long]) = {
+  def selectWhereIn(page: Seq[Long]) = time {
     val intersection = (Set(destinationIds: _*) intersect Set(page: _*)).toSeq
     Stats.transaction.record("Intersecting "+intersection.size+" ids from "+shard)
-    time(shard.intersect(sourceId, states, intersection))
+    shard.intersect(sourceId, states, intersection)
   }
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time {
     Stats.transaction.record("Selecting "+ count +" edges from an intersection of "+ destinationIds.size +" ids")
     shard.intersect(sourceId, states, destinationIds) map { results =>
       Stats.transaction.record("Selected "+ results.size +" rows.")

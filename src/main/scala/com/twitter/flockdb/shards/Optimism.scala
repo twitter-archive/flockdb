@@ -53,6 +53,7 @@ class OptimisticLockException(message: String) extends ShardException(message)
  * Also, in the short term, it's worth understanding (2), so that you can realize that adding
  * replicas doesn't screw things up.
  */
+// TODO: Make this async.
 trait OptimisticStateMonitor {
 
   def getMetadatas(sourceId: Long): Seq[Try[Option[Metadata]]]

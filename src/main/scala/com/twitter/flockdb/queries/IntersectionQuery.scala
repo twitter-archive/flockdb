@@ -29,7 +29,7 @@ class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectio
   
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = time({
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time {
     getSizeEstimates() flatMap { case (count1, count2) =>
       if (count1 == 0 || count2 == 0) {
         Future(new ResultWindow(List[(Long,Cursor)](), count, cursor))
@@ -54,13 +54,13 @@ class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectio
         orderQueries() flatMap { case (smaller, larger) => loop(smaller, larger, cursor) }
       }   
     }
-  })
+  }
 
-  def selectWhereIn(page: Seq[Long]) = time({
+  def selectWhereIn(page: Seq[Long]) = time {
     orderQueries() flatMap { case (smaller, larger) => 
       smaller.selectWhereIn(page) flatMap { larger.selectWhereIn(_) }
     }
-  })
+  }
 
   private def pageIntersection(smallerQuery: Query, largerQuery: Query, internalPageSize: Int, count: Int, cursor: Cursor) = {
     for {

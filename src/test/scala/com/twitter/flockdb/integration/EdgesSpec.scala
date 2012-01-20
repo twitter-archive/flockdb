@@ -23,7 +23,6 @@ import com.twitter.flockdb.operations._
 import com.twitter.flockdb.thrift.FlockException
 
 class EdgesSpec extends IntegrationSpecification {
-
   val FOLLOWS = 1
   val BORKEN = 900
 

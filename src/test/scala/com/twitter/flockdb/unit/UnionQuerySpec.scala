@@ -26,7 +26,7 @@ class UnionQuerySpec extends ConfiguredSpecification with JMocker {
 
     "sizeEstimate" in {
       val unionQuery = new queries.UnionQuery(query1, query2)
-      unionQuery.sizeEstimate() mustEqual 10
+      unionQuery.sizeEstimate()() mustEqual 10
     }
 
     "selectWhereIn" in {

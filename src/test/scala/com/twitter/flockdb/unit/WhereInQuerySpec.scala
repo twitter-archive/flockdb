@@ -17,6 +17,7 @@
 package com.twitter.flockdb
 package unit
 
+import com.twitter.util.Future
 import org.specs.mock.JMocker
 import shards.Shard
 
@@ -32,13 +33,13 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
 
     "sizeEstimate" in {
       val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
-      whereInQuery.sizeEstimate() mustEqual destinationIds.size
+      whereInQuery.sizeEstimate()() mustEqual destinationIds.size
     }
 
     "selectWhereIn" in {
       val page = List(65L, 63L, 60L)
       expect {
-        one(shard).intersect(sourceId, List(State.Normal), List(60L, 65L)) willReturn List(60L)
+        one(shard).intersect(sourceId, List(State.Normal), List(60L, 65L)) willReturn Future(List(60L))
       }
       val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
       whereInQuery.selectWhereIn(page)().toList mustEqual List(60L)
@@ -46,7 +47,7 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
 
     "selectPage" in {
       expect {
-        allowing(shard).intersect(sourceId, List(State.Normal), destinationIds) willReturn List(85L, 75L, 65L, 55L)
+        allowing(shard).intersect(sourceId, List(State.Normal), destinationIds) willReturn Future(List(85L, 75L, 65L, 55L))
       }
 
       val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)

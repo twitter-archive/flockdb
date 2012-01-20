@@ -25,7 +25,7 @@ import com.twitter.flockdb.conversions.Numeric._
 import com.twitter.flockdb.shards.Shard
 import com.twitter.flockdb.jobs.single.Single
 
-
+// TODO: Make this async.
 class MultiJobParser(
   forwardingManager: ForwardingManager,
   scheduler: PrioritizingJobScheduler,
@@ -130,10 +130,10 @@ extends JsonJob {
   }
 
   protected def updateMetadata(shard: Shard, state: State) = state match {
-    case State.Normal   => shard.add(sourceId, updatedAt)
-    case State.Removed  => shard.remove(sourceId, updatedAt)
-    case State.Archived => shard.archive(sourceId, updatedAt)
-    case State.Negative => shard.negate(sourceId, updatedAt)
+    case State.Normal   => shard.add(sourceId, updatedAt)()
+    case State.Removed  => shard.remove(sourceId, updatedAt)()
+    case State.Archived => shard.archive(sourceId, updatedAt)()
+    case State.Negative => shard.negate(sourceId, updatedAt)()
   }
 
   override def equals(o: Any) = o match {

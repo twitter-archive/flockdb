@@ -27,7 +27,7 @@ class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
 
     "sizeEstimate" in {
       val differenceQuery = queryConfig.difference(query1, query2)
-      differenceQuery.sizeEstimate() mustEqual 12
+      differenceQuery.sizeEstimate()() mustEqual 12
     }
 
     "selectWhereIn" in {

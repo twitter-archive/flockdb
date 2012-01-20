@@ -31,18 +31,9 @@ trait Query {
 trait Timed {
   var duration: Option[Duration] = None
 
-  // TODO: Fix this to work in async.
-  protected def time[A](f: => A) = { 
+  protected def time[A](f: => Future[A]): Future[A] = { 
     val start = Time.now
-    try {
-      val rv = f
-      duration = Some(Time.now - start)
-      rv
-    } catch {
-      case e =>
-        duration = Some(Time.now - start)
-        throw e
-    }
+    f map { rv => duration = Some(Time.now - start); rv }
   }
 } 
 

@@ -40,7 +40,7 @@ class ReadWriteShardAdapter(shard: RoutingNode[Shard]) extends Shard {
                                                                                              
   def writeCopies(edges: Seq[Edge])                                                           = Future.join(shard.write.fmap { _.writeCopies(edges) })
   def writeMetadata(metadata: Metadata)                                                       = Future.join(shard.write.fmap { _.writeMetadata(metadata) })
-  def writeMetadata(metadata: Seq[Metadata])                                                  = Future.join(shard.write.fmap { _.writeMetadata(metadata) })
+  def writeMetadatas(metadata: Seq[Metadata])                                                 = Future.join(shard.write.fmap { _.writeMetadatas(metadata) })
   def updateMetadata(metadata: Metadata)                                                      = Future.join(shard.write.fmap { _.updateMetadata(metadata) })
   def remove(sourceId: Long, updatedAt: Time)                                                 = Future.join(shard.write.fmap { _.remove(sourceId, updatedAt) })
   def remove(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time)            = Future.join(shard.write.fmap { _.remove(sourceId, destinationId, position, updatedAt) })

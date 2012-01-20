@@ -28,7 +28,7 @@ object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
 
     "sizeEstimate" in {
       val intersectionQuery = queryConfig.intersect(query1, query2)
-      intersectionQuery.sizeEstimate() mustEqual 5
+      intersectionQuery.sizeEstimate()() mustEqual 5
     }
 
     "selectWhereIn" in {
