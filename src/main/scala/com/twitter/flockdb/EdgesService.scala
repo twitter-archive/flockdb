@@ -41,14 +41,18 @@ class EdgesService(
 
   def containsMetadata(sourceId: Long, graphId: Int): Future[Boolean] = {
     wrapRPC("contains_metadata") {
-      Stats.transaction.name = "contains-metadata"
+      val name = "contains-metadata"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId) map { _.isDefined }
     }
   }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Future[Boolean] = {
     wrapRPC("contains") {
-      Stats.transaction.name = "contains"
+      val name = "contains"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) map { 
         _ map { edge => edge.state == State.Normal || edge.state == State.Negative } getOrElse false
       }
@@ -57,7 +61,9 @@ class EdgesService(
 
   def get(sourceId: Long, graphId: Int, destinationId: Long): Future[Edge] = {
     wrapRPC("get") {
-      Stats.transaction.name = "get"
+      val name = "get"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) flatMap {
         case Some(edge) => Future(edge) 
         case _ => Future.exception(new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId)))
@@ -67,7 +73,9 @@ class EdgesService(
 
   def getMetadata(sourceId: Long, graphId: Int): Future[Metadata] = {
     wrapRPC("get_metadata") {
-      Stats.transaction.name = "get-metadata"
+      val name = "get-metadata"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId) flatMap {
         case Some(metadata) => Future(metadata) 
         case _ => Future.exception(new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))) 
@@ -95,6 +103,7 @@ class EdgesService(
     wrapRPC("select_edges") {
       Future.collect(queries map { query =>
         val term = query.term
+        Stats.incr("select-edge-graph_" + (if (term.isForward) "" else "n") + term.graphId + "-count")
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
 
