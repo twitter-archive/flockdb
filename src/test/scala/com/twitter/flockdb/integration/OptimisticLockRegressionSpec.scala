@@ -69,7 +69,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
 
       found mustEqual true
 
-      flockService.get(1, FOLLOWS, 5106).state must eventually(be_==(State.Archived))
+      flockService.get(1, FOLLOWS, 5106)().state must eventually(be_==(State.Archived))
     }
 
 
@@ -147,7 +147,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
       for(i <- 1 to 500) {
         (i % 10) match {
           case 0 => ()
-          case _ => flockService.get(1, FOLLOWS, i).state mustEqual State.Archived
+          case _ => flockService.get(1, FOLLOWS, i)().state mustEqual State.Archived
         }
       }
     }

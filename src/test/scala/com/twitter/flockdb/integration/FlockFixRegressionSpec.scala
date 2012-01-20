@@ -33,7 +33,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
   def alicesFollowings() = {
     val term = QueryTerm(alice, FOLLOWS, true, None, List(State.Normal))
     val query = EdgeQuery(term, Page(pageSize, Cursor.Start))
-    val resultsList = flockService.selectEdges(List(query))
+    val resultsList = flockService.selectEdges(List(query))()
     resultsList.size mustEqual 1
     resultsList(0).toList
   }

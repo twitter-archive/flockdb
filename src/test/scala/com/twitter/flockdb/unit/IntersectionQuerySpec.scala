@@ -33,12 +33,12 @@ object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
 
     "selectWhereIn" in {
       val intersectionQuery = queryConfig.intersect(query1, query2)
-      intersectionQuery.selectWhereIn(List(1, 2, 12, 13)) mustEqual List(2, 1)
+      intersectionQuery.selectWhereIn(List(1, 2, 12, 13))() mustEqual List(2, 1)
     }
 
     "selectPage" in {
       val intersectionQuery = queryConfig.intersect(query1, query2)
-      intersectionQuery.selectPage(5, Cursor.Start).toTuple mustEqual (List(4, 3, 2, 1), Cursor.End, Cursor.End)
+      intersectionQuery.selectPage(5, Cursor.Start)().toTuple mustEqual (List(4, 3, 2, 1), Cursor.End, Cursor.End)
     }
   }
 }

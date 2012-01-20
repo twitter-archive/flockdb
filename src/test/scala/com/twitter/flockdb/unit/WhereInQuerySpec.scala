@@ -41,7 +41,7 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
         one(shard).intersect(sourceId, List(State.Normal), List(60L, 65L)) willReturn List(60L)
       }
       val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
-      whereInQuery.selectWhereIn(page).toList mustEqual List(60L)
+      whereInQuery.selectWhereIn(page)().toList mustEqual List(60L)
     }
 
     "selectPage" in {
@@ -51,9 +51,9 @@ class WhereInQuerySpec extends ConfiguredSpecification with JMocker {
 
       val whereInQuery = new queries.WhereInQuery(shard, sourceId, List(State.Normal), destinationIds)
 
-      whereInQuery.selectPage(10, Cursor(90L)).toTuple mustEqual (List(85L, 75L, 65L, 55L), Cursor.End, Cursor.End)
-      whereInQuery.selectPage(10, Cursor(75L)).toTuple mustEqual (List(65L, 55L), Cursor.End, Cursor(-65L))
-      whereInQuery.selectPage(2, Cursor(-65L)).toTuple mustEqual (List(85L, 75L), Cursor(75L), Cursor.End)
+      whereInQuery.selectPage(10, Cursor(90L))().toTuple mustEqual (List(85L, 75L, 65L, 55L), Cursor.End, Cursor.End)
+      whereInQuery.selectPage(10, Cursor(75L))().toTuple mustEqual (List(65L, 55L), Cursor.End, Cursor(-65L))
+      whereInQuery.selectPage(2, Cursor(-65L))().toTuple mustEqual (List(85L, 75L), Cursor(75L), Cursor.End)
     }
   }
 }

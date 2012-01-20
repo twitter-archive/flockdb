@@ -66,15 +66,15 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
   lazy val flockService = flock.flockService
 
   def execute(e: Execute, t: Option[Time] = None) = {
-    flockService.execute(ExecuteOperations(e.toOperations, t map { _.inSeconds }, Priority.High))
+    flockService.execute(ExecuteOperations(e.toOperations, t map { _.inSeconds }, Priority.High))()
   }
 
   def count(s: Select) = {
-    flockService.count(Seq(s.toList)).head
+    flockService.count(Seq(s.toList))().head
   }
 
   def select(s: Select, page: Page) = {
-    flockService.select(SelectQuery(s.toList, page)).toTuple
+    flockService.select(SelectQuery(s.toList, page))().toTuple
   }
 
   def reset(config: flockdb.config.FlockDB) { reset(config, 1) }
@@ -103,8 +103,8 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
           flock.shardManager.addLink(replicatingShardId, shardId, 1)
 
-          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_edges")
-          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_metadata")
+          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_edges")()
+          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_metadata")()
         }
       }
     }

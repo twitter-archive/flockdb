@@ -56,7 +56,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       "when the state is given" >> {
         expect {
           one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
-          one(shard).count(sourceId, states) willReturn 23
+          one(shard).count(sourceId, states)() willReturn 23
         }
         val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) :: Nil
         val query = selectCompiler(program)
@@ -99,7 +99,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       expect {
         one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
         one(forwardingManager).find(sourceId, graphId, Direction.Backward) willReturn shard
-        one(shard).count(sourceId, states) willReturn 23
+        one(shard).count(sourceId, states)() willReturn 23
       }
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, false, Some(List[Long](12, 13)), List(State.Normal)))) ::
@@ -114,8 +114,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
         one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
         one(forwardingManager).find(sourceId, graphId, Direction.Backward) willReturn shard
         one(forwardingManager).find(sourceId + 1, graphId, Direction.Forward) willReturn shard2
-        one(shard).count(sourceId, states) willReturn 23
-        one(shard2).count(sourceId + 1, states) willReturn 25
+        one(shard).count(sourceId, states)() willReturn 23
+        one(shard2).count(sourceId + 1, states)() willReturn 25
       }
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, false, Some(List[Long](12, 13)), List(State.Normal)))) ::
@@ -131,8 +131,8 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
       expect {
         one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
         one(forwardingManager).find(sourceId + 1, graphId, Direction.Forward) willReturn shard2
-        one(shard).count(sourceId, states) willReturn 10
-        allowing(shard2).count(sourceId + 1, states) willReturn 2
+        one(shard).count(sourceId, states)() willReturn 10
+        allowing(shard2).count(sourceId + 1, states)() willReturn 2
       }
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, None, List(State.Normal)))) ::
         new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId + 1, graphId, true, None, List(State.Normal)))) ::
@@ -146,7 +146,7 @@ object SelectCompilerSpec extends ConfiguredSpecification with JMocker with Clas
     "time a simple list query" in {
       expect {
         one(forwardingManager).find(sourceId, graphId, Direction.Forward) willReturn shard
-        one(shard).intersect(sourceId, List(State.Normal), List[Long](12, 13)) willReturn List[Long](12,13)
+        one(shard).intersect(sourceId, List(State.Normal), List[Long](12, 13))() willReturn List[Long](12,13)
       }
       val program = new SelectOperation(SelectOperationType.SimpleQuery, Some(new QueryTerm(sourceId, graphId, true, Some(List[Long](12, 13)), List(State.Normal)))) :: Nil
       val queryTree = selectCompiler(program)

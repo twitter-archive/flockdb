@@ -37,7 +37,7 @@ object SelectCompilerSpec extends IntegrationSpecification with JMocker with Cla
       execute(Select(carl, FOLLOWS, bob).add)
       execute(Select(carl, FOLLOWS, darcy).add)
 
-      flockService.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
+      flockService.contains(carl, FOLLOWS, darcy)() must eventually(beTrue)
     }
 
     def setup2() {

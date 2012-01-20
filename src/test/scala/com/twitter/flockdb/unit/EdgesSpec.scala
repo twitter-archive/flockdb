@@ -51,7 +51,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
-        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).add))
+        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).add))()
         jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
@@ -63,7 +63,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
-        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).addAt(Time.now)))
+        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).addAt(Time.now)))()
         jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
@@ -75,7 +75,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
-        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).remove))
+        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).remove))()
         jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
@@ -87,7 +87,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
         }
-        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).removeAt(Time.now)))
+        flock.execute(toExecuteOperations(Select(bob, FOLLOWS, mary).removeAt(Time.now)))()
         jsonMatching(List(job), nestedJob.captured.jobs)
       }
     }
@@ -96,9 +96,9 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
       Time.withCurrentTimeFrozen { time =>
         expect {
           one(forwardingManager).find(bob, FOLLOWS, Direction.Forward) willReturn shard
-          one(shard).get(bob, mary) willReturn Some(new Edge(bob, mary, 0, Time.now, 0, State.Normal))
+          one(shard).get(bob, mary)() willReturn Some(new Edge(bob, mary, 0, Time.now, 0, State.Normal))
         }
-        flock.contains(bob, FOLLOWS, mary) must beTrue
+        flock.contains(bob, FOLLOWS, mary)() must beTrue
       }
     }
   }

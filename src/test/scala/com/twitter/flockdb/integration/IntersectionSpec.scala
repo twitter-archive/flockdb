@@ -44,7 +44,7 @@ object IntersectionSpec extends IntegrationSpecification {
         execute(Select(carl, FOLLOWS, bob).add)
         execute(Select(carl, FOLLOWS, darcy).add)
 
-        flockService.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
+        flockService.contains(carl, FOLLOWS, darcy)() must eventually(beTrue)
 
         intersectionOf(alice, carl, new Page(1, Cursor.Start))  mustEqual ((List(darcy), Cursor(darcy), Cursor.End))
         intersectionOf(alice, carl, new Page(1, Cursor(darcy))) mustEqual ((List(bob), Cursor.End, Cursor(-bob)))

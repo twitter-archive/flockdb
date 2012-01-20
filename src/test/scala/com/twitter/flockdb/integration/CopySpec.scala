@@ -90,7 +90,7 @@ class CopySpec extends IntegrationSpecification {
 
     def validateEdges(shards: Seq[RoutingNode[Shard]], num: Int) {
       shards.foreach { getEdges(_, num) }
-      val shardsEdges = shards map { _.readOperation(_.selectAll((Cursor.Start, Cursor.Start), 2*num))._1}
+      val shardsEdges = shards map { _.readOperation(_.selectAll((Cursor.Start, Cursor.Start), 2*num))()._1}
       shardsEdges.foreach { 
         _.length must eventually(be_==(num)) }
       (0 until num).foreach { idx => 

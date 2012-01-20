@@ -32,15 +32,15 @@ class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
 
     "selectWhereIn" in {
       val differenceQuery = queryConfig.difference(query1, query2)
-      differenceQuery.selectWhereIn(List(1, 2, 3, 4, 5, 11, 12, 13)).toList mustEqual List(12,5,2,1)
+      differenceQuery.selectWhereIn(List(1, 2, 3, 4, 5, 11, 12, 13))().toList mustEqual List(12,5,2,1)
     }
 
     "selectPage" in {
       val differenceQuery = queryConfig.difference(query1, query2)
 
-      differenceQuery.selectPage(5, Cursor.Start).toTuple  mustEqual (List(12,10,9,8,6), Cursor(6), Cursor.End)
-      differenceQuery.selectPage(10, Cursor(12L)).toTuple  mustEqual (List(10,9,8,6,5,2,1), Cursor.End, Cursor(-10))
-      differenceQuery.selectPage(10, Cursor.Start).toTuple mustEqual (List(12,10,9,8,6,5,2,1), Cursor.End, Cursor.End)
+      differenceQuery.selectPage(5, Cursor.Start)().toTuple  mustEqual (List(12,10,9,8,6), Cursor(6), Cursor.End)
+      differenceQuery.selectPage(10, Cursor(12L))().toTuple  mustEqual (List(10,9,8,6,5,2,1), Cursor.End, Cursor(-10))
+      differenceQuery.selectPage(10, Cursor.Start)().toTuple mustEqual (List(12,10,9,8,6,5,2,1), Cursor.End, Cursor.End)
     }
   }
 }
