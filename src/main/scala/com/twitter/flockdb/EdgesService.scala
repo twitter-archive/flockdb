@@ -47,14 +47,18 @@ class EdgesService(
 
   def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
     rethrowExceptionsAsThrift {
-      Stats.transaction.name = "contains-metadata"
+      val name = "contains-metadata"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).isDefined
     }
   }
 
   def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
     rethrowExceptionsAsThrift {
-      Stats.transaction.name = "contains"
+      val name = "contains"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).map { edge =>
         edge.state == State.Normal || edge.state == State.Negative
       }.getOrElse(false)
@@ -63,7 +67,9 @@ class EdgesService(
 
   def get(sourceId: Long, graphId: Int, destinationId: Long): Edge = {
     rethrowExceptionsAsThrift {
-      Stats.transaction.name = "get"
+      val name = "get"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).getOrElse {
         throw new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId))
       }
@@ -72,7 +78,9 @@ class EdgesService(
 
   def getMetadata(sourceId: Long, graphId: Int): Metadata = {
     rethrowExceptionsAsThrift {
-      Stats.transaction.name = "get-metadata"
+      val name = "get-metadata"
+      Stats.transaction.name = name
+      Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).getOrElse {
         throw new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))
       }
@@ -101,6 +109,7 @@ class EdgesService(
     rethrowExceptionsAsThrift {
       queries.parallel(future).map { query =>
         val term = query.term
+        Stats.incr("select-edge-graph_" + (if (term.isForward) "" else "n") + term.graphId + "-count")
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
 
