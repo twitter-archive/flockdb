@@ -91,7 +91,7 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
 
     // collect stats per graph
     for (graphId <- graphIds) {
-      Stats.incr(name + "-graph_" + graphId);
+      Stats.incr(name + "-graph_" + graphId + "-count");
     }
 
     Stats.transaction.record("Query Plan: "+rv.toString)
