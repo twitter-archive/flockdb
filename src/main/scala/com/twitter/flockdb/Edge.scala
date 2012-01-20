@@ -22,6 +22,7 @@ import com.twitter.gizzard.scheduler.{PrioritizingJobScheduler, JsonJob}
 
 object Edge {
   def apply(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, state: State) = new Edge(sourceId, destinationId, position, updatedAt, count, state)
+  val Max = Edge(Long.MaxValue, Long.MaxValue, Long.MaxValue, 0, 0, State.Normal)
 }
 
 case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSeconds: Int, count: Int,

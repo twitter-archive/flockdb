@@ -23,6 +23,7 @@ import jobs.multi._
 object Metadata {
   def apply(sourceId: Long, state: State, count: Int, updatedAt: Time) = new Metadata(sourceId, state, count, updatedAt)
   def apply(sourceId: Long, state: State, updatedAt: Time) = new Metadata(sourceId, state, updatedAt)
+  val Max = Metadata(Long.MaxValue, State.Normal, Time.fromSeconds(0))
 }
 
 case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: Int) extends Ordered[Metadata] {
