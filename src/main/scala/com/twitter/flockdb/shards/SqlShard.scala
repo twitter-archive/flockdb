@@ -587,10 +587,10 @@ extends Shard {
           updateCount(transaction, currentSourceId, countDelta)
         }
       }
+    } else {
+      // Nothing to do.
+      Future.Unit
     }
-    
-    // TODO: Fix this.
-    Future()
   }
 
   private def atomically[A](sourceId: Long)(f: (Transaction, Metadata) => A): Future[A] = {
@@ -677,9 +677,7 @@ extends Shard {
         transaction.execute("UPDATE " + tablePrefix + "_metadata SET state = ?, updated_at = ?, count = ? WHERE source_id = ? AND updated_at <= ?",
           state.id, updatedAt.inSeconds, computeCount(sourceId, state), sourceId, updatedAt.inSeconds)
       }
-    }
-    // TODO: Fix this.
-    Future()
+    } map { _ => }
   }
 
   private def makeEdge(sourceId: Long, destinationId: Long, position: Long, updatedAt: Time, count: Int, stateId: Int): Edge = {
