@@ -92,7 +92,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         }
 
         "when the count is not materialized and user has deleted rows" >> {
-          shard.remove(alice, bob, 1, now)
+          shard.remove(alice, bob, 1, now)()
           shard.count(alice, List(State.Normal))() mustEqual 0
         }
 
@@ -153,8 +153,8 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
         shard.remove(alice, darcy, 3, now)()
 
         shard.remove(alice, now + 1.second)()
-        shard.count(alice, List(State.Normal))() mustBe 0
-        shard.count(alice, List(State.Removed))() mustBe 2
+        shard.count(alice, List(State.Normal))() mustEqual 0
+        shard.count(alice, List(State.Removed))() mustEqual 2
       }
     }
 
@@ -518,13 +518,13 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
           shard.add(alice, bob, 1, now)()
           shard.add(alice, carl, 2, now)()
           shard.archive(alice, bob, 1, now + 1.seconds)()
-          shard.count(alice, List(State.Normal))() mustBe 1
+          shard.count(alice, List(State.Normal))() mustEqual 1
         }
 
         "when the already-existing row is newer than the row to be archived" >> {
           shard.add(alice, bob, 1, now)()
           shard.archive(alice, bob, 1, now - 1.second)()
-          shard.count(alice, List(State.Normal))() mustBe 1
+          shard.count(alice, List(State.Normal))() mustEqual 1
         }
       }
     }
@@ -701,7 +701,7 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
             }
           }
 
-          stubShard.writeCopies(edges)
+          stubShard.writeCopies(edges)()
           shard.get(alice, darcy)() mustEqual Some(edges(1))
           shard.get(frank, darcy)() mustEqual Some(edges(5))
         }
