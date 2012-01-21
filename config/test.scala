@@ -40,7 +40,7 @@ class TestQueryEvaluator(label: String) extends AsyncQueryEvaluator {
     QueryClass.SelectIntersection         -> QueryTimeout(5.seconds),
     QueryClass.SelectIntersectionSmall    -> QueryTimeout(5.seconds),
     QueryClass.SelectMetadata             -> QueryTimeout(5.seconds)
-  ) 
+  )
 }
 
 class NameserverQueryEvaluator extends QueryEvaluator {
@@ -130,7 +130,7 @@ new FlockDB {
   }
 
   loggers = List(new LoggerConfig {
-    level = Some(Level.DEBUG)
+    level = Some(Level.INFO)
     handlers = List(new FileHandlerConfig { filename = "test.log" })
   })
 

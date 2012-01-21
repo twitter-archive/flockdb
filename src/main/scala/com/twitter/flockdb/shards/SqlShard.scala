@@ -152,7 +152,7 @@ extends Shard {
     var i = 0
     val query = "SELECT * FROM " + tablePrefix +
       "_metadata WHERE source_id > ? ORDER BY source_id LIMIT ?"
-    
+
     val f = queryEvaluator.select(SelectCopy, query, cursor.position, count + 1) { row =>
       if (i < count) {
         val sourceId = row.getLong("source_id")
@@ -164,7 +164,7 @@ extends Shard {
         returnedCursor = nextCursor
       }
     }
-    
+
     f map { _ => (metadatas, returnedCursor) }
   }
 
@@ -173,8 +173,8 @@ extends Shard {
       states.foldLeft(0) { (result, state) =>
         result + (if (state == State(row.getInt("state"))) row.getInt("count") else 0)
       }
-    } 
-    
+    }
+
     f flatMap {
       _ map (Future.value(_)) getOrElse {
         // TODO: recursively retrying... do we get any guarantees that this terminates?
@@ -197,7 +197,7 @@ extends Shard {
         state.id,
         updatedAt.inSeconds)
     }
-    f.unit handle { 
+    f.unit handle {
       case e: SQLIntegrityConstraintViolationException => ()
     }
   }
@@ -205,7 +205,7 @@ extends Shard {
   private def computeCount(transaction: Transaction, sourceId: Long, state: State): Int = {
     transaction.count("SELECT count(*) FROM " + tablePrefix + "_edges WHERE source_id = ? AND state = ?", sourceId, state.id)
   }
-  
+
   private def computeCount(sourceId: Long, state: State): Future[Int] = {
     queryEvaluator.transaction { computeCount(_, sourceId, state) }
   }
