@@ -46,11 +46,9 @@ class SqlShardSpec extends IntegrationSpecification with JMocker {
     var shard: Shard = null
 
     doBefore {
-      try {
-        reset(config, config.databaseConnection.database)
-        shardFactory.materialize(shardInfo)
-        shard = shardFactory.instantiate(shardInfo, 1)
-      } catch { case e => e.printStackTrace() }
+      reset(config, config.databaseConnection.database)
+      shardFactory.materialize(shardInfo)
+      shard = shardFactory.instantiate(shardInfo, 1)
     }
 
     "create" in {

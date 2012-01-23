@@ -93,14 +93,18 @@ CREATE TABLE IF NOT EXISTS %s (
     try {
       val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
 
-      val futures = List(
-        queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database),
-        queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges",
-                                                     shardInfo.sourceType, shardInfo.destinationType)),
-        queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix
-                                                         + "_metadata", shardInfo.sourceType))
-      )
-      Future.join(futures).apply()
+      val tableNamePrefix = connection.database + "." + shardInfo.tablePrefix
+      val createDB        = "CREATE DATABASE IF NOT EXISTS " + connection.database
+      val edgeDDL         = EDGE_TABLE_DDL.format(tableNamePrefix +"_edges", shardInfo.sourceType, shardInfo.destinationType)
+      val metadataDDL     = METADATA_TABLE_DDL.format(tableNamePrefix +"_metadata", shardInfo.sourceType)
+
+      val future = queryEvaluator.execute(createDB) flatMap { _ =>
+        queryEvaluator.execute(edgeDDL) flatMap { _ =>
+          queryEvaluator.execute(metadataDDL)
+        }
+      }
+
+      future()
 
     } catch {
       case e: SQLException => throw new ShardException(e.toString)
@@ -669,13 +673,13 @@ extends Shard {
           val retryMetadata = e.getUpdateCounts.zip(metadatas).collect {
             case (errorCode, metadata) if errorCode < 0 => metadata
           }
-          
+
           def loop(left: Seq[Metadata]): Future[Unit] = if (left.isEmpty) {
             Future.Done
           } else {
             writeMetadata(left.head) flatMap { _ => loop(left.tail) }
           }
-          
+
           loop(retryMetadata)
       }
     }
