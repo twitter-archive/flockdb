@@ -21,7 +21,7 @@ class ProductionQueryEvaluator extends AsyncQueryEvaluator {
     size = 40
     openTimeout = 100.millis
   }
-  
+
   query.timeouts = Map(
     QueryClass.Select                  -> QueryTimeout(1.second),
     QueryClass.Execute                 -> QueryTimeout(1.second),

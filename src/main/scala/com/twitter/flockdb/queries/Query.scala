@@ -31,11 +31,11 @@ trait Query {
 trait Timed {
   var duration: Option[Duration] = None
 
-  protected def time[A](f: => Future[A]): Future[A] = { 
+  protected def time[A](f: => Future[A]): Future[A] = {
     val start = Time.now
     f map { rv => duration = Some(Time.now - start); rv }
   }
-} 
+}
 
 sealed abstract class QueryTree extends Query with Timed {
   def getComplexity(): Int
@@ -44,16 +44,16 @@ sealed abstract class QueryTree extends Query with Timed {
 
 abstract case class ComplexQueryNode(left: QueryTree, right: QueryTree) extends QueryTree {
   val complexity = (left.getComplexity() + right.getComplexity()) + 1
-  val depth = (left.getDepth() max right.getDepth) + 1 
+  val depth = (left.getDepth() max right.getDepth) + 1
   def getComplexity(): Int = complexity
   def getDepth(): Int = depth
-  
+
   def getSizeEstimates() = {
     val f1 = left.sizeEstimate
     val f2 = right.sizeEstimate
     for (count1 <- f1; count2 <- f2) yield (count1, count2)
   }
-  
+
   def orderQueries() = {
     getSizeEstimates() map { case (count1, count2) =>
       if (count1 < count2) {
@@ -63,7 +63,7 @@ abstract case class ComplexQueryNode(left: QueryTree, right: QueryTree) extends 
       }
     }
   }
-  
+
 }
 
 abstract case class SimpleQueryNode() extends QueryTree {

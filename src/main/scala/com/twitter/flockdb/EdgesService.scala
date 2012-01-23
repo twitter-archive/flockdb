@@ -53,7 +53,7 @@ class EdgesService(
       val name = "contains"
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
-      forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) map { 
+      forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) map {
         _ map { edge => edge.state == State.Normal || edge.state == State.Negative } getOrElse false
       }
     }
@@ -65,7 +65,7 @@ class EdgesService(
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) flatMap {
-        case Some(edge) => Future(edge) 
+        case Some(edge) => Future(edge)
         case _ => Future.exception(new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId)))
       }
     }
@@ -77,8 +77,8 @@ class EdgesService(
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
       forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId) flatMap {
-        case Some(metadata) => Future(metadata) 
-        case _ => Future.exception(new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))) 
+        case Some(metadata) => Future(metadata)
+        case _ => Future.exception(new FlockException("Record not found: (%d, %d)".format(sourceId, graphId)))
       }
     }
   }
@@ -90,7 +90,7 @@ class EdgesService(
       Future.collect(queries map { query =>
         val queryTree = selectCompiler(query.operations)
         queryTree.select(query.page) onSuccess { _ =>
-          Stats.transaction.record(queryTree.toString)          
+          Stats.transaction.record(queryTree.toString)
         } rescue {
           case e: ShardBlackHoleException =>
             Future.exception(new FlockException("Shard is blackholed: " + e))
@@ -131,7 +131,7 @@ class EdgesService(
         val queryTree = selectCompiler(query)
         queryTree.sizeEstimate onSuccess { _ =>
           Stats.transaction.record(queryTree.toString)
-        }        
+        }
       })
     }
   }
@@ -158,13 +158,13 @@ class EdgesService(
         exceptionLog.error(e, "Unhandled error in EdgesService", e)
         log.error("Unhandled error in EdgesService: " + e.toString)
     }
-    
+
     e match {
       case e: FlockException => Future.exception(e)
       case _ => Future.exception(new FlockException("%s: %s".format(e.getClass.getName, e.getMessage)))
     }
   }
-  
+
   private[this] def timeFuture[T](label: String)(f: => Future[T]) = {
     Stats.timeFutureMillis(serverName +"/"+ label)(f)
   }

@@ -61,7 +61,7 @@ class CopySpec extends IntegrationSpecification {
       flock.shardManager.createAndMaterializeShard(destinationShardInfo)
       flock.shardManager.createAndMaterializeShard(shard3Info)
       flock.shardManager.setForwarding(new Forwarding(0, Long.MinValue, sourceShardInfo.id))
-      
+
     }
 
     doAfter {
@@ -76,7 +76,7 @@ class CopySpec extends IntegrationSpecification {
 
 
     def writeEdges(shard: RoutingNode[Shard], num: Int, start: Int, step: Int, outdated: Boolean, state: State = State.Normal) {
-      val edges = for (id <- start to num by step) yield { 
+      val edges = for (id <- start to num by step) yield {
         Edge(1L, id.toLong, id.toLong, (if (outdated) time-1.seconds else time), 0, state)
       }
 
@@ -89,15 +89,15 @@ class CopySpec extends IntegrationSpecification {
 
     def validateEdges(shards: Seq[RoutingNode[Shard]], num: Int) {
       playScheduledJobs()
-      
+
       val shardsEdges = shards map { _.read.any { _.selectAll((Cursor.Start, Cursor.Start), 2*num)()._1 } }
       shardsEdges.foreach { _.length mustEqual num }
-      
+
       for (idx <- 0 until num) {
         val head :: others = shardsEdges
-        
+
         others foreach { edges =>
-          head zip edges foreach { case (a, b) => 
+          head zip edges foreach { case (a, b) =>
             a mustEqual b
             b.updatedAt.inSeconds mustEqual time.inSeconds
           }
@@ -111,7 +111,7 @@ class CopySpec extends IntegrationSpecification {
       val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
       writeEdges(shard1, numData, 1, 1, false)
       writeEdges(shard2, numData, 1, 1, false)
-      
+
       flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
 
       validateEdges(Seq(shard1, shard2), numData)

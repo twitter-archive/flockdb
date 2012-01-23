@@ -21,20 +21,20 @@ import scala.util.Sorting
 
 class UnionQuery(query1: QueryTree, query2: QueryTree) extends ComplexQueryNode(query1, query2) {
   def sizeEstimate() = getSizeEstimates() map { case (count1, count2) => count1 max count2 }
-  
+
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = time {    
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time {
     val f1 = query1.selectPageByDestinationId(count, cursor)
     val f2 = query2.selectPageByDestinationId(count, cursor)
-    
+
     for (result1 <- f1; result2 <- f2) yield result1.merge(result2)
   }
 
   def selectWhereIn(page: Seq[Long]) = time {
     val f1 = query1.selectWhereIn(page)
     val f2 = query2.selectWhereIn(page)
-    
+
     for (page1 <- f1; page2 <- f2) yield {
       Sorting.stableSort((page1 ++ page2).toSet.toSeq)
     }

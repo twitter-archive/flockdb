@@ -31,9 +31,9 @@ class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionP
     val internalPageSize = guessedPageSize min intersectionPageSizeMax
     val timeout = intersectionTimeout.inMillis
     val startTime = System.currentTimeMillis
-    
+
     def loop(currCursor: Cursor): Future[ResultWindow[Long]] = {
-      pageDifference(internalPageSize, count, currCursor) flatMap { resultWindow =>      
+      pageDifference(internalPageSize, count, currCursor) flatMap { resultWindow =>
         if (resultWindow.page.size < count &&
             resultWindow.continueCursor != Cursor.End &&
             System.currentTimeMillis - startTime < timeout) {
@@ -43,7 +43,7 @@ class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionP
         }
       }
     }
-    
+
     loop(cursor)
   }
 

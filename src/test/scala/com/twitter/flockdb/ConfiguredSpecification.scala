@@ -111,7 +111,7 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
 
     flock.nameServer.reload()
   }
-  
+
   def playScheduledJobs() {
     Thread.sleep(100)
     val s = flock.jobScheduler
@@ -121,7 +121,7 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
       Thread.sleep(50)
     }
   }
-  
+
   def playNormalJobs() {
     Thread.sleep(100)
     val s = flock.jobScheduler

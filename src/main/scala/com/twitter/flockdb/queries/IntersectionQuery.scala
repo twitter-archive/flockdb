@@ -22,11 +22,11 @@ import com.twitter.gizzard.Stats
 
 class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
   def sizeEstimate() = {
-    getSizeEstimates() map { case (count1, count2) => 
+    getSizeEstimates() map { case (count1, count2) =>
       ((count1 min count2) * averageIntersectionProportion).toInt
     }
   }
-  
+
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
   def selectPageByDestinationId(count: Int, cursor: Cursor) = time {
@@ -38,9 +38,9 @@ class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectio
         val internalPageSize = guessedPageSize min intersectionPageSizeMax.toInt
         val timeout = intersectionTimeout.inMillis
         val startTime = System.currentTimeMillis
-        
+
         def loop(smaller: Query, larger: Query, currCursor: Cursor): Future[ResultWindow[Long]] = {
-          pageIntersection(smaller, larger, internalPageSize, count, currCursor) flatMap { resultWindow =>      
+          pageIntersection(smaller, larger, internalPageSize, count, currCursor) flatMap { resultWindow =>
             if (resultWindow.page.size < count &&
                 resultWindow.continueCursor != Cursor.End &&
                 System.currentTimeMillis - startTime < timeout) {
@@ -52,12 +52,12 @@ class IntersectionQuery(query1: QueryTree, query2: QueryTree, averageIntersectio
         }
 
         orderQueries() flatMap { case (smaller, larger) => loop(smaller, larger, cursor) }
-      }   
+      }
     }
   }
 
   def selectWhereIn(page: Seq[Long]) = time {
-    orderQueries() flatMap { case (smaller, larger) => 
+    orderQueries() flatMap { case (smaller, larger) =>
       smaller.selectWhereIn(page) flatMap { larger.selectWhereIn(_) }
     }
   }

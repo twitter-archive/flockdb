@@ -1,4 +1,4 @@
-/*
+q/*
  * Copyright 2010 Twitter, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -34,10 +34,10 @@ class ReadWriteShardAdapter(shard: RoutingNode[Shard]) extends Shard {
   def selectAllMetadata(cursor: Cursor, count: Int)                                           = shard.read.futureAny { _.selectAllMetadata(cursor, count) }
   def get(sourceId: Long, destinationId: Long)                                                = shard.read.futureAny { _.get(sourceId, destinationId) }
   def count(sourceId: Long, states: Seq[State])                                               = shard.read.futureAny { _.count(sourceId, states) }
-                                                                                             
+
   def bulkUnsafeInsertEdges(edges: Seq[Edge])                                                 = Future.join(shard.write.fmap { _.bulkUnsafeInsertEdges(edges) })
   def bulkUnsafeInsertMetadata(metadata: Seq[Metadata])                                       = Future.join(shard.write.fmap { _.bulkUnsafeInsertMetadata(metadata) })
-                                                                                             
+
   def writeCopies(edges: Seq[Edge])                                                           = Future.join(shard.write.fmap { _.writeCopies(edges) })
   def writeMetadata(metadata: Metadata)                                                       = Future.join(shard.write.fmap { _.writeMetadata(metadata) })
   def writeMetadatas(metadata: Seq[Metadata])                                                 = Future.join(shard.write.fmap { _.writeMetadatas(metadata) })

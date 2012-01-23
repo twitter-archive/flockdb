@@ -35,7 +35,7 @@ class WhereInQuery(shard: Shard, sourceId: Long, states: Seq[State], destination
     Stats.transaction.record("Selecting "+ count +" edges from an intersection of "+ destinationIds.size +" ids")
     shard.intersect(sourceId, states, destinationIds) map { results =>
       Stats.transaction.record("Selected "+ results.size +" rows.")
-      new ResultWindow(results.map(result => (result, Cursor(result))), count, cursor)  
+      new ResultWindow(results.map(result => (result, Cursor(result))), count, cursor)
     }
   }
 
