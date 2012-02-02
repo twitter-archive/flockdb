@@ -2,7 +2,7 @@ package com.twitter.flockdb.config
 
 import com.twitter.gizzard.config._
 import com.twitter.ostrich.admin.config.AdminServiceConfig
-import com.twitter.querulous.config.{Connection, QueryEvaluator}
+import com.twitter.querulous.config.{Connection, AsyncQueryEvaluator}
 import com.twitter.util.TimeConversions._
 import com.twitter.flockdb.queries.QueryTree
 import com.twitter.flockdb.queries
@@ -30,9 +30,9 @@ trait FlockDB extends GizzardServer {
 
   def databaseConnection: Connection
 
-  def edgesQueryEvaluator: QueryEvaluator
-  def lowLatencyQueryEvaluator: QueryEvaluator
-  def materializingQueryEvaluator: QueryEvaluator
+  def edgesQueryEvaluator: AsyncQueryEvaluator
+  def lowLatencyQueryEvaluator: AsyncQueryEvaluator
+  def materializingQueryEvaluator: AsyncQueryEvaluator
 
   def readFuture: Future
 
