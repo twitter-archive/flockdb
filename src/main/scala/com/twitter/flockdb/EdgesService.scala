@@ -146,15 +146,15 @@ class EdgesService(
         Stats.incr("invalid_shard_error_count")
         log.error(e, "Invalid shard: %s", e)
       case e: FlockException =>
-        Stats.incr(endpoint + "_normal_error_count")
+        Stats.incr("normal_error_count_" + endpoint)
       case e: ShardDatabaseTimeoutException =>
-          Stats.incr(endpoint + "_timeout_count")
+          Stats.incr("timeout_count_" + endpoint)
       case e: ShardTimeoutException =>
-        Stats.incr(endpoint + "_timeout_count")
+        Stats.incr("timeout_count_" + endpoint)
       case e: ShardOfflineException =>
-        Stats.incr(endpoint + "_offline_count")
+        Stats.incr("offline_count_" + endpoint)
       case _ =>
-        Stats.incr(endpoint + "_internal_error_count")
+        Stats.incr("internal_error_count_" + endpoint)
         exceptionLog.error(e, "Unhandled error in EdgesService", e)
         log.error("Unhandled error in EdgesService: " + e.toString)
     }
