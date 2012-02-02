@@ -17,10 +17,7 @@
 package com.twitter.flockdb
 package integration
 
-import scala.collection.JavaConversions._
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
-import thrift.{Page, QueryTerm, Results, SelectOperation, SelectOperationType}
 
 object IntersectionSpec extends IntegrationSpecification {
 
@@ -33,45 +30,33 @@ object IntersectionSpec extends IntegrationSpecification {
   var queryEvaluatorFactories: List[QueryEvaluatorFactory] = null
 
 
-  def intersection_of(user1: Long, user2: Long, page: Page) = {
-    val op1 = new SelectOperation(SelectOperationType.SimpleQuery)
-    op1.setTerm(new QueryTerm(user1, FOLLOWS, true))
-    val op2 = new SelectOperation(SelectOperationType.SimpleQuery)
-    op2.setTerm(new QueryTerm(user2, FOLLOWS, true))
-    flockService.select(List[SelectOperation](
-      op1,
-      op2,
-      new SelectOperation(SelectOperationType.Intersection)), page)
+  def intersectionOf(user1: Long, user2: Long, page: Page) = {
+    select(Select(user1, FOLLOWS, ()) intersect Select(user2, FOLLOWS, ()), page)
   }
 
   def intersectAlot = {
     "intersection_for" in {
       "pagination" in {
         reset(config)
-        flockService.execute(Select(alice, FOLLOWS, bob).add.toThrift)
-        flockService.execute(Select(alice, FOLLOWS, carl).add.toThrift)
-        flockService.execute(Select(alice, FOLLOWS, darcy).add.toThrift)
-        flockService.execute(Select(carl, FOLLOWS, bob).add.toThrift)
-        flockService.execute(Select(carl, FOLLOWS, darcy).add.toThrift)
-        flockService.contains(carl, FOLLOWS, darcy) must eventually(beTrue)
+        execute(Select(alice, FOLLOWS, bob).add)
+        execute(Select(alice, FOLLOWS, carl).add)
+        execute(Select(alice, FOLLOWS, darcy).add)
+        execute(Select(carl, FOLLOWS, bob).add)
+        execute(Select(carl, FOLLOWS, darcy).add)
 
-        var result = new Results(List[Long](darcy).pack, darcy, Cursor.End.position)
-        intersection_of(alice, carl, new Page(1, Cursor.Start.position)) mustEqual result
+        flockService.contains(carl, FOLLOWS, darcy)() must eventually(beTrue)
 
-        result = new Results(List[Long](bob).pack, Cursor.End.position, -bob)
-        intersection_of(alice, carl, new Page(1, darcy)) mustEqual result
-
-        result = new Results(List[Long](darcy, bob).pack, Cursor.End.position, Cursor.End.position)
-        intersection_of(alice, carl, new Page(2, Cursor.Start.position)) mustEqual result
+        intersectionOf(alice, carl, new Page(1, Cursor.Start))  mustEqual ((List(darcy), Cursor(darcy), Cursor.End))
+        intersectionOf(alice, carl, new Page(1, Cursor(darcy))) mustEqual ((List(bob), Cursor.End, Cursor(-bob)))
+        intersectionOf(alice, carl, new Page(2, Cursor.Start))  mustEqual ((List(darcy, bob), Cursor.End, Cursor.End))
       }
 
       "one list is empty" in {
         reset(config)
-        for (i <- 1 until 11) flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
-        flockService.count(Select(alice, FOLLOWS, ()).toThrift) must eventually(be_==(10))
+        for (i <- 1 until 11) execute(Select(alice, FOLLOWS, i).add)
+        count(Select(alice, FOLLOWS, ())) must eventually(be_==(10))
 
-        var result = new Results(List[Long]().pack, Cursor.End.position, Cursor.End.position)
-        intersection_of(alice, carl, new Page(10, Cursor.Start.position)) mustEqual result
+        intersectionOf(alice, carl, new Page(10, Cursor.Start)) mustEqual (Nil, Cursor.End, Cursor.End)
       }
     }
   }

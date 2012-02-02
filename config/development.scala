@@ -17,17 +17,23 @@ trait Credentials extends Connection {
   val password = env.get("DB_PASSWORD").getOrElse("")
 }
 
-class ProductionQueryEvaluator extends QueryEvaluator {
-  autoDisable = new AutoDisablingQueryEvaluator {
-    val errorCount = 100
-    val interval = 60.seconds
-  }
-
+class ProductionQueryEvaluator extends AsyncQueryEvaluator {
   database.memoize = true
   database.pool = new ThrottledPoolingDatabase {
     size = 40
     openTimeout = 100.millis
   }
+
+  query.timeouts = Map(
+    QueryClass.Select                  -> QueryTimeout(1.second),
+    QueryClass.Execute                 -> QueryTimeout(1.second),
+    QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
+    QueryClass.SelectModify            -> QueryTimeout(3.seconds),
+    QueryClass.SelectSingle            -> QueryTimeout(1.second),
+    QueryClass.SelectIntersection      -> QueryTimeout(1.second),
+    QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
+    QueryClass.SelectMetadata          -> QueryTimeout(1.second)
+  )
 }
 
 class ProductionNameServerReplica(host: String) extends Mysql {
@@ -36,16 +42,12 @@ class ProductionNameServerReplica(host: String) extends Mysql {
     val database = "flockdb_development"
   }
 
-  queryEvaluator = new ProductionQueryEvaluator {
+  queryEvaluator = new QueryEvaluator {
+    database.memoize = true
     database.pool = new ThrottledPoolingDatabase {
       size = 1
       openTimeout = 1.second
     }
-
-    query.timeouts = Map(
-      QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second)
-    )
   }
 }
 
@@ -79,18 +81,7 @@ new FlockDB {
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
-  val edgesQueryEvaluator = new ProductionQueryEvaluator {
-    query.timeouts = Map(
-      QueryClass.Select                  -> QueryTimeout(1.second),
-      QueryClass.Execute                 -> QueryTimeout(1.second),
-      QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify            -> QueryTimeout(3.seconds),
-      QueryClass.SelectSingle            -> QueryTimeout(1.second),
-      QueryClass.SelectIntersection      -> QueryTimeout(1.second),
-      QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
-      QueryClass.SelectMetadata          -> QueryTimeout(1.second)
-    )
-  }
+  val edgesQueryEvaluator = new ProductionQueryEvaluator
 
   val lowLatencyQueryEvaluator = edgesQueryEvaluator
 

@@ -22,11 +22,12 @@ import com.twitter.gizzard.shards.{Busy, ShardId, ShardInfo}
 import com.twitter.gizzard.nameserver.Forwarding
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.test.NameServerDatabase
-import com.twitter.util.Eval
+import com.twitter.util.{Eval, Time}
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import com.twitter.logging.Logger
 import scala.collection.mutable
 import com.twitter.flockdb
+import com.twitter.flockdb.operations._
 
 object MemoizedQueryEvaluators {
   val evaluators = mutable.Map[String,QueryEvaluatorFactory]()
@@ -49,6 +50,7 @@ object Config {
 
 abstract class ConfiguredSpecification extends Specification {
   val config = Config.config
+
   def jsonMatching(list1: Iterable[JsonJob], list2: Iterable[JsonJob]) = {
     list1 must eventually(verify(l1 => { l1.map(_.toJson).sameElements(list2.map(_.toJson))}))
   }
@@ -62,6 +64,18 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
   }
 
   lazy val flockService = flock.flockService
+
+  def execute(e: Execute, t: Option[Time] = None) = {
+    flockService.execute(ExecuteOperations(e.toOperations, t map { _.inSeconds }, Priority.High))()
+  }
+
+  def count(s: Select) = {
+    flockService.count(Seq(s.toList))().head
+  }
+
+  def select(s: Select, page: Page) = {
+    flockService.select(SelectQuery(s.toList, page))().toTuple
+  }
 
   def reset(config: flockdb.config.FlockDB) { reset(config, 1) }
 
@@ -89,8 +103,8 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
             "com.twitter.flockdb.SqlShard", "INT UNSIGNED", "INT UNSIGNED", Busy.Normal))
           flock.shardManager.addLink(replicatingShardId, shardId, 1)
 
-          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_edges")
-          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_metadata")
+          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_edges")()
+          queryEvaluator.execute("DELETE FROM " + shardId.tablePrefix + "_metadata")()
         }
       }
     }
@@ -98,14 +112,21 @@ abstract class IntegrationSpecification extends ConfiguredSpecification with Nam
     flock.nameServer.reload()
   }
 
-  def jobSchedulerMustDrain = {
-    var last = flock.jobScheduler.size
-    while(flock.jobScheduler.size > 0) {
-      flock.jobScheduler.size must eventually(be_<(last))
-      last = flock.jobScheduler.size
+  def playScheduledJobs() {
+    Thread.sleep(100)
+    val s = flock.jobScheduler
+    while (s.size > 0 || s.errorSize > 0 || s.activeThreads > 0) {
+      s.retryErrors()
+
+      Thread.sleep(50)
     }
-    while(flock.jobScheduler.activeThreads > 0) {
-      Thread.sleep(10)
+  }
+
+  def playNormalJobs() {
+    Thread.sleep(100)
+    val s = flock.jobScheduler
+    while (s.size > 0 || s.activeThreads > 0) {
+      Thread.sleep(50)
     }
   }
 

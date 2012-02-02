@@ -17,33 +17,25 @@
 package com.twitter.flockdb
 package queries
 
-import com.twitter.util.{Time, Duration}
+import com.twitter.util.{Time, Duration, Future}
 
 trait Query {
-  def sizeEstimate(): Int
-  def selectWhereIn(page: Seq[Long]): Seq[Long]
+  def sizeEstimate(): Future[Int]
+  def selectWhereIn(page: Seq[Long]): Future[Seq[Long]]
   def select(page: Page) = selectPage(page.count, page.cursor)
-  def selectPageByDestinationId(count: Int, cursor: Cursor): ResultWindow[Long]
+  def selectPageByDestinationId(count: Int, cursor: Cursor): Future[ResultWindow[Long]]
 
-  protected def selectPage(count: Int, cursor: Cursor): ResultWindow[Long]
+  protected def selectPage(count: Int, cursor: Cursor): Future[ResultWindow[Long]]
 }
 
 trait Timed {
   var duration: Option[Duration] = None
 
-  protected def time[A](f: => A) = { 
+  protected def time[A](f: => Future[A]): Future[A] = {
     val start = Time.now
-    try {
-      val rv = f
-      duration = Some(Time.now - start)
-      rv
-    } catch {
-      case e =>
-        duration = Some(Time.now - start)
-        throw e
-    }
+    f map { rv => duration = Some(Time.now - start); rv }
   }
-} 
+}
 
 sealed abstract class QueryTree extends Query with Timed {
   def getComplexity(): Int
@@ -52,9 +44,26 @@ sealed abstract class QueryTree extends Query with Timed {
 
 abstract case class ComplexQueryNode(left: QueryTree, right: QueryTree) extends QueryTree {
   val complexity = (left.getComplexity() + right.getComplexity()) + 1
-  val depth = (left.getDepth() max right.getDepth) + 1 
+  val depth = (left.getDepth() max right.getDepth) + 1
   def getComplexity(): Int = complexity
   def getDepth(): Int = depth
+
+  def getSizeEstimates() = {
+    val f1 = left.sizeEstimate
+    val f2 = right.sizeEstimate
+    for (count1 <- f1; count2 <- f2) yield (count1, count2)
+  }
+
+  def orderQueries() = {
+    getSizeEstimates() map { case (count1, count2) =>
+      if (count1 < count2) {
+        (left, right)
+      } else {
+        (right, left)
+      }
+    }
+  }
+
 }
 
 abstract case class SimpleQueryNode() extends QueryTree {
