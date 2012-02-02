@@ -181,7 +181,6 @@ extends Shard {
 
     f flatMap {
       _ map (Future.value(_)) getOrElse {
-        // TODO: recursively retrying... do we get any guarantees that this terminates?
         populateMetadata(sourceId, Normal)
         count(sourceId, states)
       }
