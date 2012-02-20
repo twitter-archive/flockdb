@@ -76,8 +76,18 @@ class ResultWindow[T](val data: ResultWindowRows[T], val inNextCursor: Cursor, v
   def --(values: Seq[T]) = {
     val rejects = Set(values: _*)
     val newPage = page.filter { row => !rejects.contains(row.id) }
-    val newNextCursor = if (nextCursor == Cursor.End || newPage.size == 0) Cursor.End else newPage(newPage.size - 1).cursor
-    val newPrevCursor = if (prevCursor == Cursor.End || newPage.size == 0) Cursor.End else newPage(0).cursor.reverse
+    val newNextCursor = if (nextCursor == Cursor.End) 
+                          Cursor.End 
+                        else if (newPage.size == 0)
+                          nextCursor
+                        else
+                          newPage(newPage.size - 1).cursor
+    val newPrevCursor = if (prevCursor == Cursor.End) 
+                          Cursor.End 
+                        else if (newPage.size == 0)
+                          prevCursor
+                        else
+                          newPage(0).cursor.reverse
     new ResultWindow(new ResultWindowRows(newPage), newNextCursor, newPrevCursor, count, cursor)
   }
 
