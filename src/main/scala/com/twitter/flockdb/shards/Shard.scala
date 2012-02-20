@@ -21,8 +21,6 @@ import com.twitter.gizzard.shards
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 
-case class Metadata(sourceId: Long, state: State, count: Int, updatedAt: Time)
-
 trait Shard extends shards.Shard {
   @throws(classOf[shards.ShardException]) def get(sourceId: Long, destinationId: Long): Option[Edge]
   @throws(classOf[shards.ShardException]) def getMetadata(sourceId: Long): Option[Metadata]

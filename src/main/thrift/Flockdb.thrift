@@ -34,6 +34,13 @@ struct Page {
   2: i64 cursor
 }
 
+struct Metadata {
+  1: i64 source_id
+  2: i32 state_id
+  3: i32 count
+  4: i32 updated_at
+}
+
 struct Edge {
   1: i64 source_id
   2: i64 destination_id
@@ -134,6 +141,12 @@ service FlockDB {
   
   # return all data about an edge if it exists (otherwise, throw an exception).
   Edge get(1: i64 source_id, 2: i32 graph_id, 3: i64 destination_id) throws(1: FlockException ex)
+
+  # return all data about a node if it exists (otherwise, throw an exception).
+  Metadata get_metadata(1: i64 source_id, 2: i32 graph_id) throws(1: FlockException ex)
+  
+  # return true if the node exists.
+  bool contains_metadata(1: i64 source_id, 2: i32 graph_id) throws(1: FlockException ex)
 
   # perform a list of queries in parallel. each query may be paged, and may be compound.
   list<Results> select2(1: list<SelectQuery> queries) throws(1: FlockException ex)

@@ -23,7 +23,8 @@ import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.{Archive, RemoveAll, Unarchive}
 import jobs.single.{Add, Remove}
-import shards.{Shard, SqlShard, Metadata}
+import shards.{Shard, SqlShard}
+import flockdb.Metadata
 import thrift.Edge
 
 

@@ -31,6 +31,7 @@ import com.twitter.querulous.database.DatabaseFactory
 import com.twitter.querulous.evaluator.QueryEvaluatorFactory
 import com.twitter.querulous.query.{QueryClass, QueryFactory}
 import com.twitter.flockdb.conversions.Edge._
+import com.twitter.flockdb.conversions.Metadata._
 import com.twitter.flockdb.conversions.EdgeQuery._
 import com.twitter.flockdb.conversions.EdgeResults._
 import com.twitter.flockdb.conversions.ExecuteOperations._
@@ -125,6 +126,14 @@ class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.Iface
 
   def get(source_id: Long, graph_id: Int, destination_id: Long) = {
     edges.get(source_id, graph_id, destination_id).toThrift
+  }
+  
+  def get_metadata(source_id: Long, graph_id: Int) = {
+    edges.getMetadata(source_id, graph_id).toThrift
+  }
+  
+  def contains_metadata(source_id: Long, graph_id: Int) = {
+    edges.containsMetadata(source_id, graph_id)
   }
 
   @deprecated
