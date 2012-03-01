@@ -103,7 +103,7 @@ extends JsonJob {
   }
 
   def apply() : Unit = {
-    if (!jobFilter(sourceId, destinationId, graphId)) {
+    if (!jobFilter(sourceId, graphId, destinationId)) {
       Stats.incr("single-jobs-filtered")
       Single.filteredJobsQueue.put(this)
       return

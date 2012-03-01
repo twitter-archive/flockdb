@@ -13,45 +13,45 @@ trait JobFilter {
    * Returns true iff the job with the given sourceId, destID,
    * and graphId parameters should be executed.
    */
-  def apply(sourceId: Long, destId: Long, graphId: Int): Boolean
+  def apply(sourceId: Long, graphId: Int, destId: Long): Boolean
 }
 
 /**
  * Default no-op filter. All operations pass.
  */
 object NoOpFilter extends JobFilter {
-  def apply(sourceId: Long, destId: Long, graphId: Int): Boolean = true
+  def apply(sourceId: Long, graphId: Int, destId: Long): Boolean = true
 }
 
 /**
  * A filter based on an independently-updated Java set.
  *
- * Set entries should have the form 'SOURCE_ID:DEST_ID:GRAPH_ID', each of
+ * Set entries should have the form 'SOURCE_ID:GRAPH_ID:DEST_ID', each of
  * which specifies either a user ID or a wildcard (*).
- * A wildcard may be specified for At most one of SOURCE_ID and DEST_ID.
+ * A wildcard may be specified for at most one of SOURCE_ID and DEST_ID.
  *
- * Ex. Filter all writes from user 1234 on graph 5: "1234:*:5".
- * Filter all writes to user 2345 on all graphs: "*:2345:*".
- * Filter writes on edges between users 100 and 200 on all graphs: "100:200:*".
+ * Ex. Filter all writes from user 1234 on graph 5: "1234:5:*".
+ * Filter all writes to user 2345 on all graphs: "*:*:2345".
+ * Filter writes on edges between users 100 and 200 on all graphs: "100:*:200".
  */
 class SetFilter(set: JSet[String]) extends JobFilter {
   private val WILDCARD = "*"
   private val FILTERS = Seq(
     (true, true, true),
-    (true, true, false),
     (true, false, true),
+    (true, true, false),
     (false, true, true),
-    (false, true, false),
+    (false, false, true),
     (true, false, false))
 
   Stats.addGauge("active-filters") { set.size() }
 
-  def apply(sourceId: Long, destId: Long, graphId: Int): Boolean = {
+  def apply(sourceId: Long, graphId: Int, destId: Long): Boolean = {
     def filterKey(filter: (Boolean, Boolean, Boolean)) = {
       "%s:%s:%s".format(
           if (filter._1) sourceId.toString else WILDCARD,
-          if (filter._2) destId.toString else WILDCARD,
-          if (filter._3) graphId.toString else WILDCARD
+          if (filter._2) graphId.toString else WILDCARD,
+          if (filter._3) destId.toString else WILDCARD
       )
     }
 
@@ -83,6 +83,6 @@ class ZooKeeperSetFilter(zkClient: ZooKeeperClient, zkPath: String) extends JobF
 
   private val setFilter = new SetFilter(zkMap.keySet())
 
-  def apply(sourceId: Long, destId: Long, graphId: Int): Boolean =
-    setFilter(sourceId, destId, graphId)
+  def apply(sourceId: Long, graphId: Int, destId: Long): Boolean =
+    setFilter(sourceId, graphId, destId)
 }

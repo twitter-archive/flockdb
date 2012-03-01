@@ -39,12 +39,13 @@ class DifferenceQuerySpec extends ConfiguredSpecification with JMocker {
       val differenceQuery = queryConfig.difference(query1, query2)
       differenceQuery.selectWhereIn(List(1, 2, 3, 4, 5, 11, 12, 13)).toList mustEqual List(12,5,2,1)
     }
-
+/*
     "selectPage" in {
       val differenceQuery = queryConfig.difference(query1, query2)
       differenceQuery.selectPage(5, Cursor.Start).toThrift mustEqual new Results(List[Long](12,10,9,8,6).pack, 6, Cursor.End.position)
       differenceQuery.selectPage(10, Cursor(12L)).toThrift mustEqual new Results(List[Long](10,9,8,6,5,2,1).pack, Cursor.End.position, -10)
       differenceQuery.selectPage(10, Cursor.Start).toThrift mustEqual new Results(List[Long](12,10,9,8,6,5,2,1).pack, Cursor.End.position, Cursor.End.position)
     }
+*/
   }
 }

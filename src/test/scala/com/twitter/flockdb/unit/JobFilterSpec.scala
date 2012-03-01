@@ -19,7 +19,7 @@ object JobFilterSpec extends Specification {
     }
 
     "apply filters" in {
-      val filter = new SetFilter(Set("1:2:3", "4:5:*", "6:*:7", "8:*:*", "*:9:10", "*:11:*"))
+      val filter = new SetFilter(Set("1:2:3", "4:5:*", "6:*:7", "8:*:*", "*:9:10", "*:*:11"))
 
       // Fully-specified filter.
       filter(1, 2, 3) mustEqual false
@@ -27,12 +27,12 @@ object JobFilterSpec extends Specification {
       filter(1, 3, 4) mustEqual true
       filter(2, 1, 3) mustEqual true
 
-      // Source and destination filter on any graph.
+      // Source filter on a specific graph.
       filter(4, 5, 1) mustEqual false
       filter(4, 5, 2) mustEqual false
       filter(4, 1, 1) mustEqual true
 
-      // Source filter on a specific graph.
+      // Source and destination filter on any graph.
       filter(6, 1, 7) mustEqual false
       filter(6, 2, 7) mustEqual false
       filter(6, 1, 8) mustEqual true
@@ -53,21 +53,21 @@ object JobFilterSpec extends Specification {
       filter(1, 9, 1) mustEqual true
 
       // Destination filter on any graph.
-      filter(1, 11, 1) mustEqual false
-      filter(1, 11, 2) mustEqual false
-      filter(2, 11, 1) mustEqual false
-      filter(2, 11, 2) mustEqual false
-      filter(1, 12, 1) mustEqual true
-      filter(1, 12, 2) mustEqual true
-      filter(1, 12, 1) mustEqual true
-      filter(1, 12, 2) mustEqual true
+      filter(1, 1, 11) mustEqual false
+      filter(1, 2, 11) mustEqual false
+      filter(2, 1, 11) mustEqual false
+      filter(2, 2, 11) mustEqual false
+      filter(1, 1, 12) mustEqual true
+      filter(1, 2, 12) mustEqual true
+      filter(1, 1, 12) mustEqual true
+      filter(1, 2, 12) mustEqual true
     }
 
     "not support filtering on all sources and destinations" in {
       // Invalid filter on all sources and destinations for a single graph.
-      val filter = new SetFilter(Set("*:*:1"))
+      val filter = new SetFilter(Set("*:1:*"))
       filter(1, 1, 1) mustEqual true
-      filter(1, 2, 1) mustEqual true
+      filter(1, 1, 2) mustEqual true
       filter(2, 1, 1) mustEqual true
 
       // Invalid filter on everything.
