@@ -29,7 +29,7 @@ import jobs.multi.Multi
 import operations.{ExecuteOperations, ExecuteOperationType}
 
 
-class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: ForwardingManager, aggregateJobPageSize: Int) {
+class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: ForwardingManager, jobFilter: JobFilter, aggregateJobPageSize: Int) {
   @throws(classOf[ShardException])
   def apply(program: ExecuteOperations) {
     val now = Time.now
@@ -62,7 +62,8 @@ class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: Fo
           state,
           time,
           null,
-          null
+          null,
+          jobFilter
         )
       } {
         new Multi(
@@ -74,7 +75,8 @@ class ExecuteCompiler(scheduler: PrioritizingJobScheduler, forwardingManager: Fo
           program.priority,
           aggregateJobPageSize,
           null,
-          null
+          null,
+          jobFilter
         )
       }
     }

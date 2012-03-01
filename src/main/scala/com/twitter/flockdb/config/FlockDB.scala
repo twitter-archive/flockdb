@@ -6,7 +6,7 @@ import com.twitter.querulous.config.{Connection, QueryEvaluator}
 import com.twitter.util.TimeConversions._
 import com.twitter.flockdb.queries.QueryTree
 import com.twitter.flockdb.queries
-
+import java.net.InetSocketAddress
 
 trait FlockDBServer extends TServer {
   var name = "flockdb_edges"
@@ -37,4 +37,7 @@ trait FlockDB extends GizzardServer {
   def readFuture: Future
 
   def adminConfig: AdminServiceConfig
+
+  case class ZooKeeperSettings(server: String, basePath: String)
+  def zooKeeperSettings: Option[ZooKeeperSettings] = None
 }

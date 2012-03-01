@@ -33,11 +33,11 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSe
 
   val updatedAt = Time.fromSeconds(updatedAtSeconds)
 
-  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int) = {
-    scheduler.put(priority, toJob(tableId, forwardingManager))
+  def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int, jobFilter: JobFilter) = {
+    scheduler.put(priority, toJob(tableId, forwardingManager, jobFilter))
   }
 
-  def toJob(tableId: Int, forwardingManager: ForwardingManager) = {
+  def toJob(tableId: Int, forwardingManager: ForwardingManager, jobFilter: JobFilter) = {
     new Single(
       sourceId,
       tableId,
@@ -46,7 +46,8 @@ case class Edge(sourceId: Long, destinationId: Long, position: Long, updatedAtSe
       state,
       updatedAt,
       forwardingManager,
-      OrderedUuidGenerator
+      OrderedUuidGenerator,
+      jobFilter
     )
   }
 

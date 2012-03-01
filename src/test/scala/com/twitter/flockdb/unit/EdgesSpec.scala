@@ -46,11 +46,11 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
     val shard = mock[Shard]
     val scheduler = mock[PrioritizingJobScheduler]
     val future = mock[Future]
-    val flock = new FlockDBThriftAdapter(new EdgesService(forwardingManager, scheduler, future, config.intersectionQuery, config.aggregateJobsPageSize), null)
+    val flock = new FlockDBThriftAdapter(new EdgesService(forwardingManager, scheduler, NoOpFilter, future, config.intersectionQuery, config.aggregateJobsPageSize), null)
 
     "add" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Normal, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Normal, Time.now, null, null, NoOpFilter)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
@@ -62,7 +62,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "add_at" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Normal, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Normal, Time.now, null, null, NoOpFilter)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
@@ -74,7 +74,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "remove" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Removed, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Removed, Time.now, null, null, NoOpFilter)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)
@@ -86,7 +86,7 @@ object EdgesSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "remove_at" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Removed, Time.now, null, null)
+        val job = new Single(bob, FOLLOWS, mary, Time.now.inMillis, State.Removed, Time.now, null, null, NoOpFilter)
         expect {
           one(forwardingManager).find(0, FOLLOWS, Direction.Forward)
           one(scheduler).put(will(beEqual(Priority.High.id)), nestedJob.capture)

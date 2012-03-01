@@ -53,7 +53,7 @@ class OptimisticLockRegressionSpec extends IntegrationSpecification() {
       val errors = scheduler.errorQueue
 
       // No thrift api for this, so this is the best I know how to do.
-      scheduler.put(new Single(1, FOLLOWS, 5106, 123456, State.Normal, Time.now, flock.forwardingManager, OrderedUuidGenerator))
+      scheduler.put(new Single(1, FOLLOWS, 5106, 123456, State.Normal, Time.now, flock.forwardingManager, OrderedUuidGenerator, NoOpFilter))
 
       flockService.execute(Select(1, FOLLOWS, ()).archive.toThrift)
 

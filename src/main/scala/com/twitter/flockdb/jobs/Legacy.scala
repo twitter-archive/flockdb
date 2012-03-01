@@ -20,7 +20,7 @@ import com.twitter.logging.Logger
 import com.twitter.util.Time
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards._
-import com.twitter.flockdb.{State, ForwardingManager, Cursor, UuidGenerator, Direction, Priority}
+import com.twitter.flockdb.{State, ForwardingManager, Cursor, UuidGenerator, Direction, Priority, JobFilter}
 import com.twitter.flockdb.conversions.Numeric._
 import com.twitter.flockdb.jobs.single.Single
 import com.twitter.flockdb.jobs.multi.Multi
@@ -30,20 +30,20 @@ import com.twitter.flockdb.jobs.multi.Multi
 // XXX: remove once we're off of the old format, or factor out common code with above.
 
 object LegacySingleJobParser {
-  def Add(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
-    new LegacySingleJobParser(forwardingManager, uuidGenerator, State.Normal)
+  def Add(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator, jobFilter: JobFilter) = {
+    new LegacySingleJobParser(forwardingManager, uuidGenerator, jobFilter, State.Normal)
   }
 
-  def Negate(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
-    new LegacySingleJobParser(forwardingManager, uuidGenerator, State.Negative)
+  def Negate(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator, jobFilter: JobFilter) = {
+    new LegacySingleJobParser(forwardingManager, uuidGenerator, jobFilter, State.Negative)
   }
 
-  def Archive(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
-    new LegacySingleJobParser(forwardingManager, uuidGenerator, State.Archived)
+  def Archive(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator, jobFilter: JobFilter) = {
+    new LegacySingleJobParser(forwardingManager, uuidGenerator, jobFilter, State.Archived)
   }
 
-  def Remove(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator) = {
-    new LegacySingleJobParser(forwardingManager, uuidGenerator, State.Removed)
+  def Remove(forwardingManager: ForwardingManager, uuidGenerator: UuidGenerator, jobFilter: JobFilter) = {
+    new LegacySingleJobParser(forwardingManager, uuidGenerator, jobFilter, State.Removed)
   }
 }
 
@@ -51,39 +51,44 @@ object LegacyMultiJobParser {
   def Archive(
     forwardingManager: ForwardingManager,
     scheduler: PrioritizingJobScheduler,
+    jobFilter: JobFilter,
     aggregateJobPageSize: Int
   ) = {
-    new LegacyMultiJobParser(forwardingManager, scheduler, aggregateJobPageSize, State.Archived)
+    new LegacyMultiJobParser(forwardingManager, scheduler, jobFilter, aggregateJobPageSize, State.Archived)
   }
 
   def Unarchive(
     forwardingManager: ForwardingManager,
     scheduler: PrioritizingJobScheduler,
+    jobFilter: JobFilter,
     aggregateJobPageSize: Int
   ) = {
-    new LegacyMultiJobParser(forwardingManager, scheduler, aggregateJobPageSize, State.Normal)
+    new LegacyMultiJobParser(forwardingManager, scheduler, jobFilter, aggregateJobPageSize, State.Normal)
   }
 
   def RemoveAll(
     forwardingManager: ForwardingManager,
     scheduler: PrioritizingJobScheduler,
+    jobFilter: JobFilter,
     aggregateJobPageSize: Int
   ) = {
-    new LegacyMultiJobParser(forwardingManager, scheduler, aggregateJobPageSize, State.Removed)
+    new LegacyMultiJobParser(forwardingManager, scheduler, jobFilter, aggregateJobPageSize, State.Removed)
   }
 
   def Negate(
     forwardingManager: ForwardingManager,
     scheduler: PrioritizingJobScheduler,
+    jobFilter: JobFilter,
     aggregateJobPageSize: Int
   ) = {
-    new LegacyMultiJobParser(forwardingManager, scheduler, aggregateJobPageSize, State.Negative)
+    new LegacyMultiJobParser(forwardingManager, scheduler, jobFilter, aggregateJobPageSize, State.Negative)
   }
 }
 
 class LegacySingleJobParser(
   forwardingManager: ForwardingManager,
   uuidGenerator: UuidGenerator,
+  jobFilter: JobFilter,
   state: State)
 extends JsonJobParser {
 
@@ -100,7 +105,8 @@ extends JsonJobParser {
       state, // ONLY DIFFERENCE FROM SingleJobParser
       Time.fromSeconds(casted("updated_at").toInt),
       forwardingManager,
-      uuidGenerator
+      uuidGenerator,
+      jobFilter
     )
   }
 }
@@ -108,6 +114,7 @@ extends JsonJobParser {
 class LegacyMultiJobParser(
   forwardingManager: ForwardingManager,
   scheduler: PrioritizingJobScheduler,
+  jobFilter: JobFilter,
   aggregateJobPageSize: Int,
   state: State)
 extends JsonJobParser {
@@ -124,7 +131,8 @@ extends JsonJobParser {
       Priority(casted.get("priority").map(_.toInt).getOrElse(Priority.Low.id)),
       aggregateJobPageSize,
       forwardingManager,
-      scheduler
+      scheduler,
+      jobFilter
     )
   }
 }

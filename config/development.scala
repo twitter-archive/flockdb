@@ -124,6 +124,8 @@ new FlockDB {
     httpPort = Some(9990)
   }
 
+  override def zooKeeperSettings = Some(ZooKeeperSettings("localhost:2181", "/twitter/flock"))
+
   loggers = List(new LoggerConfig {
     level = Some(Level.INFO)
     handlers = List(
@@ -136,5 +138,9 @@ new FlockDB {
         }
       }
     )
+  }, new LoggerConfig {
+    node = "filtered_jobs"
+    useParents = true
+    level = Level.INFO
   })
 }

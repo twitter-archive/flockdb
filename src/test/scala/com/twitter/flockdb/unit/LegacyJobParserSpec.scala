@@ -19,7 +19,7 @@ package com.twitter.flockdb.unit
 import com.twitter.util.Time
 import com.twitter.gizzard.scheduler.JsonCodec
 import com.twitter.flockdb.ConfiguredSpecification
-import com.twitter.flockdb.{Direction, State, Priority}
+import com.twitter.flockdb.{Direction, State, Priority, NoOpFilter}
 import com.twitter.flockdb.jobs.single.Single
 import com.twitter.flockdb.jobs.multi.Multi
 import com.twitter.flockdb.jobs._
@@ -30,14 +30,14 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
   val updatedAt = Time.fromSeconds(1111)
   val codec = new JsonCodec(_ => ())
 
-  codec += ("com.twitter.flockdb.jobs.single.Add".r,      LegacySingleJobParser.Add(null, null))
-  codec += ("com.twitter.flockdb.jobs.single.Remove".r,   LegacySingleJobParser.Remove(null, null))
-  codec += ("com.twitter.flockdb.jobs.single.Negate".r,   LegacySingleJobParser.Negate(null, null))
-  codec += ("com.twitter.flockdb.jobs.single.Archive".r,  LegacySingleJobParser.Archive(null, null))
-  codec += ("com.twitter.flockdb.jobs.multi.Archive".r,   LegacyMultiJobParser.Archive(null, null, 500))
-  codec += ("com.twitter.flockdb.jobs.multi.Unarchive".r, LegacyMultiJobParser.Unarchive(null, null, 500))
-  codec += ("com.twitter.flockdb.jobs.multi.RemoveAll".r, LegacyMultiJobParser.RemoveAll(null, null, 500))
-  codec += ("com.twitter.flockdb.jobs.multi.Negate".r,    LegacyMultiJobParser.Negate(null, null, 500))
+  codec += ("com.twitter.flockdb.jobs.single.Add".r,      LegacySingleJobParser.Add(null, null, NoOpFilter))
+  codec += ("com.twitter.flockdb.jobs.single.Remove".r,   LegacySingleJobParser.Remove(null, null, NoOpFilter))
+  codec += ("com.twitter.flockdb.jobs.single.Negate".r,   LegacySingleJobParser.Negate(null, null, NoOpFilter))
+  codec += ("com.twitter.flockdb.jobs.single.Archive".r,  LegacySingleJobParser.Archive(null, null, NoOpFilter))
+  codec += ("com.twitter.flockdb.jobs.multi.Archive".r,   LegacyMultiJobParser.Archive(null, null, NoOpFilter, 500))
+  codec += ("com.twitter.flockdb.jobs.multi.Unarchive".r, LegacyMultiJobParser.Unarchive(null, null, NoOpFilter, 500))
+  codec += ("com.twitter.flockdb.jobs.multi.RemoveAll".r, LegacyMultiJobParser.RemoveAll(null, null, NoOpFilter, 500))
+  codec += ("com.twitter.flockdb.jobs.multi.Negate".r,    LegacyMultiJobParser.Negate(null, null, NoOpFilter, 500))
 
   "LegacySingleJobParser" should {
     "correctly generate a new style job from an old serialized Add job" in {
@@ -51,7 +51,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Normal, updatedAt, null, null)
+      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Normal, updatedAt, null, null, NoOpFilter)
     }
 
     "correctly generate a new style job from an old serialized Remove job" in {
@@ -65,7 +65,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Removed, updatedAt, null, null)
+      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Removed, updatedAt, null, null, NoOpFilter)
     }
 
     "correctly generate a new style job from an old serialized Negate job" in {
@@ -79,7 +79,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Negative, updatedAt, null, null)
+      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Negative, updatedAt, null, null, NoOpFilter)
     }
 
     "correctly generate a new style job from an old serialized Archive job" in {
@@ -93,7 +93,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Archived, updatedAt, null, null)
+      codec.inflate(map) mustEqual new Single(22, 1, 11, 1111, State.Archived, updatedAt, null, null, NoOpFilter)
     }
   }
 
@@ -109,7 +109,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      val job = new Multi(22, 1, Direction.Forward, State.Archived, updatedAt, Priority.Low, 500, null, null)
+      val job = new Multi(22, 1, Direction.Forward, State.Archived, updatedAt, Priority.Low, 500, null, null, NoOpFilter)
 
       codec.inflate(map) mustEqual job
     }
@@ -125,7 +125,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      val job = new Multi(22, 1, Direction.Forward, State.Normal, updatedAt, Priority.Low, 500, null, null)
+      val job = new Multi(22, 1, Direction.Forward, State.Normal, updatedAt, Priority.Low, 500, null, null, NoOpFilter)
 
       codec.inflate(map) mustEqual job
     }
@@ -141,7 +141,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      val job = new Multi(22, 1, Direction.Forward, State.Removed, updatedAt, Priority.Low, 500, null, null)
+      val job = new Multi(22, 1, Direction.Forward, State.Removed, updatedAt, Priority.Low, 500, null, null, NoOpFilter)
 
       codec.inflate(map) mustEqual job
     }
@@ -157,7 +157,7 @@ class LegacyJobParserSpec extends ConfiguredSpecification {
         )
       )
 
-      val job = new Multi(22, 1, Direction.Forward, State.Negative, updatedAt, Priority.Low, 500, null, null)
+      val job = new Multi(22, 1, Direction.Forward, State.Negative, updatedAt, Priority.Low, 500, null, null, NoOpFilter)
 
       codec.inflate(map) mustEqual job
     }

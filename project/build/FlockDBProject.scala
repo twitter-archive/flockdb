@@ -11,6 +11,15 @@ with SubversionPublisher {
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.8.1"
 
   val gizzard   = "com.twitter" % "gizzard" % "3.0.0-beta29"
+  val zookeeper = "org.apache.zookeeper" % "zookeeper" % "3.3.4"
+  val commonZk  = "com.twitter.common" % "zookeeper" % "0.0.31"
+
+  override def ivyXML =
+    <dependencies>
+      <exclude org="com.sun.jmx" module="jmxri" />
+      <exclude org="com.sun.jdmk" module="jmxtools" />
+      <exclude org="javax.jms" module="jms" />
+    </dependencies>
 
   val asm       = "asm"                     % "asm"          % "1.5.3" % "test"
   val cglib     = "cglib"                   % "cglib"        % "2.2"   % "test"
