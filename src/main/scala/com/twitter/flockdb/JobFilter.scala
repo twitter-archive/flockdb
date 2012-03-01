@@ -30,7 +30,7 @@ object NoOpFilter extends JobFilter {
  * which specifies either a user ID or a wildcard (*).
  * A wildcard may be specified for at most one of SOURCE_ID and DEST_ID.
  *
- * Ex. Filter all writes from user 1234 on graph "*1234:5:*".
+ * Ex. Filter all writes from user 1234 on graph "1234:5:*".
  * Filter all writes to user 2345 on all graphs: "*:*:2345".
  * Filter writes on edges between users 100 and 200 on all graphs: "100:*:200".
  */
