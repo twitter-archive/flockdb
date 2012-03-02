@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS %s (
 
 /**
  * All methods are externally asynchronous via Futures, but Transactions are only available in a
- * context where it is safe to block (a FuturePool), so private methods may take Transactions, with
+ * context where it is safe to block (a FuturePool), so private methods may take Transactions with
  * the understanding that they will be executed in a blocking fashion.
  */
 class SqlShard(
@@ -128,6 +128,7 @@ extends Shard {
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
 
+  type EdgeStateChange = (Option[State],State)
   import QueryClass._
 
   def get(sourceId: Long, destinationId: Long) = {
@@ -390,13 +391,12 @@ extends Shard {
   }
 
 
-  private def insertEdge(transaction: Transaction, metadata: Metadata, edge: Edge): Int = {
-    val insertedRows =
-      transaction.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, " +
-                          "updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)",
-                          edge.sourceId, edge.position, edge.updatedAt.inSeconds,
-                          edge.destinationId, edge.count, edge.state.id)
-    if (edge.state == metadata.state) insertedRows else 0
+  private def insertEdge(transaction: Transaction, edge: Edge): EdgeStateChange = {
+    transaction.execute("INSERT INTO " + tablePrefix + "_edges (source_id, position, " +
+                        "updated_at, destination_id, count, state) VALUES (?, ?, ?, ?, ?, ?)",
+                        edge.sourceId, edge.position, edge.updatedAt.inSeconds,
+                        edge.destinationId, edge.count, edge.state.id)
+    (None, edge.state)
   }
 
   def bulkUnsafeInsertEdges(edges: Seq[Edge]): Future[Unit] = {
@@ -429,9 +429,9 @@ extends Shard {
     }
   }
 
-  private def updateEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
-                         oldEdge: Edge): Int = {
-    if ((oldEdge.updatedAtSeconds == edge.updatedAtSeconds) && (oldEdge.state max edge.state) != edge.state) return 0
+  private def updateEdge(transaction: Transaction, edge: Edge, oldEdge: Edge): EdgeStateChange = {
+    if ((oldEdge.updatedAtSeconds == edge.updatedAtSeconds) && (oldEdge.state max edge.state) != edge.state)
+      return (Some(oldEdge.state), oldEdge.state)
 
     val updatedRows = if (
       oldEdge.state != Archived &&  // Only update position when coming from removed or negated into normal
@@ -441,14 +441,14 @@ extends Shard {
       transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                           "position = ?, count = 0, state = ? " +
                           "WHERE source_id = ? AND destination_id = ? AND " +
-                          "updated_at <= ?",
+                          "updated_at <= ? LIMIT 1",
                           edge.updatedAt.inSeconds, edge.position, edge.state.id,
                           edge.sourceId, edge.destinationId, edge.updatedAt.inSeconds)
     } else {
       try {
         transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                             "count = 0, state = ? " +
-                            "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
+                            "WHERE source_id = ? AND destination_id = ? AND updated_at <= ? LIMIT 1",
                             edge.updatedAt.inSeconds, edge.state.id, edge.sourceId,
                             edge.destinationId, edge.updatedAt.inSeconds)
       } catch {
@@ -457,34 +457,40 @@ extends Shard {
           // FIXME: hacky. remove with the new schema.
           transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                               "count = 0, state = ?, position = position + ? " +
-                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
+                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ? LIMIT 1",
                               edge.updatedAt.inSeconds, edge.state.id,
                               (randomGenerator.nextInt() % 999) + 1, edge.sourceId,
                               edge.destinationId, edge.updatedAt.inSeconds)
       }
     }
-    if (edge.state != oldEdge.state &&
-        (oldEdge.state == metadata.state || edge.state == metadata.state)) updatedRows else 0
+
+    val newEdgeState =
+      updatedRows match {
+        case 1 => edge.state
+        case 0 => oldEdge.state
+        case x =>
+          throw new AssertionError("Invalid update count " + x + ": LIMIT statement not applied?")
+      }
+    (Some(oldEdge.state), newEdgeState)
   }
 
-  // returns +1, 0, or -1, depending on how the metadata count should change after this operation.
-  // `predictExistence`=true for normal operations, false for copy/migrate.
-
+  // returns the old and new edge states. `predictExistence`=true for normal
+  // operations, false for copy/migrate
   private def writeEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
-                        predictExistence: Boolean): Int = {
-    val countDelta = if (predictExistence) {
+                        predictExistence: Boolean): EdgeStateChange = {
+    if (predictExistence) {
       transaction.selectOne(SelectModify,
                             "SELECT * FROM " + tablePrefix + "_edges WHERE source_id = ? " +
                             "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
         makeEdge(row)
       }.map { oldRow =>
-        updateEdge(transaction, metadata, edge, oldRow)
+        updateEdge(transaction, edge, oldRow)
       }.getOrElse {
-        insertEdge(transaction, metadata, edge)
+        insertEdge(transaction, edge)
       }
     } else {
       try {
-        insertEdge(transaction, metadata, edge)
+        insertEdge(transaction, edge)
       } catch {
         case e: SQLIntegrityConstraintViolationException =>
           transaction.selectOne(SelectModify,
@@ -492,11 +498,13 @@ extends Shard {
                                 "and destination_id = ?", edge.sourceId, edge.destinationId) { row =>
             makeEdge(row)
           }.map { oldRow =>
-            updateEdge(transaction, metadata, edge, oldRow)
-          }.getOrElse(0)
+            updateEdge(transaction, edge, oldRow)
+          }.getOrElse {
+            // edge removed within transaction: nothing obvious to do
+            throw new RuntimeException("Edge disappeared during transaction?", e)
+          }
       }
     }
-    if (edge.state == metadata.state) countDelta else -countDelta
   }
 
   private def write(edge: Edge): Future[Unit] = {
@@ -506,7 +514,8 @@ extends Shard {
   private def write(edge: Edge, tries: Int, predictExistence: Boolean): Future[Unit] = {
     try {
       atomically(edge.sourceId) { (transaction, metadata) =>
-        val countDelta = writeEdge(transaction, metadata, edge, predictExistence)
+        val preAndPostStates = writeEdge(transaction, metadata, edge, predictExistence)
+        val countDelta = countDeltaFor(preAndPostStates, metadata.state)
         if (countDelta != 0) {
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
                               "WHERE source_id = ?", countDelta, edge.sourceId)
@@ -548,6 +557,15 @@ extends Shard {
         BurstResult(completed, failed)
     }
   }
+
+  private def countDeltaFor(oldAndNewEdgeState: EdgeStateChange, metadataState: State): Int =
+    oldAndNewEdgeState match {
+      case (None, `metadataState`) => 1
+      case (Some(o), n) if o == n => 0
+      case (Some(_), `metadataState`) => 1
+      case (Some(`metadataState`), _) => -1
+      case (_, _) => 0
+    }
 
   private def updateCount(transaction: Transaction, sourceId: Long, countDelta: Int) = {
     transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
@@ -591,7 +609,9 @@ extends Shard {
               currentSourceId = edge.sourceId
               countDelta = 0
             }
-            countDelta += writeEdge(transaction, metadataById(edge.sourceId), edge, false)
+            val metadataForId = metadataById(edge.sourceId)
+            val preAndPostStates = writeEdge(transaction, metadataForId, edge, false)
+            countDelta += countDeltaFor(preAndPostStates, metadataForId.state)
           }
           updateCount(transaction, currentSourceId, countDelta)
         }
