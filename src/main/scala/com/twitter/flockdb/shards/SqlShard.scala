@@ -476,7 +476,7 @@ extends Shard {
 
   // returns the old and new edge states. `predictExistence`=true for normal
   // operations, false for copy/migrate
-  private def writeEdge(transaction: Transaction, metadata: Metadata, edge: Edge,
+  private def writeEdge(transaction: Transaction, edge: Edge,
                         predictExistence: Boolean): EdgeStateChange = {
     if (predictExistence) {
       transaction.selectOne(SelectModify,
@@ -514,7 +514,7 @@ extends Shard {
   private def write(edge: Edge, tries: Int, predictExistence: Boolean): Future[Unit] = {
     try {
       atomically(edge.sourceId) { (transaction, metadata) =>
-        val preAndPostStates = writeEdge(transaction, metadata, edge, predictExistence)
+        val preAndPostStates = writeEdge(transaction, edge, predictExistence)
         val countDelta = countDeltaFor(preAndPostStates, metadata.state)
         if (countDelta != 0) {
           transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
@@ -609,9 +609,8 @@ extends Shard {
               currentSourceId = edge.sourceId
               countDelta = 0
             }
-            val metadataForId = metadataById(edge.sourceId)
-            val preAndPostStates = writeEdge(transaction, metadataForId, edge, false)
-            countDelta += countDeltaFor(preAndPostStates, metadataForId.state)
+            val preAndPostStates = writeEdge(transaction, edge, false)
+            countDelta += countDeltaFor(preAndPostStates, metadataById(edge.sourceId).state)
           }
           updateCount(transaction, currentSourceId, countDelta)
         }
