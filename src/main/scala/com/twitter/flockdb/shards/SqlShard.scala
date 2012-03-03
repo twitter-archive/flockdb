@@ -512,16 +512,22 @@ extends Shard {
   }
 
   private def write(edge: Edge, tries: Int, predictExistence: Boolean): Future[Unit] = {
-    try {
-      atomically(edge.sourceId) { (transaction, metadata) =>
-        val preAndPostStates = writeEdge(transaction, edge, predictExistence)
-        val countDelta = countDeltaFor(preAndPostStates, metadata.state)
-        if (countDelta != 0) {
-          transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
-                              "WHERE source_id = ?", countDelta, edge.sourceId)
+    queryEvaluator.transaction { transaction =>
+      // insert the edge, and then acquire the metadata to update/populate its count
+      val preAndPostStates = writeEdge(transaction, edge, predictExistence)
+      atomically(transaction, edge.sourceId) { metadataOption =>
+        metadataOption.map { metadata =>
+          // metadata already existed: update its count
+          val countDelta = countDeltaFor(preAndPostStates, metadata.state)
+          if (countDelta != 0) {
+            updateCount(transaction, edge.sourceId, countDelta)
+          }
+        }.getOrElse {
+          // metadata doesn't exist: populate it from scratch (post-edge-insert)
+          populateMetadata(transaction, edge.sourceId, Normal)
         }
       }
-    } catch {
+    }.unit.rescue {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
         write(edge, tries - 1, predictExistence)
       case e: SQLIntegrityConstraintViolationException if (tries > 0) =>
@@ -568,7 +574,7 @@ extends Shard {
     }
 
   private def updateCount(transaction: Transaction, sourceId: Long, countDelta: Int) = {
-    transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = count + ? " +
+    transaction.execute("UPDATE " + tablePrefix + "_metadata SET count = GREATEST(count + ?, 0) " +
                         "WHERE source_id = ?", countDelta, sourceId)
   }
 
