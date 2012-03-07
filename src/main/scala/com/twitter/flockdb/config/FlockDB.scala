@@ -10,7 +10,7 @@ import com.twitter.flockdb.queries
 
 trait FlockDBServer extends TServer {
   var name = "flockdb_edges"
-  var port = 7915
+  var port = 6915
 }
 
 trait IntersectionQuery {
