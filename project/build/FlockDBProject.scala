@@ -13,10 +13,6 @@ with SubversionPublisher {
   val gizzard = "com.twitter" % "gizzard"         % "3.0.0-beta30" withSources()
   val scrooge = "com.twitter" % "scrooge-runtime" % "1.0.3"        withSources()
 
-  val finagleVersion  = "1.9.10"
-  val finagleThrift   = "com.twitter" % "finagle-thrift"   % finagleVersion withSources()
-  val finagleOstrich4 = "com.twitter" % "finagle-ostrich4" % finagleVersion withSources()
-
   val asm       = "asm"                     % "asm"          % "1.5.3" % "test"
   val cglib     = "cglib"                   % "cglib"        % "2.2"   % "test"
   val hamcrest  = "org.hamcrest"            % "hamcrest-all" % "1.1"   % "test"
