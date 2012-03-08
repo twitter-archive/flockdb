@@ -97,7 +97,6 @@ new FlockDB {
     errorStrobeInterval = 30.seconds
     perFlushItemLimit = 1000
     jitterRate = 0.0f
-    badJobQueue = new JsonJobLogger { name = "bad_jobs" }
   }
 
   val jobQueues = Map(
