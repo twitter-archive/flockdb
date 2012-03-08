@@ -23,7 +23,7 @@ trait IntersectionQuery {
 }
 
 trait FlockDB extends GizzardServer {
-  var server: new FlockDBServer
+  var server = new FlockDBServer
 
   var intersectionQuery: IntersectionQuery = new IntersectionQuery { }
   var aggregateJobsPageSize         = 500
