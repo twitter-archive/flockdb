@@ -440,15 +440,14 @@ extends Shard {
     ) {
       transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                           "position = ?, count = 0, state = ? " +
-                          "WHERE source_id = ? AND destination_id = ? AND " +
-                          "updated_at <= ? LIMIT 1",
+                          "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
                           edge.updatedAt.inSeconds, edge.position, edge.state.id,
                           edge.sourceId, edge.destinationId, edge.updatedAt.inSeconds)
     } else {
       try {
         transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                             "count = 0, state = ? " +
-                            "WHERE source_id = ? AND destination_id = ? AND updated_at <= ? LIMIT 1",
+                            "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
                             edge.updatedAt.inSeconds, edge.state.id, edge.sourceId,
                             edge.destinationId, edge.updatedAt.inSeconds)
       } catch {
@@ -457,7 +456,7 @@ extends Shard {
           // FIXME: hacky. remove with the new schema.
           transaction.execute("UPDATE " + tablePrefix + "_edges SET updated_at = ?, " +
                               "count = 0, state = ?, position = position + ? " +
-                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ? LIMIT 1",
+                              "WHERE source_id = ? AND destination_id = ? AND updated_at <= ?",
                               edge.updatedAt.inSeconds, edge.state.id,
                               (randomGenerator.nextInt() % 999) + 1, edge.sourceId,
                               edge.destinationId, edge.updatedAt.inSeconds)
@@ -469,7 +468,9 @@ extends Shard {
         case 1 => edge.state
         case 0 => oldEdge.state
         case x =>
-          throw new AssertionError("Invalid update count " + x + ": LIMIT statement not applied?")
+          throw new AssertionError(
+            "Invalid update count " + x + ": querying by primary key should make this impossible?"
+          )
       }
     (Some(oldEdge.state), newEdgeState)
   }
