@@ -53,13 +53,6 @@ class NameserverQueryEvaluator extends QueryEvaluator {
 }
 
 new FlockDB {
-  val server = new FlockDBServer with THsHaServer {
-    timeout = 100.millis
-    idleTimeout = 60.seconds
-    threadPool.minThreads = 250
-    threadPool.maxThreads = 250
-  }
-
   mappingFunction = Identity
   jobRelay        = NoJobRelay
 
@@ -75,15 +68,6 @@ new FlockDB {
   jobInjector.timeout               = 100.milliseconds
   jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
-
-
-  val readFuture = new Future {
-    poolSize = 100
-    maxPoolSize = 100
-    keepAlive = 5.seconds
-    timeout = 500.millis
-  }
-
 
   // Database Connectivity
 

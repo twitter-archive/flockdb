@@ -8,7 +8,7 @@ import com.twitter.flockdb.queries.QueryTree
 import com.twitter.flockdb.queries
 
 
-trait FlockDBServer extends TServer {
+class FlockDBServer {
   var name = "flockdb_edges"
   var port = 7915
 }
@@ -23,7 +23,7 @@ trait IntersectionQuery {
 }
 
 trait FlockDB extends GizzardServer {
-  def server: FlockDBServer
+  var server: new FlockDBServer
 
   var intersectionQuery: IntersectionQuery = new IntersectionQuery { }
   var aggregateJobsPageSize         = 500
@@ -33,8 +33,6 @@ trait FlockDB extends GizzardServer {
   def edgesQueryEvaluator: AsyncQueryEvaluator
   def lowLatencyQueryEvaluator: AsyncQueryEvaluator
   def materializingQueryEvaluator: AsyncQueryEvaluator
-
-  def readFuture: Future
 
   def adminConfig: AdminServiceConfig
 }
