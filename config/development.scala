@@ -54,26 +54,12 @@ class ProductionNameServerReplica(host: String) extends Mysql {
 new FlockDB {
   aggregateJobsPageSize = 500
 
-  val server = new FlockDBServer with TSelectorServer {
-    timeout = 100.millis
-    idleTimeout = 60.seconds
-    threadPool.minThreads = 250
-    threadPool.maxThreads = 250
-  }
-
   mappingFunction                   = ByteSwapper
   jobRelay                          = NoJobRelay
   nameServerReplicas                = Seq(new ProductionNameServerReplica("localhost"))
   jobInjector.timeout               = 100.millis
   jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
-
-  val readFuture = new Future {
-    poolSize = 100
-    maxPoolSize = 100
-    keepAlive = 5.seconds
-    timeout = 6.seconds
-  }
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
