@@ -136,8 +136,6 @@ class EdgesService(
     }
   }
 
-  // TODO: Is exception tracking here sufficient or do we need to fix Gizzard's LoggingProxy
-  // to work with async API?
   private[this] def logAndWrapException(rpcName: String, e: Throwable) = {
     val endpoint = serverName +"/"+ rpcName
     e match {
