@@ -102,26 +102,29 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
     config.aggregateJobsPageSize
   )
 
-  val flockThriftServer = new FlockDBThriftAdapter(
+  private val flockThriftServer = new FlockDBThriftAdapter(
     config.server.name,
     config.server.port,
     flockService
   )
 
+  private val loggingProxy = makeLoggingProxy[thrift.FlockDB.ThriftServer]()
+  lazy val loggingFlockThriftServer = loggingProxy(flockThriftServer)
+
   // satisfy service
 
   def start() {
     startGizzard()
-    flockThriftServer.start()
+    loggingFlockThriftServer.start()
   }
 
   def shutdown() {
-    flockThriftServer.shutdown()
+    loggingFlockThriftServer.shutdown()
     shutdownGizzard(false)
   }
 
   override def quiesce() {
-    flockThriftServer.shutdown()
+    loggingFlockThriftServer.shutdown()
     shutdownGizzard(true)
   }
 }
