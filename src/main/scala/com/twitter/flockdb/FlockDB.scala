@@ -53,17 +53,16 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
   val copyPriority = Priority.Medium.id
 
   val shardFactory = new SqlShardFactory(
-    config.edgesQueryEvaluator(stats),
-// TODO: need to add an apply() on AsyncQueryEvaluator that takes QueryFactory's.
-//      stats,
-//      new TransactionStatsCollectingDatabaseFactory(_),
-//      new TransactionStatsCollectingQueryFactory(_)
-//    ),
-    config.lowLatencyQueryEvaluator(stats),
-//      stats,
-//      new TransactionStatsCollectingDatabaseFactory(_),
-//      new TransactionStatsCollectingQueryFactory(_)
-//    ),
+    config.edgesQueryEvaluator(
+      stats,
+      new TransactionStatsCollectingDatabaseFactory(_),
+      new TransactionStatsCollectingQueryFactory(_)
+    ),
+    config.lowLatencyQueryEvaluator(
+      stats,
+      new TransactionStatsCollectingDatabaseFactory(_),
+      new TransactionStatsCollectingQueryFactory(_)
+    ),
     config.materializingQueryEvaluator(stats),
     config.databaseConnection
   )
