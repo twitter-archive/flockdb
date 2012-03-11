@@ -22,23 +22,12 @@ import com.twitter.ostrich.admin.Service
 import com.twitter.querulous.StatsCollector
 import com.twitter.gizzard.GizzardServer
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.proxy.ExceptionHandlingProxyFactory
 import com.twitter.gizzard.Stats
 import com.twitter.flockdb.shards.{Shard, SqlShardFactory}
 import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 
 
 class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service {
-  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
-    e match {
-      case _: thrift.FlockException =>
-        throw e
-      case _ =>
-        exceptionLog.error(e, "Error in FlockDB.")
-        throw new thrift.FlockException(e.toString)
-    }
-  })
-
   val stats = new StatsCollector {
     def incr(name: String, count: Int) = Stats.incr(name, count)
     def time[A](name: String)(f: => A): A = {
