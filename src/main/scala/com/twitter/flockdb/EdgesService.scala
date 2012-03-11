@@ -121,7 +121,8 @@ class EdgesService(
   def execute(operations: ExecuteOperations): Future[Unit] = {
     wrapRPC("execute") {
       Stats.transaction.name = "execute"
-      Future(executeCompiler(operations))
+      executeCompiler(operations)
+      Future.Unit
     }
   }
 
