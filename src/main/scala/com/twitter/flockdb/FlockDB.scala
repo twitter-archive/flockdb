@@ -91,39 +91,81 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
     config.aggregateJobsPageSize
   )
 
-  private val flockThriftServer = new FlockDBThriftAdapter(
+  private val flockThriftIface = new FlockDBThriftAdapter(flockService)
+  private val loggingProxy = makeLoggingProxy[thrift.FlockDB.FutureIface]()
+  lazy val loggingFlockThriftIface = loggingProxy(flockThriftIface)
+
+  private val flockThriftServer = new FlockDBThriftServer(
     config.server.name,
     config.server.port,
-    flockService
+    loggingFlockThriftIface
   )
-
-  private val loggingProxy = makeLoggingProxy[thrift.FlockDB.ThriftServer]()
-  lazy val loggingFlockThriftServer = loggingProxy(flockThriftServer)
 
   // satisfy service
 
   def start() {
     startGizzard()
-    loggingFlockThriftServer.start()
+    flockThriftServer.start()
   }
 
   def shutdown() {
-    loggingFlockThriftServer.shutdown()
+    flockThriftServer.shutdown()
     shutdownGizzard(false)
   }
 
   override def quiesce() {
-    loggingFlockThriftServer.shutdown()
+    flockThriftServer.shutdown()
     shutdownGizzard(true)
   }
 }
 
-
-class FlockDBThriftAdapter(
+class FlockDBThriftServer(
   val serverName: String,
   val thriftPort: Int,
-  val edges: EdgesService)
+  val ifaceImpl: thrift.FlockDB.FutureIface)
 extends thrift.FlockDB.ThriftServer {
+  def contains(`sourceId`: Long, `graphId`: Int, `destinationId`: Long) = {
+    ifaceImpl.contains(sourceId, graphId, destinationId)
+  }
+
+  def get(`sourceId`: Long, `graphId`: Int, `destinationId`: Long) = {
+    ifaceImpl.get(sourceId, graphId, destinationId)
+  }
+
+  def getMetadata(`sourceId`: Long, `graphId`: Int) = {
+    ifaceImpl.getMetadata(sourceId, graphId)
+  }
+
+  def containsMetadata(`sourceId`: Long, `graphId`: Int) = {
+    ifaceImpl.containsMetadata(sourceId, graphId)
+  }
+
+  def select2(`queries`: Seq[thrift.SelectQuery]) = {
+    ifaceImpl.select2(queries)
+  }
+
+  def count2(`queries`: Seq[Seq[thrift.SelectOperation]]) = {
+    ifaceImpl.count2(queries)
+  }
+
+  def selectEdges(`queries`: Seq[thrift.EdgeQuery]) = {
+    ifaceImpl.selectEdges(queries)
+  }
+
+  def execute(`operations`: thrift.ExecuteOperations) = {
+    ifaceImpl.execute(operations)
+  }
+
+  def count(`operations`: Seq[thrift.SelectOperation]) = {
+    ifaceImpl.count(operations)
+  }
+
+  def select(`operations`: Seq[thrift.SelectOperation], `page`: thrift.Page) = {
+    ifaceImpl.select(operations, page)
+  }
+}
+
+class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.FutureIface {
   import com.twitter.flockdb.operations._
   import java.nio.{BufferUnderflowException, ByteBuffer, ByteOrder}
 
