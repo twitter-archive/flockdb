@@ -94,7 +94,7 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
   private val flockThriftServer = {
     val flockThriftIface = new FlockDBThriftAdapter(flockService)
     val loggingProxy = makeLoggingProxy[thrift.FlockDB.FutureIface]()
-    lazy val loggingFlockThriftIface = loggingProxy(flockThriftIface)
+    val loggingFlockThriftIface = loggingProxy(flockThriftIface)
     new FlockDBThriftServer(
       config.server.name,
       config.server.port,
