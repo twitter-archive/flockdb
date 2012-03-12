@@ -121,7 +121,10 @@ class EdgesService(
   def execute(operations: ExecuteOperations): Future[Unit] = {
     wrapRPC("execute") {
       Stats.transaction.name = "execute"
-      Future(executeCompiler(operations))
+      // TODO: This results in a kestrel enqueue, which can block on disk I/O. Consider moving this work
+      // to a separate threadpool.
+      executeCompiler(operations)
+      Future.Unit
     }
   }
 

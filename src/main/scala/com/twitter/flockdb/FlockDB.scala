@@ -22,23 +22,12 @@ import com.twitter.ostrich.admin.Service
 import com.twitter.querulous.StatsCollector
 import com.twitter.gizzard.GizzardServer
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.proxy.ExceptionHandlingProxyFactory
 import com.twitter.gizzard.Stats
 import com.twitter.flockdb.shards.{Shard, SqlShardFactory}
 import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 
 
 class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service {
-  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
-    e match {
-      case _: thrift.FlockException =>
-        throw e
-      case _ =>
-        exceptionLog.error(e, "Error in FlockDB.")
-        throw new thrift.FlockException(e.toString)
-    }
-  })
-
   val stats = new StatsCollector {
     def incr(name: String, count: Int) = Stats.incr(name, count)
     def time[A](name: String)(f: => A): A = {
@@ -102,11 +91,16 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
     config.aggregateJobsPageSize
   )
 
-  val flockThriftServer = new FlockDBThriftAdapter(
-    config.server.name,
-    config.server.port,
-    flockService
-  )
+  private val flockThriftServer = {
+    val flockThriftIface = new FlockDBThriftAdapter(flockService)
+    val loggingProxy = makeLoggingProxy[thrift.FlockDB.FutureIface]()
+    val loggingFlockThriftIface = loggingProxy(flockThriftIface)
+    new FlockDBThriftServer(
+      config.server.name,
+      config.server.port,
+      loggingFlockThriftIface
+    )
+  }
 
   // satisfy service
 
@@ -126,12 +120,53 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
   }
 }
 
-
-class FlockDBThriftAdapter(
+class FlockDBThriftServer(
   val serverName: String,
   val thriftPort: Int,
-  val edges: EdgesService)
+  val ifaceImpl: thrift.FlockDB.FutureIface)
 extends thrift.FlockDB.ThriftServer {
+  def contains(`sourceId`: Long, `graphId`: Int, `destinationId`: Long) = {
+    ifaceImpl.contains(sourceId, graphId, destinationId)
+  }
+
+  def get(`sourceId`: Long, `graphId`: Int, `destinationId`: Long) = {
+    ifaceImpl.get(sourceId, graphId, destinationId)
+  }
+
+  def getMetadata(`sourceId`: Long, `graphId`: Int) = {
+    ifaceImpl.getMetadata(sourceId, graphId)
+  }
+
+  def containsMetadata(`sourceId`: Long, `graphId`: Int) = {
+    ifaceImpl.containsMetadata(sourceId, graphId)
+  }
+
+  def select2(`queries`: Seq[thrift.SelectQuery]) = {
+    ifaceImpl.select2(queries)
+  }
+
+  def count2(`queries`: Seq[Seq[thrift.SelectOperation]]) = {
+    ifaceImpl.count2(queries)
+  }
+
+  def selectEdges(`queries`: Seq[thrift.EdgeQuery]) = {
+    ifaceImpl.selectEdges(queries)
+  }
+
+  def execute(`operations`: thrift.ExecuteOperations) = {
+    ifaceImpl.execute(operations)
+  }
+
+  def count(`operations`: Seq[thrift.SelectOperation]) = {
+    ifaceImpl.count(operations)
+  }
+
+  def select(`operations`: Seq[thrift.SelectOperation], `page`: thrift.Page) = {
+    ifaceImpl.select(operations, page)
+  }
+}
+
+class FlockDBThriftAdapter(val edges: EdgesService) extends thrift.FlockDB.FutureIface {
   import com.twitter.flockdb.operations._
   import java.nio.{BufferUnderflowException, ByteBuffer, ByteOrder}
 
