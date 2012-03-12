@@ -91,15 +91,16 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
     config.aggregateJobsPageSize
   )
 
-  private val flockThriftIface = new FlockDBThriftAdapter(flockService)
-  private val loggingProxy = makeLoggingProxy[thrift.FlockDB.FutureIface]()
-  lazy val loggingFlockThriftIface = loggingProxy(flockThriftIface)
-
-  private val flockThriftServer = new FlockDBThriftServer(
-    config.server.name,
-    config.server.port,
-    loggingFlockThriftIface
-  )
+  private val flockThriftServer = {
+    val flockThriftIface = new FlockDBThriftAdapter(flockService)
+    val loggingProxy = makeLoggingProxy[thrift.FlockDB.FutureIface]()
+    lazy val loggingFlockThriftIface = loggingProxy(flockThriftIface)
+    new FlockDBThriftServer(
+      config.server.name,
+      config.server.port,
+      loggingFlockThriftIface
+    )
+  }
 
   // satisfy service
 
