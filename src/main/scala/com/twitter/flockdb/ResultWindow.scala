@@ -58,13 +58,16 @@ class ResultWindow[T](val data: ResultWindowRows[T], val inNextCursor: Cursor, v
   val nextCursor = if (nextChanged && !page.isEmpty) page(page.size - 1).cursor else inNextCursor
   val prevCursor = if (prevChanged && !page.isEmpty) page(0).cursor.reverse else inPrevCursor
 
-  def ++(other: ResultWindow[T]) = {
+  def ++(other: ResultWindow[T]) = concat(other)
+
+  def concat(other: ResultWindow[T], newCount: Int = count) = {
     if (cursor < Cursor.Start) {
-      new ResultWindow(new ResultWindowRows(other.page ++ page), nextCursor, other.prevCursor, count, cursor)
+      new ResultWindow(new ResultWindowRows(other.page ++ page), nextCursor, other.prevCursor, newCount, cursor)
     } else {
-      new ResultWindow(new ResultWindowRows(page ++ other.page), other.nextCursor, prevCursor, count, cursor)
+      new ResultWindow(new ResultWindowRows(page ++ other.page), other.nextCursor, prevCursor, newCount, cursor)
     }
   }
+
 
   def merge(other: ResultWindow[T]) = {
     val newPage = Sorting.stableSort((Set((page ++ other.page): _*)).toSeq)
@@ -73,12 +76,14 @@ class ResultWindow[T](val data: ResultWindowRows[T], val inNextCursor: Cursor, v
     new ResultWindow(new ResultWindowRows(newPage), newNextCursor, newPrevCursor, count, cursor)
   }
 
-  def --(values: Seq[T]) = {
+  def --(values: Seq[T]) = diff(values)
+
+  def diff(values: Seq[T], newCount: Int = count) = {
     val rejects = Set(values: _*)
     val newPage = page.filter { row => !rejects.contains(row.id) }
     val newNextCursor = if (nextCursor == Cursor.End || newPage.size == 0) Cursor.End else newPage(newPage.size - 1).cursor
     val newPrevCursor = if (prevCursor == Cursor.End || newPage.size == 0) Cursor.End else newPage(0).cursor.reverse
-    new ResultWindow(new ResultWindowRows(newPage), newNextCursor, newPrevCursor, count, cursor)
+    new ResultWindow(new ResultWindowRows(newPage), newNextCursor, newPrevCursor, newCount, cursor)
   }
 
   def length = page.length

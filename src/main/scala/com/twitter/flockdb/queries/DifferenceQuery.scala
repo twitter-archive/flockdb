@@ -51,7 +51,7 @@ class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionP
   private def pageDifference(internalPageSize: Int, count: Int, cursor: Cursor) = {
     val results = query1.selectPageByDestinationId(internalPageSize, cursor)
     val rejects = query2.selectWhereIn(results.view)
-    results -- rejects
+    results.diff(rejects, count)
   }
 
   override def toString =
