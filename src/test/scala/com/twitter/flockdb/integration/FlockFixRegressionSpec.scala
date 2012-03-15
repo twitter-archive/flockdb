@@ -17,18 +17,13 @@
 package com.twitter.flockdb
 package integration
 
-import scala.collection.JavaConversions._
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import com.twitter.gizzard.shards.ShardInfo
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
-import com.twitter.flockdb
-import com.twitter.flockdb.{SelectQuery, Metadata}
+import com.twitter.conversions.time._
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.multi.Multi
 import shards.{Shard, SqlShard}
-import thrift._
 
 class FlockFixRegressionSpec extends IntegrationSpecification {
   val alice = 1L
@@ -36,12 +31,11 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
   val pageSize = 100
 
   def alicesFollowings() = {
-    val term = new QueryTerm(alice, FOLLOWS, true)
-    term.setState_ids(List[Int](State.Normal.id))
-    val query = new EdgeQuery(term, new Page(pageSize, Cursor.Start.position))
-    val resultsList = flockService.select_edges(List[EdgeQuery](query)).toList
+    val term = QueryTerm(alice, FOLLOWS, true, None, List(State.Normal))
+    val query = EdgeQuery(term, Page(pageSize, Cursor.Start))
+    val resultsList = flockService.selectEdges(List(query))()
     resultsList.size mustEqual 1
-    resultsList(0).edges
+    resultsList(0).toList
   }
 
   "select results" should {
@@ -50,9 +44,9 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
 
       for(i <- 0 until 10) {
         if (i % 2 == 0) {
-          flockService.execute(Select(alice, FOLLOWS, i).add.toThrift)
+          execute(Select(alice, FOLLOWS, i).add)
         } else {
-          flockService.execute(Select(alice, FOLLOWS, i).archive.toThrift)
+          execute(Select(alice, FOLLOWS, i).archive)
         }
         Thread.sleep(1000) // prevent same-millisecond collision
       }
@@ -60,16 +54,16 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
       flock.jobScheduler.size must eventually(be(0)) // Make sure adds get applied.  I can't wait for Time.asOf()
 
       alicesFollowings().size must eventually(be_==(5))
-      alicesFollowings().toList.map(_.destination_id) mustEqual List(8,6,4,2,0)
+      alicesFollowings().toList.map(_.destinationId) mustEqual List(8,6,4,2,0)
 
       Thread.sleep(1000)
 
-      val job = new Multi(alice, FOLLOWS, Direction.Forward, State.Normal, Time.now, flockdb.Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler)
+      val job = new Multi(alice, FOLLOWS, Direction.Forward, State.Normal, Time.now, Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler)
       job()
 
       alicesFollowings().size must eventually(be(10))
 
-      alicesFollowings().toList.map(_.destination_id) mustEqual List(9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+      alicesFollowings().toList.map(_.destinationId) mustEqual List(9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
     }
   }
 

@@ -27,6 +27,7 @@ import com.twitter.flockdb.shards.Shard
 import com.twitter.flockdb.shards.LockingNodeSet._
 
 
+// TODO: Make this async.
 class SingleJobParser(
   forwardingManager: ForwardingManager,
   uuidGenerator: UuidGenerator)
@@ -123,10 +124,10 @@ extends JsonJob {
   def writeToShard(shards: NodeSet[Shard], sourceId: Long, destinationId: Long, uuid: Long, state: State) = {
     shards.skip(successes) all { (shardId, shard) =>
       state match {
-        case State.Normal   => shard.add(sourceId, destinationId, uuid, updatedAt)
-        case State.Removed  => shard.remove(sourceId, destinationId, uuid, updatedAt)
-        case State.Archived => shard.archive(sourceId, destinationId, uuid, updatedAt)
-        case State.Negative => shard.negate(sourceId, destinationId, uuid, updatedAt)
+        case State.Normal   => shard.add(sourceId, destinationId, uuid, updatedAt)()
+        case State.Removed  => shard.remove(sourceId, destinationId, uuid, updatedAt)()
+        case State.Archived => shard.archive(sourceId, destinationId, uuid, updatedAt)()
+        case State.Negative => shard.negate(sourceId, destinationId, uuid, updatedAt)()
       }
 
       shardId

@@ -98,4 +98,7 @@ class ResultWindow[T](val data: ResultWindowRows[T], val inNextCursor: Cursor, v
     case that: ResultWindow[_] => iterator.toList == that.iterator.toList && nextCursor == that.nextCursor && prevCursor == that.prevCursor && cursor == that.cursor
     case _ => false
   }
+
+  // convenience method that makes for easier matching in tests
+  def toTuple = (iterator.toList, nextCursor, prevCursor)
 }
