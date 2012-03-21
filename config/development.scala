@@ -18,9 +18,10 @@ trait Credentials extends Connection {
 }
 
 class ProductionQueryEvaluator extends AsyncQueryEvaluator {
+  workPoolSize = 40
   database.memoize = true
   database.pool = new ThrottledPoolingDatabase {
-    size = 40
+    size = workPoolSize
     openTimeout = 100.millis
   }
 
@@ -72,8 +73,9 @@ new FlockDB {
   val lowLatencyQueryEvaluator = edgesQueryEvaluator
 
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
+    workPoolSize = 1
     database.pool = new ThrottledPoolingDatabase {
-      size = 1
+      size = workPoolSize
       openTimeout = 1.second
     }
   }
