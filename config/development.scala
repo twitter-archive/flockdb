@@ -18,7 +18,7 @@ trait Credentials extends Connection {
 }
 
 class ProductionQueryEvaluator extends AsyncQueryEvaluator {
-  workPoolSize = 40
+  override var workPoolSize = 40
   database.memoize = true
   database.pool = new ThrottledPoolingDatabase {
     size = workPoolSize
