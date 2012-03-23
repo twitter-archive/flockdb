@@ -24,11 +24,11 @@ trait Credentials extends Connection {
 
 class TestQueryEvaluator(label: String) extends AsyncQueryEvaluator {
   query.debug = { s => Logger.get("query").debug(s) }
-  workPoolSize = Some(2)
+  workPoolSize = 2
   singletonFactory = true
   database.memoize = true
   database.pool = new ThrottledPoolingDatabase {
-    size = workPoolSize.get
+    size = workPoolSize
     openTimeout = 5.seconds
   }
 
