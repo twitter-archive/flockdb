@@ -16,161 +16,176 @@
 
 package com.twitter.flockdb
 
+import com.twitter.logging.Logger
 import com.twitter.gizzard.Stats
-import com.twitter.gizzard.util.Future
 import com.twitter.gizzard.nameserver.{NameServer, NonExistentShard, InvalidShard}
 import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobScheduler}
-import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
-  ShardOfflineException, ShardTimeoutException}
-import com.twitter.gizzard.thrift.conversions.Sequences._
-import operations.{ExecuteOperations, SelectOperation}
-import com.twitter.logging.Logger
-import queries._
-import thrift.FlockException
+import com.twitter.gizzard.shards._
+import com.twitter.flockdb.operations.{ExecuteOperations, SelectOperation}
+import com.twitter.flockdb.queries._
+import com.twitter.flockdb.thrift.FlockException
+import com.twitter.util.Future
 
 class EdgesService(
   forwardingManager: ForwardingManager,
   schedule: PrioritizingJobScheduler,
   jobFilter: JobFilter,
-  future: Future,
   intersectionQueryConfig: config.IntersectionQuery,
   aggregateJobsPageSize: Int) {
 
+  // TODO: Make serverName configurable.
+  private val serverName = "edges"
   private val log = Logger.get(getClass.getName)
   private val exceptionLog = Logger.get("exception")
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
   private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, jobFilter, aggregateJobsPageSize)
 
-  def shutdown() {
-    schedule.shutdown()
-    future.shutdown()
-  }
-
-  def containsMetadata(sourceId: Long, graphId: Int): Boolean = {
-    rethrowExceptionsAsThrift {
+  def containsMetadata(sourceId: Long, graphId: Int): Future[Boolean] = {
+    wrapRPC("contains_metadata") {
       val name = "contains-metadata"
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
-      forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).isDefined
+      forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId) map { _.isDefined }
     }
   }
 
-  def contains(sourceId: Long, graphId: Int, destinationId: Long): Boolean = {
-    rethrowExceptionsAsThrift {
+  def contains(sourceId: Long, graphId: Int, destinationId: Long): Future[Boolean] = {
+    wrapRPC("contains") {
       val name = "contains"
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
-      forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).map { edge =>
-        edge.state == State.Normal || edge.state == State.Negative
-      }.getOrElse(false)
+      forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) map {
+        _ map { edge => edge.state == State.Normal || edge.state == State.Negative } getOrElse false
+      }
     }
   }
 
-  def get(sourceId: Long, graphId: Int, destinationId: Long): Edge = {
-    rethrowExceptionsAsThrift {
+  def get(sourceId: Long, graphId: Int, destinationId: Long): Future[Edge] = {
+    wrapRPC("get") {
       val name = "get"
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
-      forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId).getOrElse {
-        throw new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId))
+      forwardingManager.find(sourceId, graphId, Direction.Forward).get(sourceId, destinationId) flatMap {
+        case Some(edge) => Future(edge)
+        case _ => Future.exception(new FlockException("Record not found: (%d, %d, %d)".format(sourceId, graphId, destinationId)))
       }
     }
   }
 
-  def getMetadata(sourceId: Long, graphId: Int): Metadata = {
-    rethrowExceptionsAsThrift {
+  def getMetadata(sourceId: Long, graphId: Int): Future[Metadata] = {
+    wrapRPC("get_metadata") {
       val name = "get-metadata"
       Stats.transaction.name = name
       Stats.incr(name + "-graph_" + graphId + "-count")
-      forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId).getOrElse {
-        throw new FlockException("Record not found: (%d, %d)".format(sourceId, graphId))
+      forwardingManager.find(sourceId, graphId, Direction.Forward).getMetadata(sourceId) flatMap {
+        case Some(metadata) => Future(metadata)
+        case _ => Future.exception(new FlockException("Record not found: (%d, %d)".format(sourceId, graphId)))
       }
     }
   }
 
-  def select(query: SelectQuery): ResultWindow[Long] = select(List(query)).head
+  def select(query: SelectQuery): Future[ResultWindow[Long]] = select(List(query)) map { _.head }
 
-  def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
-    rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
-        try {
-          val queryTree = selectCompiler(query.operations)
-          val rv = queryTree.select(query.page)
+  def select(queries: Seq[SelectQuery]): Future[Seq[ResultWindow[Long]]] = {
+    wrapRPC("select") {
+      Future.collect(queries map { query =>
+        val queryTree = selectCompiler(query.operations)
+        queryTree.select(query.page) onSuccess { _ =>
           Stats.transaction.record(queryTree.toString)
-          rv
-        } catch {
+        } rescue {
           case e: ShardBlackHoleException =>
-            throw new FlockException("Shard is blackholed: " + e)
+            Future.exception(new FlockException("Shard is blackholed: " + e))
         }
-      }
+      })
     }
   }
 
-  def selectEdges(queries: Seq[EdgeQuery]): Seq[ResultWindow[Edge]] = {
-    rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
+  def selectEdges(queries: Seq[EdgeQuery]): Future[Seq[ResultWindow[Edge]]] = {
+    wrapRPC("select_edges") {
+      Future.collect(queries map { query =>
         val term = query.term
         Stats.incr("select-edge-graph_" + (if (term.isForward) "" else "n") + term.graphId + "-count")
         val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
         val states = if (term.states.isEmpty) List(State.Normal) else term.states
 
         if (term.destinationIds.isDefined) {
-          val results = shard.intersectEdges(term.sourceId, states, term.destinationIds.get)
-          new ResultWindow(results.map { edge => (edge, Cursor(edge.destinationId)) }, query.page.count, query.page.cursor)
+          shard.intersectEdges(term.sourceId, states, term.destinationIds.get) map { results =>
+            new ResultWindow(results.map { edge => (edge, Cursor(edge.destinationId)) }, query.page.count, query.page.cursor)
+          }
         } else {
           shard.selectEdges(term.sourceId, states, query.page.count, query.page.cursor)
         }
-      }
+      })
     }
   }
 
-  def execute(operations: ExecuteOperations) {
-    rethrowExceptionsAsThrift {
+  def execute(operations: ExecuteOperations): Future[Unit] = {
+    wrapRPC("execute") {
       Stats.transaction.name = "execute"
+      // TODO: This results in a kestrel enqueue, which can block on disk I/O. Consider moving this work
+      // to a separate threadpool.
       executeCompiler(operations)
+      Future.Unit
     }
   }
 
-  def count(queries: Seq[Seq[SelectOperation]]): Seq[Int] = {
-    rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
+  def count(queries: Seq[Seq[SelectOperation]]): Future[Seq[Int]] = {
+    wrapRPC("count") {
+      Future.collect(queries map { query =>
         val queryTree = selectCompiler(query)
-        val rv = queryTree.sizeEstimate
-        Stats.transaction.record(queryTree.toString)
-        rv
-      }
+        queryTree.sizeEstimate onSuccess { _ =>
+          Stats.transaction.record(queryTree.toString)
+        }
+      })
     }
   }
 
-  private def countAndRethrow(e: Throwable) = {
-    Stats.incr("exceptions-" + e.getClass.getName.split("\\.").last)
-    throw(new FlockException(e.getMessage))
-  }
-
-  private def rethrowExceptionsAsThrift[A](block: => A): A = {
-    try {
-      block
-    } catch {
+  private[this] def logAndWrapException(rpcName: String, e: Throwable) = {
+    val endpoint = serverName +"/"+ rpcName
+    e match {
       case e: NonExistentShard =>
-        log.error(e, "NonexistentShard: %s", e)
-        throw(new FlockException(e.getMessage))
+        Stats.incr("nonexistent_shard_error_count")
+        log.error(e, "Nonexistent shard: %s", e)
       case e: InvalidShard =>
-        log.error(e, "NonexistentShard: %s", e)
-        throw(new FlockException(e.getMessage))
+        Stats.incr("invalid_shard_error_count")
+        log.error(e, "Invalid shard: %s", e)
       case e: FlockException =>
-        Stats.incr(e.getClass.getName)
-        throw(e)
-      case e: ShardTimeoutException =>
-        countAndRethrow(e)
+        Stats.incr("normal_error_count_" + endpoint)
       case e: ShardDatabaseTimeoutException =>
-        countAndRethrow(e)
+          Stats.incr("timeout_count_" + endpoint)
+      case e: ShardTimeoutException =>
+        Stats.incr("timeout_count_" + endpoint)
       case e: ShardOfflineException =>
-        countAndRethrow(e)
-      case e: Throwable =>
-        Stats.incr("exceptions-unknown")
+        Stats.incr("offline_count_" + endpoint)
+      case _ =>
+        Stats.incr("internal_error_count_" + endpoint)
         exceptionLog.error(e, "Unhandled error in EdgesService", e)
         log.error("Unhandled error in EdgesService: " + e.toString)
-        throw(new FlockException(e.toString))
+    }
+
+    e match {
+      case e: FlockException => Future.exception(e)
+      case _ => Future.exception(new FlockException("%s: %s".format(e.getClass.getName, e.getMessage)))
+    }
+  }
+
+  private[this] def timeFuture[T](label: String)(f: => Future[T]) = {
+    Stats.timeFutureMillis(serverName +"/"+ label)(f)
+  }
+
+  private[this] def wrapRPC[T](rpcName: String)(f: => Future[T]) = timeFuture(rpcName) {
+    val rv = try {
+      f
+    } catch {
+      case e => Future.exception(e)
+    }
+
+    rv respond { _ =>
+      Stats.incr(serverName +"/"+ rpcName +"_count")
+    } onSuccess { _ =>
+      Stats.incr(serverName +"/"+ rpcName +"_success_count")
+    } rescue {
+      case e => logAndWrapException(rpcName, e)
     }
   }
 }

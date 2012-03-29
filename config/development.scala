@@ -17,17 +17,24 @@ trait Credentials extends Connection {
   val password = env.get("DB_PASSWORD").getOrElse("")
 }
 
-class ProductionQueryEvaluator extends QueryEvaluator {
-  autoDisable = new AutoDisablingQueryEvaluator {
-    val errorCount = 100
-    val interval = 60.seconds
-  }
-
+class ProductionQueryEvaluator extends AsyncQueryEvaluator {
+  override var workPoolSize = 40
   database.memoize = true
   database.pool = new ThrottledPoolingDatabase {
-    size = 40
+    size = workPoolSize
     openTimeout = 100.millis
   }
+
+  query.timeouts = Map(
+    QueryClass.Select                  -> QueryTimeout(1.second),
+    QueryClass.Execute                 -> QueryTimeout(1.second),
+    QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
+    QueryClass.SelectModify            -> QueryTimeout(3.seconds),
+    QueryClass.SelectSingle            -> QueryTimeout(1.second),
+    QueryClass.SelectIntersection      -> QueryTimeout(1.second),
+    QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
+    QueryClass.SelectMetadata          -> QueryTimeout(1.second)
+  )
 }
 
 class ProductionNameServerReplica(host: String) extends Mysql {
@@ -36,28 +43,17 @@ class ProductionNameServerReplica(host: String) extends Mysql {
     val database = "flockdb_development"
   }
 
-  queryEvaluator = new ProductionQueryEvaluator {
+  queryEvaluator = new QueryEvaluator {
+    database.memoize = true
     database.pool = new ThrottledPoolingDatabase {
       size = 1
       openTimeout = 1.second
     }
-
-    query.timeouts = Map(
-      QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second)
-    )
   }
 }
 
 new FlockDB {
   aggregateJobsPageSize = 500
-
-  val server = new FlockDBServer with TSelectorServer {
-    timeout = 100.millis
-    idleTimeout = 60.seconds
-    threadPool.minThreads = 250
-    threadPool.maxThreads = 250
-  }
 
   mappingFunction                   = ByteSwapper
   jobRelay                          = NoJobRelay
@@ -66,37 +62,20 @@ new FlockDB {
   jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
 
-  val readFuture = new Future {
-    poolSize = 100
-    maxPoolSize = 100
-    keepAlive = 5.seconds
-    timeout = 6.seconds
-  }
-
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
     val database = "edges_development"
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
-  val edgesQueryEvaluator = new ProductionQueryEvaluator {
-    query.timeouts = Map(
-      QueryClass.Select                  -> QueryTimeout(1.second),
-      QueryClass.Execute                 -> QueryTimeout(1.second),
-      QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
-      QueryClass.SelectModify            -> QueryTimeout(3.seconds),
-      QueryClass.SelectSingle            -> QueryTimeout(1.second),
-      QueryClass.SelectIntersection      -> QueryTimeout(1.second),
-      QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
-      QueryClass.SelectMetadata          -> QueryTimeout(1.second)
-    )
-  }
+  val edgesQueryEvaluator = new ProductionQueryEvaluator
 
   val lowLatencyQueryEvaluator = edgesQueryEvaluator
 
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
+    workPoolSize = 1
     database.pool = new ThrottledPoolingDatabase {
-      size = 1
+      size = workPoolSize
       openTimeout = 1.second
     }
   }

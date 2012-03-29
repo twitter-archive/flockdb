@@ -16,17 +16,10 @@
 
 package com.twitter.flockdb
 
-import scala.collection.JavaConversions._
-import java.util.{List => JList}
-import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.conversions.time._
 import com.twitter.util.Time
-import com.twitter.util.TimeConversions._
-import conversions.ExecuteOperation._
-import conversions.ExecuteOperations._
-import conversions.Priority._
-import conversions.SelectOperation._
-import operations.SelectOperationType._
-import operations._
+import com.twitter.flockdb.operations.SelectOperationType._
+import com.twitter.flockdb.operations._
 
 
 object Select {
@@ -52,14 +45,13 @@ object Select {
 }
 
 trait Select {
-  def toThrift: JList[thrift.SelectOperation] = toList
-  def toList: List[thrift.SelectOperation]
+  def toList: List[SelectOperation]
   def intersect(that: Select): Select = new CompoundSelect(Intersection, this, that)
+  def difference(that: Select): Select = new CompoundSelect(Difference, this, that)
 }
 
 trait Execute {
-  def toThrift: thrift.ExecuteOperations
-  def toOperations: List[thrift.ExecuteOperation]
+  def toOperations: List[ExecuteOperation]
   def at(time: Time): Execute
   def +(execute: Execute): Execute
 }
@@ -71,7 +63,7 @@ object NullSelect extends Select {
 }
 
 case class SimpleSelect(operation: SelectOperation) extends Select {
-  def toList = List(operation.toThrift)
+  def toList = List(operation)
 
   def addAt(at: Time) = execute(ExecuteOperationType.Add, at)
   def add = addAt(Time.now)
@@ -99,26 +91,16 @@ case class SimpleSelect(operation: SelectOperation) extends Select {
 }
 
 case class CompoundSelect(operation: SelectOperationType.Value, operand1: Select, operand2: Select) extends Select {
-  def toList = operand1.toList ++ operand2.toList ++ List(new SelectOperation(operation, None).toThrift)
+  def toList = operand1.toList ++ operand2.toList ++ List(new SelectOperation(operation, None))
 }
 
 case class SimpleExecute(operation: ExecuteOperation, at: Time) extends Execute {
-  def toThrift = {
-    val rv = new thrift.ExecuteOperations(toOperations, thrift.Priority.High)
-    rv.setExecute_at(at.inSeconds)
-    rv
-  }
-  def toOperations = List(operation.toThrift)
+  def toOperations = List(operation)
   def at(time: Time) = new SimpleExecute(operation, time)
   def +(execute: Execute) = new CompoundExecute(this, execute, at, Priority.High)
 }
 
 case class CompoundExecute(operand1: Execute, operand2: Execute, at: Time, priority: Priority.Value) extends Execute {
-  def toThrift = {
-    val rv = new thrift.ExecuteOperations(toOperations, priority.toThrift)
-    rv.setExecute_at(at.inSeconds)
-    rv
-  }
   def toOperations = operand1.toOperations ++ operand2.toOperations
 
   def +(execute: Execute) = new CompoundExecute(this, execute, at, priority)

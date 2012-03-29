@@ -20,7 +20,7 @@ package unit
 import scala.collection.mutable
 import com.twitter.gizzard.scheduler.{JsonJob, PrioritizingJobScheduler}
 import com.twitter.gizzard.shards._
-import com.twitter.util.Time
+import com.twitter.util.{Future, Time}
 import com.twitter.util.TimeConversions._
 import org.specs.mock.{ClassMocker, JMocker}
 import com.twitter.flockdb
@@ -66,26 +66,26 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
           allowing(forwardingManager).findNode(mary, FOLLOWS, Backward) willReturn shards(1)
 
           // Before
-          one(mocks(0)).getMetadataForWrite(bob) willReturn Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second))
-          one(mocks(1)).getMetadataForWrite(mary) willReturn Some(new Metadata(mary, maryBefore, 1, Time.now - 1.second))
+          one(mocks(0)).getMetadataForWrite(bob) willReturn Future(Some(new Metadata(bob, bobBefore, 1, Time.now - 1.second)))
+          one(mocks(1)).getMetadataForWrite(mary) willReturn Future(Some(new Metadata(mary, maryBefore, 1, Time.now - 1.second)))
 
           // After
-          allowing(mocks(0)).getMetadataForWrite(bob) willReturn Some(new Metadata(mary, bobAfter, 1, Time.now))
-          allowing(mocks(1)).getMetadataForWrite(mary) willReturn Some(new Metadata(mary, maryAfter, 1, Time.now))
+          allowing(mocks(0)).getMetadataForWrite(bob) willReturn Future(Some(new Metadata(mary, bobAfter, 1, Time.now)))
+          allowing(mocks(1)).getMetadataForWrite(mary) willReturn Future(Some(new Metadata(mary, maryAfter, 1, Time.now)))
 
           // Results
           applied match {
             case Normal => {
-              one(mocks(0)).add(bob, mary, 1, Time.now)
-              one(mocks(1)).add(mary, bob, 1, Time.now)
+              one(mocks(0)).add(bob, mary, 1, Time.now)()
+              one(mocks(1)).add(mary, bob, 1, Time.now)()
             }
             case Archived => {
-              one(mocks(0)).archive(bob, mary, 1, Time.now)
-              one(mocks(1)).archive(mary, bob, 1, Time.now)
+              one(mocks(0)).archive(bob, mary, 1, Time.now)()
+              one(mocks(1)).archive(mary, bob, 1, Time.now)()
             }
             case Removed => {
-              one(mocks(0)).remove(bob, mary, 1, Time.now)
-              one(mocks(1)).remove(mary, bob, 1, Time.now)
+              one(mocks(0)).remove(bob, mary, 1, Time.now)()
+              one(mocks(1)).remove(mary, bob, 1, Time.now)()
             }
           }
         }

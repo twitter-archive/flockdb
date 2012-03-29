@@ -26,19 +26,19 @@ class SimpleQuery(shard: Shard, sourceId: Long, states: Seq[State]) extends Simp
     time(shard.count(sourceId, states))
   }
 
-  def selectWhereIn(page: Seq[Long]) = {
+  def selectWhereIn(page: Seq[Long]) = time {
     Stats.transaction.record("Intersecting "+page.size+" ids from "+shard)
-    time(shard.intersect(sourceId, states, page))
+    shard.intersect(sourceId, states, page)
   }
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = {
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time {
     Stats.transaction.record("Selecting "+count+" destinationIds from "+shard)
-    time(shard.selectByDestinationId(sourceId, states, count, cursor))
+    shard.selectByDestinationId(sourceId, states, count, cursor)
   }
 
-  def selectPage(count: Int, cursor: Cursor) = {
+  def selectPage(count: Int, cursor: Cursor) = time {
     Stats.transaction.record("Selecting "+count+" edges from "+shard)
-    time(shard.selectByPosition(sourceId, states, count, cursor))
+    shard.selectByPosition(sourceId, states, count, cursor)
   }
 
   override def toString = {

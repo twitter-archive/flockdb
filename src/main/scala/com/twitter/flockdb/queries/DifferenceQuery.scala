@@ -17,43 +17,53 @@
 package com.twitter.flockdb
 package queries
 
-import com.twitter.util.Duration
-import com.twitter.util.TimeConversions._
+import com.twitter.util.{Duration, Future}
 
-
-class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionProportion: Double, intersectionPageSizeMax: Int, intersectionTimeout: Duration) extends ComplexQueryNode(query1, query2) {
+class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionProportion: Double,
+                      intersectionPageSizeMax: Int, intersectionTimeout: Duration)
+    extends ComplexQueryNode(query1, query2) {
   def sizeEstimate = query1.sizeEstimate
 
   def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
 
-  def selectPageByDestinationId(count: Int, cursor: Cursor) = time({
+  def selectPageByDestinationId(count: Int, cursor: Cursor) = time {
     val guessedPageSize = (count + count * averageIntersectionProportion).toInt
     val internalPageSize = guessedPageSize min intersectionPageSizeMax
     val timeout = intersectionTimeout.inMillis
+    val startTime = System.currentTimeMillis
 
-    var resultWindow = pageDifference(internalPageSize, count, cursor)
-    val now = System.currentTimeMillis
-    while (resultWindow.page.size < count &&
-           resultWindow.continueCursor != Cursor.End &&
-           System.currentTimeMillis - now < timeout
-    ) {
-      resultWindow = resultWindow ++ pageDifference(internalPageSize, count, resultWindow.continueCursor)
+    def loop(currCursor: Cursor): Future[ResultWindow[Long]] = {
+      pageDifference(internalPageSize, count, currCursor) flatMap { resultWindow =>
+        if (resultWindow.page.size < count &&
+            resultWindow.continueCursor != Cursor.End &&
+            System.currentTimeMillis - startTime < timeout) {
+          loop(resultWindow.continueCursor) map { resultWindow ++ _ }
+        } else {
+          Future(resultWindow)
+        }
+      }
     }
-    resultWindow
-  })
 
-  def selectWhereIn(page: Seq[Long]) = time({
-    val results = query1.selectWhereIn(page)
-    val rejects = Set(query2.selectWhereIn(results): _*)
-    results.filter { item => !rejects.contains(item) }
-  })
+    loop(cursor)
+  }
+
+  def selectWhereIn(page: Seq[Long]) = time {
+    for {
+      results <- query1.selectWhereIn(page)
+      rejects <- query2.selectWhereIn(results)
+    } yield {
+      val rejectsSet = rejects.toSet
+      results.filterNot { rejects.contains(_) }
+    }
+  }
 
   private def pageDifference(internalPageSize: Int, count: Int, cursor: Cursor) = {
-    val results = query1.selectPageByDestinationId(internalPageSize, cursor)
-    val rejects = query2.selectWhereIn(results.view)
-    results -- rejects
+    for {
+      results <- query1.selectPageByDestinationId(internalPageSize, cursor)
+      rejects <- query2.selectWhereIn(results.view)
+    } yield results -- rejects
   }
 
   override def toString =
-    "<DifferenceQuery query1="+query1.toString+" query2="+query2.toString+duration.map(" time="+_.inMillis).mkString+">"
+    "<DifferenceQuery query1="+ query1.toString +" query2="+ query2.toString + duration.map(" time="+ _.inMillis).mkString +">"
 }

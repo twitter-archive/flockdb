@@ -17,11 +17,7 @@
 package com.twitter.flockdb
 package unit
 
-import scala.collection.mutable
-import com.twitter.gizzard.thrift.conversions.Sequences._
 import org.specs.mock.JMocker
-import conversions.Results._
-import thrift.Results
 
 class UnionQuerySpec extends ConfiguredSpecification with JMocker {
   "UnionQuery" should {
@@ -30,17 +26,17 @@ class UnionQuerySpec extends ConfiguredSpecification with JMocker {
 
     "sizeEstimate" in {
       val unionQuery = new queries.UnionQuery(query1, query2)
-      unionQuery.sizeEstimate mustEqual 10
+      unionQuery.sizeEstimate()() mustEqual 10
     }
 
     "selectWhereIn" in {
       val unionQuery = new queries.UnionQuery(query1, query2)
-      unionQuery.selectWhereIn(List[Long](1, 2, 3, 12)).toList mustEqual List[Long](1, 2, 3)
+      unionQuery.selectWhereIn(List(1, 2, 3, 12))().toList mustEqual List(1, 2, 3)
     }
 
     "selectPage" in {
       val unionQuery = new queries.UnionQuery(query1, query2)
-      unionQuery.selectPage(10, Cursor(9)).toThrift mustEqual new Results(List[Long](8,7,6,5,4,3,2,1).pack, Cursor.End.position, -8)
+      unionQuery.selectPage(10, Cursor(9))().toTuple mustEqual (List(8,7,6,5,4,3,2,1), Cursor.End, Cursor(-8))
     }
   }
 }

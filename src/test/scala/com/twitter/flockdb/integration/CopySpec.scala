@@ -50,87 +50,86 @@ class CopySpec extends IntegrationSpecification {
     doBefore {
       val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
 
-      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_edges")
-      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_metadata")
-      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_edges")
-      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_metadata")
-      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_edges")
-      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_metadata")
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_edges")()
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_metadata")()
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_edges")()
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_metadata")()
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_edges")()
+      queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_metadata")()
       flock.nameServer.reload()
       flock.shardManager.createAndMaterializeShard(sourceShardInfo)
       flock.shardManager.createAndMaterializeShard(destinationShardInfo)
       flock.shardManager.createAndMaterializeShard(shard3Info)
       flock.shardManager.setForwarding(new Forwarding(0, Long.MinValue, sourceShardInfo.id))
-      
+
     }
 
     doAfter {
        val queryEvaluator = config.edgesQueryEvaluator()(config.databaseConnection)
-       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_edges")
-       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_metadata")
-       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_edges")
-       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_metadata")
-       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_edges")
-       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_metadata")
+       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_edges")()
+       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test1_metadata")()
+       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_edges")()
+       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test2_metadata")()
+       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_edges")()
+       queryEvaluator.execute("DROP TABLE IF EXISTS copy_test3_metadata")()
     }
 
 
     def writeEdges(shard: RoutingNode[Shard], num: Int, start: Int, step: Int, outdated: Boolean, state: State = State.Normal) {
-      val edges = mutable.ArrayBuffer[Edge]()
-      (start to num by step).foreach { id => 
-        edges += Edge(1L, id.toLong, id.toLong, (if (outdated) time-1.seconds else time), 0, state)
+      val edges = for (id <- start to num by step) yield {
+        Edge(1L, id.toLong, id.toLong, (if (outdated) time-1.seconds else time), 0, state)
       }
 
-      shard.writeOperation(_.writeCopies(edges))
+      shard.write.foreach { _.writeCopies(edges)() }
     }
 
     def getEdges(shard: RoutingNode[Shard], num: Int) {
-      shard.readOperation(_.count(1L, Seq(State.Normal))) must eventually(100, new SpecsDuration(60000))(be_==(num))
+      shard.read.any { _.count(1L, Seq(State.Normal))() } mustEqual num
     }
 
     def validateEdges(shards: Seq[RoutingNode[Shard]], num: Int) {
-      shards.foreach { getEdges(_, num) }
-      val shardsEdges = shards map { _.readOperation(_.selectAll((Cursor.Start, Cursor.Start), 2*num))._1}
-      shardsEdges.foreach { 
-        _.length must eventually(be_==(num)) }
-      (0 until num).foreach { idx => 
-        shardsEdges.foldLeft(shardsEdges(0)) { case (lastEdges, edges) => 
-          lastEdges(idx) must be_==(edges(idx))
-          edges(idx).updatedAt.inSeconds must be_==(time.inSeconds)
-          edges
+      playScheduledJobs()
+
+      val shardsEdges = shards map { _.read.any { _.selectAll((Cursor.Start, Cursor.Start), 2*num)()._1 } }
+      shardsEdges.foreach { _.length mustEqual num }
+
+      for (idx <- 0 until num) {
+        val head :: others = shardsEdges
+
+        others foreach { edges =>
+          head zip edges foreach { case (a, b) =>
+            a mustEqual b
+            b.updatedAt.inSeconds mustEqual time.inSeconds
+          }
         }
       }
     }
 
     "do nothing on equivalent shards" in {
-      val numData = 20000
+      val numData = 100
       val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
       val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
       writeEdges(shard1, numData, 1, 1, false)
       writeEdges(shard2, numData, 1, 1, false)
-      
+
       flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
 
       validateEdges(Seq(shard1, shard2), numData)
-
     }
 
     "copy" in {
-      val numData = 20000
-      val sourceShard = flock.nameServer.findShardById[Shard](sourceShardId)
-      val destinationShard = flock.nameServer.findShardById[Shard](destinationShardId)
-      writeEdges(sourceShard, numData, 1, 1, false)
-      getEdges(sourceShard, numData)
-      getEdges(destinationShard, 0)
+      val numData = 100
+      val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
+      val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
+      writeEdges(shard1, numData, 1, 1, false)
 
       flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id))
 
-      getEdges(destinationShard, numData)
-
+      validateEdges(Seq(shard1, shard2), numData)
     }
 
     "repair by merging" in {
-      val numData = 20000
+      val numData = 100
       val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
       val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
       writeEdges(shard1, numData, 1, 2, false)
@@ -141,14 +140,12 @@ class CopySpec extends IntegrationSpecification {
       validateEdges(Seq(shard1, shard2), numData)
     }
 
-
     "repair and fill out of date" in {
-      val numData = 50000
-      
+      val numData = 100
+
       val shard1 = flock.nameServer.findShardById[Shard](sourceShardId)
       val shard2 = flock.nameServer.findShardById[Shard](destinationShardId)
       val shard3 = flock.nameServer.findShardById[Shard](shard3Id)
-
 
       writeEdges(shard1, numData, 1, 2, false)
       writeEdges(shard2, numData/2, 2, 2, false)
@@ -156,18 +153,12 @@ class CopySpec extends IntegrationSpecification {
       writeEdges(shard2, numData, numData/2, 1, false)
       writeEdges(shard3, numData, 1, 3, true, State.Archived)
 
-      shard1.writeOperation(_.writeMetadata(Metadata(1L, State.Normal, time)))
-      shard2.writeOperation(_.writeMetadata(Metadata(1L, State.Normal, time)))
-      shard3.writeOperation(_.writeMetadata(Metadata(1L, State.Archived, (time - 1.seconds)) ))
-
-      
+      shard1.write.foreach { _.writeMetadata(Metadata(1L, State.Normal, time))() }
+      shard2.write.foreach { _.writeMetadata(Metadata(1L, State.Normal, time))() }
+      shard3.write.foreach { _.writeMetadata(Metadata(1L, State.Archived, (time - 1.seconds)) )() }
 
       flock.managerServer.copy_shard(Seq(sourceShardInfo.toThrift.id, destinationShardInfo.toThrift.id, shard3Info.toThrift.id))
       validateEdges(Seq(shard1, shard2, shard3), numData)
-
     }
-
-
   }
-  
 }

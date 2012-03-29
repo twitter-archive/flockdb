@@ -19,11 +19,12 @@ package queries
 
 import scala.util.Sorting
 import com.twitter.gizzard.thrift.conversions.Sequences._
+import com.twitter.util.Future
 
 class SeqQuery(s: Seq[Long]) extends SimpleQueryNode {
   val seq = sort(s)
-  def sizeEstimate = seq.size
-  def selectWhereIn(i: Seq[Long]) = sort(seq.toList intersect i.toList).toList
+  def sizeEstimate = Future(seq.size)
+  def selectWhereIn(i: Seq[Long]) = Future(sort(seq.toList intersect i.toList).toList)
   protected def selectPage(count: Int, cursor: Cursor) = selectPageByDestinationId(count, cursor)
   def selectPageByDestinationId(count: Int, cursor: Cursor) = {
     val filtered: Seq[Long] = cursor match {
@@ -32,7 +33,7 @@ class SeqQuery(s: Seq[Long]) extends SimpleQueryNode {
       case _ => seq.filter(_ <= cursor.position)
     }
 
-    new ResultWindow(Cursor.cursorZip(filtered), count, cursor)
+    Future(new ResultWindow(Cursor.cursorZip(filtered), count, cursor))
   }
 
   private def sort(s: Seq[Long]) = Sorting.stableSort(s, (x: Long, y: Long) => y < x)

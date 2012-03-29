@@ -10,7 +10,7 @@ import com.twitter.conversions.storage._
 import com.twitter.flockdb.shards.QueryClass
 import com.twitter.flockdb.{MemoizedQueryEvaluators, Priority}
 import com.twitter.ostrich.admin.config.AdminServiceConfig
-import com.twitter.logging.Level
+import com.twitter.logging.{Level, Logger}
 import com.twitter.logging.config.{FileHandlerConfig, LoggerConfig}
 
 
@@ -22,49 +22,43 @@ trait Credentials extends Connection {
   urlOptions = Map("connectTimeout" -> "0")
 }
 
-class TestQueryEvaluator(label: String) extends QueryEvaluator {
-//  query.debug = DebugLog
+class TestQueryEvaluator(label: String) extends AsyncQueryEvaluator {
+  query.debug = { s => Logger.get("query").debug(s) }
+  override var workPoolSize = 2
+  singletonFactory = true
   database.memoize = true
-  database.pool = new ApachePoolingDatabase {
-    sizeMin = 8
-    sizeMax = 8
-//    maxWait = 0.seconds
-    minEvictableIdle = 60.seconds
-    testIdle = 1.second
-    testOnBorrow = false
+  database.pool = new ThrottledPoolingDatabase {
+    size = workPoolSize
+    openTimeout = 5.seconds
   }
 
   query.timeouts = Map(
-    QueryClass.Select       -> QueryTimeout(100.millis),
+    QueryClass.Select       -> QueryTimeout(5.seconds),
     QueryClass.SelectModify -> QueryTimeout(5.seconds),
     QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
     QueryClass.Execute      -> QueryTimeout(5.seconds),
-    QueryClass.SelectSingle -> QueryTimeout(100.millis),
-    QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
-    QueryClass.SelectIntersectionSmall    -> QueryTimeout(100.millis),
-    QueryClass.SelectMetadata             -> QueryTimeout(100.millis)
+    QueryClass.SelectSingle -> QueryTimeout(5.seconds),
+    QueryClass.SelectIntersection         -> QueryTimeout(5.seconds),
+    QueryClass.SelectIntersectionSmall    -> QueryTimeout(5.seconds),
+    QueryClass.SelectMetadata             -> QueryTimeout(5.seconds)
   )
+}
 
-  override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {
-    try {
-      MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats, dbStatsFactory, queryStatsFactory) } )
-    } catch { case e: Throwable => e.printStackTrace(); throw e }
+class NameserverQueryEvaluator extends QueryEvaluator {
+  singletonFactory = true
+  database.memoize = true
+  database.pool = new ThrottledPoolingDatabase {
+    size = 1
+    openTimeout = 5.seconds
   }
 }
 
 new FlockDB {
-  val server = new FlockDBServer with THsHaServer {
-    timeout = 100.millis
-    idleTimeout = 60.seconds
-    threadPool.minThreads = 250
-    threadPool.maxThreads = 250
-  }
-
   mappingFunction = Identity
   jobRelay        = NoJobRelay
 
   nameServerReplicas = Seq(new Mysql {
-    queryEvaluator  = new TestQueryEvaluator("nameserver")
+    queryEvaluator  = new NameserverQueryEvaluator
 
     val connection = new Connection with Credentials {
       val hostnames = Seq("localhost")
@@ -75,15 +69,6 @@ new FlockDB {
   jobInjector.timeout               = 100.milliseconds
   jobInjector.idleTimeout           = 60.seconds
   jobInjector.threadPool.minThreads = 30
-
-
-  val readFuture = new Future {
-    poolSize = 100
-    maxPoolSize = 100
-    keepAlive = 5.seconds
-    timeout = 500.millis
-  }
-
 
   // Database Connectivity
 
@@ -113,7 +98,6 @@ new FlockDB {
     errorStrobeInterval = 30.seconds
     perFlushItemLimit = 1000
     jitterRate = 0.0f
-    badJobQueue = new JsonJobLogger { name = "bad_jobs" }
   }
 
   val jobQueues = Map(

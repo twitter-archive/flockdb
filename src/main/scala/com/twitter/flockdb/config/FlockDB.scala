@@ -2,13 +2,13 @@ package com.twitter.flockdb.config
 
 import com.twitter.gizzard.config._
 import com.twitter.ostrich.admin.config.AdminServiceConfig
-import com.twitter.querulous.config.{Connection, QueryEvaluator}
+import com.twitter.querulous.config.{Connection, AsyncQueryEvaluator}
 import com.twitter.util.TimeConversions._
 import com.twitter.flockdb.queries.QueryTree
 import com.twitter.flockdb.queries
 import java.net.InetSocketAddress
 
-trait FlockDBServer extends TServer {
+class FlockDBServer {
   var name = "flockdb_edges"
   var port = 7915
 }
@@ -23,18 +23,16 @@ trait IntersectionQuery {
 }
 
 trait FlockDB extends GizzardServer {
-  def server: FlockDBServer
+  var server = new FlockDBServer
 
   var intersectionQuery: IntersectionQuery = new IntersectionQuery { }
   var aggregateJobsPageSize         = 500
 
   def databaseConnection: Connection
 
-  def edgesQueryEvaluator: QueryEvaluator
-  def lowLatencyQueryEvaluator: QueryEvaluator
-  def materializingQueryEvaluator: QueryEvaluator
-
-  def readFuture: Future
+  def edgesQueryEvaluator: AsyncQueryEvaluator
+  def lowLatencyQueryEvaluator: AsyncQueryEvaluator
+  def materializingQueryEvaluator: AsyncQueryEvaluator
 
   def adminConfig: AdminServiceConfig
 
