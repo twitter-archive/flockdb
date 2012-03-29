@@ -33,16 +33,6 @@ import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service {
   val FILTER_SET_ZK_PATH = "/filters"
 
-  object FlockExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.FlockDB.Iface]({ (flock, e) =>
-    e match {
-      case _: thrift.FlockException =>
-        throw e
-      case _ =>
-        exceptionLog.error(e, "Error in FlockDB.")
-        throw new thrift.FlockException(e.toString)
-    }
-  })
-
   val stats = new StatsCollector {
     def incr(name: String, count: Int) = Stats.incr(name, count)
     def time[A](name: String)(f: => A): A = {
