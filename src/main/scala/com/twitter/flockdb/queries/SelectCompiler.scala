@@ -19,7 +19,6 @@ package queries
 
 import scala.collection.mutable
 import com.twitter.gizzard.Stats
-import com.twitter.gizzard.util.Future
 import operations.{SelectOperation, SelectOperationType}
 import thrift.FlockException
 
@@ -84,7 +83,7 @@ class SelectCompiler(forwardingManager: ForwardingManager, intersectionConfig: c
       "select-complex-"+complexity
     } else {
       "select" + (rv match {
-        case query: WhereInQuery => if (query.sizeEstimate() == 1) "-single" else "-simple"
+        case query: WhereInQuery => if (program.head.term.get.destinationIds.get.size == 1) "-single" else "-simple"
         case query: SimpleQuery  => if (program.head.term.get.states.size > 1) "-multistate" else ""
       })
     }
