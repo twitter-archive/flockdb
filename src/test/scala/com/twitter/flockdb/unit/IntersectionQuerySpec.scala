@@ -24,11 +24,10 @@ object IntersectionQuerySpec extends ConfiguredSpecification with JMocker {
     val query1 = new queries.SeqQuery(List(1,2,3,4,5,6,7,8,9,10))
     val query2 = new queries.SeqQuery(List(1,2,3,4,11))
     val queryConfig = config.intersectionQuery
-    queryConfig.averageIntersectionProportion = 1.0
 
     "sizeEstimate" in {
       val intersectionQuery = queryConfig.intersect(query1, query2)
-      intersectionQuery.sizeEstimate()() mustEqual 5
+      intersectionQuery.sizeEstimate()() mustEqual (5 * queryConfig.averageIntersectionProportion).toInt
     }
 
     "selectWhereIn" in {

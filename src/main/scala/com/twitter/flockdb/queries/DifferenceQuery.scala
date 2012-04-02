@@ -61,7 +61,7 @@ class DifferenceQuery(query1: QueryTree, query2: QueryTree, averageIntersectionP
     for {
       results <- query1.selectPageByDestinationId(internalPageSize, cursor)
       rejects <- query2.selectWhereIn(results.view)
-    } yield results -- rejects
+    } yield results.diff(rejects, count)
   }
 
   override def toString =
