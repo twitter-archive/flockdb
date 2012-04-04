@@ -98,6 +98,7 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
     new FlockDBThriftServer(
       config.server.name,
       config.server.port,
+      config.server.maxConcurrentRequests,
       loggingFlockThriftIface
     )
   }
@@ -123,8 +124,11 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
 class FlockDBThriftServer(
   val serverName: String,
   val thriftPort: Int,
+  val maxConcurrentRequests: Int,
   val ifaceImpl: thrift.FlockDB.FutureIface)
 extends thrift.FlockDB.ThriftServer {
+  override def serverBuilder = super.serverBuilder.maxConcurrentRequests(maxConcurrentRequests)
+
   def contains(`sourceId`: Long, `graphId`: Int, `destinationId`: Long) = {
     ifaceImpl.contains(sourceId, graphId, destinationId)
   }

@@ -11,6 +11,7 @@ import com.twitter.flockdb.queries
 class FlockDBServer {
   var name = "flockdb_edges"
   var port = 7915
+  var maxConcurrentRequests = 10000
 }
 
 trait IntersectionQuery {
