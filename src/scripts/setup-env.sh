@@ -60,12 +60,12 @@ echo "Creating shards..."
 i=1
 while [ $i -le 15 ]; do
   /bin/echo -n "$i "
-  exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_edges"
-  exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_metadata"
-  exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_edges"
-  exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_metadata"
-  forward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "com.twitter.flockdb.SqlShard" "localhost/forward_${i}")
-  backward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "com.twitter.flockdb.SqlShard" "localhost/backward_${i}")
+  exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_0000_edges"
+  exec_sql "DROP TABLE IF EXISTS edges_development.forward_${i}_0000_metadata"
+  exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_0000_edges"
+  exec_sql "DROP TABLE IF EXISTS edges_development.backward_${i}_0000_metadata"
+  forward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "com.twitter.flockdb.SqlShard" "localhost/forward_${i}_0000")
+  backward_shard=$($gizzmo create -s "INT UNSIGNED" -d "INT UNSIGNED" "com.twitter.flockdb.SqlShard" "localhost/backward_${i}_0000")
   $gizzmo addforwarding -- $i 0 $forward_shard
   $gizzmo addforwarding -- -$i 0 $backward_shard
   i=$((i + 1))
