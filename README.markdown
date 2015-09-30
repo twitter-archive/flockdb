@@ -5,7 +5,7 @@ FlockDB is a distributed graph database for storing adjancency lists, with
 goals of supporting:
 
 - a high rate of add/update/remove operations
-- potientially complex set arithmetic queries
+- potentially complex set arithmetic queries
 - paging through query result sets containing millions of entries
 - ability to "archive" and later restore archived edges
 - horizontal scaling including replication
