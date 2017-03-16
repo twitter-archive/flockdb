@@ -4,7 +4,7 @@ Twitter is no longer maintaining this project or responding to issues or PRs.
 
 # FlockDB
 
-FlockDB is a distributed graph database for storing adjancency lists, with
+FlockDB is a distributed graph database for storing adjacency lists, with
 goals of supporting:
 
 - a high rate of add/update/remove operations
