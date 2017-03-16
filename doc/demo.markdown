@@ -7,7 +7,7 @@ via the ruby client. To play along, you need:
 - sbt 0.7.4
 - ruby 1.8
 - mysql 5.0
-- [gizzmo](http://github.com/twitter/gizzmo)
+- [gizzmo 0.13.1](http://github.com/twitter/gizzmo)
 
 Newer versions should work for all of the above. Make sure to put the gizzmo binary on your path.
 
