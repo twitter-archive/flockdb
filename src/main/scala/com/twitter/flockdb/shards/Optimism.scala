@@ -118,6 +118,7 @@ object LockingNodeSet {
   implicit def asLockingNodeSet(n: NodeSet[Shard]) = new LockingNodeSet(n)
 }
 
+// TODO: metadataForWrite does not lock the metadata?
 class LockingNodeSet(node: NodeSet[Shard]) extends OptimisticStateMonitor {
   def getMetadatas(id: Long) = node.all { _.getMetadataForWrite(id)() }
 }

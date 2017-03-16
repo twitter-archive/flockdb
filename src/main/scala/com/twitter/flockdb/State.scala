@@ -16,7 +16,7 @@
 
 package com.twitter.flockdb
 
-abstract class State(val id: Int, val name: String, val ordinal: Int) extends Ordered[State] {
+sealed abstract class State(val id: Int, val name: String, val ordinal: Int) extends Ordered[State] {
   def max(other: State) = if (this > other) this else other
   def compare(s: State) = ordinal.compare(s.ordinal)
 }
