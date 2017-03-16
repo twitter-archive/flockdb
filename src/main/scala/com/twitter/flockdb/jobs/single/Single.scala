@@ -18,10 +18,12 @@ package com.twitter.flockdb.jobs.single
 
 import com.twitter.logging.Logger
 import com.twitter.util.{Time, Return, Throw}
+import com.twitter.gizzard.config
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards._
+import com.twitter.gizzard.Stats
 import com.twitter.conversions.time._
-import com.twitter.flockdb.{State, ForwardingManager, Cursor, UuidGenerator, Direction}
+import com.twitter.flockdb.{State, ForwardingManager, Cursor, UuidGenerator, Direction, JobFilter}
 import com.twitter.flockdb.conversions.Numeric._
 import com.twitter.flockdb.shards.Shard
 import com.twitter.flockdb.shards.LockingNodeSet._
@@ -30,7 +32,8 @@ import com.twitter.flockdb.shards.LockingNodeSet._
 // TODO: Make this async.
 class SingleJobParser(
   forwardingManager: ForwardingManager,
-  uuidGenerator: UuidGenerator)
+  uuidGenerator: UuidGenerator,
+  jobFilter: JobFilter)
 extends JsonJobParser {
 
   def log = Logger.get
@@ -58,9 +61,16 @@ extends JsonJobParser {
       Time.fromSeconds(casted("updated_at").toInt),
       forwardingManager,
       uuidGenerator,
+      jobFilter,
       writeSuccesses.toList
     )
   }
+}
+
+// TODO: move the filteredJobsQueue into a field in the gizzard JobScheduler.
+object Single {
+  val filteredJobsLogger = new config.JsonJobLogger{ name = "filtered_jobs" }
+  val filteredJobsQueue: JobConsumer = filteredJobsLogger()
 }
 
 class Single(
@@ -72,6 +82,7 @@ class Single(
   updatedAt: Time,
   forwardingManager: ForwardingManager,
   uuidGenerator: UuidGenerator,
+  jobFilter: JobFilter,
   var successes: List[ShardId] = Nil)
 extends JsonJob {
 
@@ -92,7 +103,12 @@ extends JsonJob {
     }
   }
 
-  def apply() = {
+  def apply() : Unit = {
+    if (!jobFilter(sourceId, graphId, destinationId)) {
+      Stats.incr("single-jobs-filtered")
+      Single.filteredJobsQueue.put(this)
+      return
+    }
     val forward  = forwardingManager.findNode(sourceId, graphId, Direction.Forward).write
     val backward = forwardingManager.findNode(destinationId, graphId, Direction.Backward).write
     val uuid     = uuidGenerator(position)

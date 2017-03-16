@@ -52,7 +52,8 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: 
     tableId: Int,
     forwardingManager: ForwardingManager,
     scheduler: PrioritizingJobScheduler,
-    priority: Int
+    priority: Int,
+    jobFilter: JobFilter
   ) = {
     val job = new Multi(
       sourceId,
@@ -63,7 +64,8 @@ case class Metadata(sourceId: Long, state: State, count: Int, updatedAtSeconds: 
       Priority.Medium,
       500,
       forwardingManager,
-      scheduler
+      scheduler,
+      jobFilter
     )
 
     scheduler.put(priority, job)

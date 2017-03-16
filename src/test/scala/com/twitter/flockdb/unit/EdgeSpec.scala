@@ -33,7 +33,7 @@ object EdgeSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
   "Edge" should {
     "becomes correct job" in {
       val edge = new Edge(source, dest, pos, now, count, State.Normal)
-      edge.toJob(graph, forwardingManager) mustEqual new Single(source, graph, dest, pos, State.Normal, now, forwardingManager, OrderedUuidGenerator)
+      edge.toJob(graph, forwardingManager, NoOpFilter) mustEqual new Single(source, graph, dest, pos, State.Normal, now, forwardingManager, OrderedUuidGenerator, NoOpFilter)
     }
   }
 }

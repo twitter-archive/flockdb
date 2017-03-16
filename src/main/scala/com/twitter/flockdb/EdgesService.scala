@@ -29,6 +29,7 @@ import com.twitter.util.Future
 class EdgesService(
   forwardingManager: ForwardingManager,
   schedule: PrioritizingJobScheduler,
+  jobFilter: JobFilter,
   intersectionQueryConfig: config.IntersectionQuery,
   aggregateJobsPageSize: Int) {
 
@@ -37,7 +38,7 @@ class EdgesService(
   private val log = Logger.get(getClass.getName)
   private val exceptionLog = Logger.get("exception")
   private val selectCompiler = new SelectCompiler(forwardingManager, intersectionQueryConfig)
-  private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, aggregateJobsPageSize)
+  private var executeCompiler = new ExecuteCompiler(schedule, forwardingManager, jobFilter, aggregateJobsPageSize)
 
   def containsMetadata(sourceId: Long, graphId: Int): Future[Boolean] = {
     wrapRPC("contains_metadata") {

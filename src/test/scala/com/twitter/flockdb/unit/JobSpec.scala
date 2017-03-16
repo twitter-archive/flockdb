@@ -59,7 +59,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   ) = {
     desc in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, 1, jobState, Time.now, forwardingManager, uuidGenerator)
+        val job = new Single(bob, FOLLOWS, mary, 1, jobState, Time.now, forwardingManager, uuidGenerator, NoOpFilter)
 
         expect {
           allowing(forwardingManager).findNode(bob, FOLLOWS, Forward) willReturn shards(0)
@@ -98,7 +98,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "Single" should {
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator)
+        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator, NoOpFilter)
         val json = job.toJson
         json mustMatch "Single"
         json mustMatch "\"source_id\":" + bob
@@ -111,7 +111,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
 
     "toJson with successes" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator, List(ShardId("host", "prefix")))
+        val job = new Single(bob, FOLLOWS, mary, 1, State.Normal, Time.now, forwardingManager, uuidGenerator, NoOpFilter, List(ShardId("host", "prefix")))
         val json = job.toJson
         json mustMatch "Single"
         json mustMatch "\"source_id\":" + bob
@@ -150,7 +150,7 @@ class JobSpec extends ConfiguredSpecification with JMocker with ClassMocker {
   "Multi" should {
     "toJson" in {
       Time.withCurrentTimeFrozen { time =>
-        val job = new Multi(bob, FOLLOWS, Direction.Forward, State.Normal, Time.now, Priority.Low, 500, null, null)
+        val job = new Multi(bob, FOLLOWS, Direction.Forward, State.Normal, Time.now, Priority.Low, 500, null, null, NoOpFilter)
         val json = job.toJson
         json mustMatch "Multi"
         json mustMatch "\"source_id\":" + bob

@@ -26,6 +26,7 @@ object Main {
       val service = new FlockDB(config)
 
       ServiceTracker.register(service)
+      log.info("Starting Flock service")
       service.start()
 
     } catch {

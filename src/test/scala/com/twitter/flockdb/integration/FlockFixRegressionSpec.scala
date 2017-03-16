@@ -58,7 +58,7 @@ class FlockFixRegressionSpec extends IntegrationSpecification {
 
       Thread.sleep(1000)
 
-      val job = new Multi(alice, FOLLOWS, Direction.Forward, State.Normal, Time.now, Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler)
+      val job = new Multi(alice, FOLLOWS, Direction.Forward, State.Normal, Time.now, Priority.High, pageSize, flock.forwardingManager, flock.jobScheduler, NoOpFilter)
       job()
 
       alicesFollowings().size must eventually(be(10))

@@ -20,7 +20,7 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-import com.twitter.flockdb.{State, ForwardingManager, Cursor, Priority, Direction}
+import com.twitter.flockdb.{State, ForwardingManager, Cursor, Priority, Direction, JobFilter}
 import com.twitter.flockdb.conversions.Numeric._
 import com.twitter.flockdb.shards.Shard
 import com.twitter.flockdb.jobs.single.Single
@@ -29,7 +29,8 @@ import com.twitter.flockdb.jobs.single.Single
 class MultiJobParser(
   forwardingManager: ForwardingManager,
   scheduler: PrioritizingJobScheduler,
-  aggregateJobPageSize: Int)
+  aggregateJobPageSize: Int,
+  jobFilter: JobFilter)
 extends JsonJobParser {
 
   def apply(attributes: Map[String, Any]): JsonJob = {
@@ -45,7 +46,8 @@ extends JsonJobParser {
       aggregateJobPageSize,
       casted.get("cursor").map( c => Cursor(c.toLong)).getOrElse(Cursor.Start),
       forwardingManager,
-      scheduler
+      scheduler,
+      jobFilter
     )
   }
 }
@@ -60,7 +62,8 @@ class Multi(
   aggregateJobPageSize: Int,
   var cursor: Cursor,
   forwardingManager: ForwardingManager,
-  scheduler: PrioritizingJobScheduler)
+  scheduler: PrioritizingJobScheduler,
+  jobFilter: JobFilter)
 extends JsonJob {
 
   def this(
@@ -72,7 +75,8 @@ extends JsonJob {
     priority: Priority.Value,
     aggregateJobPageSize: Int,
     forwardingManager: ForwardingManager,
-    scheduler: PrioritizingJobScheduler
+    scheduler: PrioritizingJobScheduler,
+    jobFilter: JobFilter
   ) = {
     this(
       sourceId,
@@ -84,7 +88,8 @@ extends JsonJob {
       aggregateJobPageSize,
       Cursor.Start,
       forwardingManager,
-      scheduler
+      scheduler,
+      jobFilter
     )
   }
 
@@ -126,7 +131,7 @@ extends JsonJob {
 
   // XXX: since this job gets immediately serialized, pass null for forwardingManager and uuidGenerator.
   protected def singleEdgeJob(sourceId: Long, graphId: Int, destinationId: Long, state: State) = {
-    new Single(sourceId, graphId, destinationId, updatedAt.inMillis, state, updatedAt, null, null)
+    new Single(sourceId, graphId, destinationId, updatedAt.inMillis, state, updatedAt, null, null, jobFilter)
   }
 
   protected def updateMetadata(shard: Shard, state: State) = state match {

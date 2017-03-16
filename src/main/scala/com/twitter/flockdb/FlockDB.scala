@@ -16,6 +16,9 @@
 
 package com.twitter.flockdb
 
+import com.twitter.common.net.InetSocketAddressHelper
+import com.twitter.common.quantity.Amount
+import com.twitter.common.zookeeper.{ZooKeeperClient, ZooKeeperUtils}
 import com.twitter.util.Future
 import com.twitter.util.Duration
 import com.twitter.ostrich.admin.Service
@@ -28,6 +31,8 @@ import com.twitter.flockdb.config.{FlockDB => FlockDBConfig}
 
 
 class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service {
+  val FILTER_SET_ZK_PATH = "/filters"
+
   val stats = new StatsCollector {
     def incr(name: String, count: Int) = Stats.incr(name, count)
     def time[A](name: String)(f: => A): A = {
@@ -36,6 +41,27 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
       rv
     }
     override def addGauge(name: String)(gauge: => Double) { Stats.addGauge(name)(gauge) }
+  }
+
+  val zkClientAndBasePath: Option[(ZooKeeperClient, String)] =
+    config.zooKeeperSettings.map {
+      zkConfig => {
+        log.info("Using ZooKeeper server " + zkConfig.server)
+        val zkServer = InetSocketAddressHelper.parse(zkConfig.server)
+        val zkClient = new ZooKeeperClient(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT, zkServer)
+        (zkClient, zkConfig.basePath)
+      }
+    }
+
+  val jobFilter: JobFilter = {
+    zkClientAndBasePath match {
+      case Some((zkClient, zkBasePath)) => {
+        val filterPath = zkBasePath + FILTER_SET_ZK_PATH
+        log.info("Using ZooKeeperSetFilter with path " + filterPath)
+        new ZooKeeperSetFilter(zkClient, filterPath)
+      }
+      case None => NoOpFilter
+    }
   }
 
   val jobPriorities = List(Priority.Low, Priority.Medium, Priority.High).map(_.id)
@@ -66,8 +92,8 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
 
   val forwardingManager = new ForwardingManager(nameServer.multiTableForwarder[Shard])
 
-  jobCodec += ("single.Single".r, new jobs.single.SingleJobParser(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("multi.Multi".r,   new jobs.multi.MultiJobParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("single.Single".r, new jobs.single.SingleJobParser(forwardingManager, OrderedUuidGenerator, jobFilter))
+  jobCodec += ("multi.Multi".r,   new jobs.multi.MultiJobParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize, jobFilter))
 
   jobCodec += ("jobs\\.(Copy|Migrate)".r,                 new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
   jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
@@ -75,18 +101,19 @@ class FlockDB(config: FlockDBConfig) extends GizzardServer(config) with Service 
   // XXX: remove when old tagged jobs no longer exist.
   import jobs.LegacySingleJobParser
   import jobs.LegacyMultiJobParser
-  jobCodec += ("single.Add".r,      LegacySingleJobParser.Add(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("single.Remove".r,   LegacySingleJobParser.Remove(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("single.Archive".r,  LegacySingleJobParser.Archive(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("single.Negate".r,   LegacySingleJobParser.Negate(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("multi.Archive".r,   LegacyMultiJobParser.Archive(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
-  jobCodec += ("multi.Unarchive".r, LegacyMultiJobParser.Unarchive(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
-  jobCodec += ("multi.RemoveAll".r, LegacyMultiJobParser.RemoveAll(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
-  jobCodec += ("multi.Negate".r,    LegacyMultiJobParser.Negate(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("single.Add".r,      LegacySingleJobParser.Add(forwardingManager, OrderedUuidGenerator, jobFilter))
+  jobCodec += ("single.Remove".r,   LegacySingleJobParser.Remove(forwardingManager, OrderedUuidGenerator, jobFilter))
+  jobCodec += ("single.Archive".r,  LegacySingleJobParser.Archive(forwardingManager, OrderedUuidGenerator, jobFilter))
+  jobCodec += ("single.Negate".r,   LegacySingleJobParser.Negate(forwardingManager, OrderedUuidGenerator, jobFilter))
+  jobCodec += ("multi.Archive".r,   LegacyMultiJobParser.Archive(forwardingManager, jobScheduler, jobFilter, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Unarchive".r, LegacyMultiJobParser.Unarchive(forwardingManager, jobScheduler, jobFilter, config.aggregateJobsPageSize))
+  jobCodec += ("multi.RemoveAll".r, LegacyMultiJobParser.RemoveAll(forwardingManager, jobScheduler, jobFilter, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Negate".r,    LegacyMultiJobParser.Negate(forwardingManager, jobScheduler, jobFilter, config.aggregateJobsPageSize))
 
   val flockService = new EdgesService(
     forwardingManager,
     jobScheduler,
+    jobFilter,
     config.intersectionQuery,
     config.aggregateJobsPageSize
   )
